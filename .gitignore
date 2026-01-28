@@ -41,3 +41,7 @@ yarn-error.*
 /ios
 /android
 *.p8
+
+# Firebase
+GoogleService-Info.plist
+google-services.json

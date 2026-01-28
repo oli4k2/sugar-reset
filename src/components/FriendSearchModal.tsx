@@ -1,7 +1,7 @@
 /**
  * FriendSearchModal
- * 
- * Modal for searching and adding friends by username.
+ *
+ * Modal for searching and adding friends by name or email.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -70,7 +70,7 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                 undefined, // username - will be fetched from profile
                 toUser.id
             );
-            Alert.alert('Success', `Friend request sent to ${toUser.displayName || toUser.username}!`);
+            Alert.alert('Success', `Friend request sent to ${toUser.displayName || toUser.email}!`);
             onRequestSent?.();
 
             // Remove from results to prevent duplicate sends
@@ -100,15 +100,15 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
             <View style={styles.userRow}>
                 <View style={[styles.avatar, { backgroundColor: looviColors.accent.primary }]}>
                     <Text style={styles.avatarText}>
-                        {(item.displayName || item.username || item.email)?.[0]?.toUpperCase() || '?'}
+                        {(item.displayName || item.email)?.[0]?.toUpperCase() || '?'}
                     </Text>
                 </View>
                 <View style={styles.userInfo}>
                     <Text style={styles.userName}>
-                        {item.displayName || item.username || 'Anonymous'}
+                        {item.displayName || 'Anonymous'}
                     </Text>
-                    {item.username && (
-                        <Text style={styles.userUsername}>@{item.username}</Text>
+                    {item.email && (
+                        <Text style={styles.userEmail}>{item.email}</Text>
                     )}
                 </View>
                 <TouchableOpacity
@@ -151,7 +151,7 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                         <Ionicons name="search" size={20} color={looviColors.text.muted} />
                         <TextInput
                             style={styles.searchInput}
-                            placeholder="Search by username..."
+                            placeholder="Search by name or email..."
                             placeholderTextColor={looviColors.text.muted}
                             value={searchQuery}
                             onChangeText={setSearchQuery}
@@ -183,7 +183,15 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                     {/* Results */}
                     <View style={styles.resultsContainer}>
                         {searchResults.length === 0 && !isSearching && searchQuery.length >= 2 && (
-                            <Text style={styles.noResults}>No users found</Text>
+                            <View style={styles.noResultsContainer}>
+                                <Text style={styles.noResults}>No users found for "{searchQuery}"</Text>
+                                <Text style={styles.noResultsHint}>
+                                    Make sure your friend has signed up for SugarReset.
+                                </Text>
+                                <Text style={styles.noResultsTip}>
+                                    Tip: Try searching by their email address
+                                </Text>
+                            </View>
                         )}
                         <FlatList
                             data={searchResults}
@@ -196,7 +204,7 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
 
                     {/* Hint */}
                     <Text style={styles.hint}>
-                        Search for friends by their username to add them to your Inner Circle
+                        Search for friends by their name or email to add them to your Inner Circle
                     </Text>
                 </View>
             </View>
@@ -266,11 +274,30 @@ const styles = StyleSheet.create({
     resultsList: {
         gap: spacing.sm,
     },
+    noResultsContainer: {
+        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        marginTop: spacing.xl,
+    },
     noResults: {
-        fontSize: 14,
+        fontSize: 15,
+        fontWeight: '600',
+        color: looviColors.text.secondary,
+        textAlign: 'center',
+        marginBottom: spacing.sm,
+    },
+    noResultsHint: {
+        fontSize: 13,
         color: looviColors.text.tertiary,
         textAlign: 'center',
-        marginTop: spacing.xl,
+        marginBottom: spacing.xs,
+        lineHeight: 18,
+    },
+    noResultsTip: {
+        fontSize: 12,
+        color: looviColors.text.muted,
+        textAlign: 'center',
+        fontStyle: 'italic',
     },
     userCard: {
         marginBottom: spacing.sm,
@@ -300,7 +327,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: looviColors.text.primary,
     },
-    userUsername: {
+    userEmail: {
         fontSize: 13,
         color: looviColors.text.tertiary,
         marginTop: 2,

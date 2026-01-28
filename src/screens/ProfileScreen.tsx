@@ -53,7 +53,6 @@ const menuSections = [
         items: [
             { id: 'notifications', emoji: '🔔', label: 'Notifications' },
             { id: 'reminders', emoji: '⏰', label: 'Daily Reminders' },
-            { id: 'appearance', emoji: '🎨', label: 'Appearance' },
         ],
     },
     {
@@ -81,9 +80,6 @@ export default function ProfileScreen() {
     const [showPlanDetails, setShowPlanDetails] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
-    const [editUsername, setEditUsername] = useState('');
-    const [originalUsername, setOriginalUsername] = useState('');
-    const [usernameError, setUsernameError] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
 
     // Determine auth provider type
@@ -165,60 +161,29 @@ export default function ProfileScreen() {
     const handleEditProfile = async () => {
         if (!user) return;
         setEditNameState(name);
-
-        // Fetch current username if exists
-        try {
-            const profile = await userService.getUserProfile(user.id);
-            const currentUsername = profile?.username || '';
-            setEditUsername(currentUsername);
-            setOriginalUsername(currentUsername);
-        } catch (error) {
-            console.error('Error fetching profile:', error);
-            setEditUsername('');
-        }
-
-        setUsernameError('');
         setShowEditProfile(true);
     };
 
     const handleSaveProfile = async () => {
         if (!user) return;
         setIsSavingProfile(true);
-        setUsernameError(''); // Clear previous error
 
         try {
-            // Update displayName locally and in auth/onboarding
-            if (editNameState.trim() !== name) {
-                await updateOnboardingData({ nickname: editNameState.trim() });
-                // Note: user.displayName updates are handled by auth provider usually, 
-                // but we store nickname in onboardingData for this app
-            }
+            const trimmedName = editNameState.trim();
 
-            // Update username if changed
-            const trimmedUsername = editUsername.trim().toLowerCase();
-            if (trimmedUsername && trimmedUsername !== originalUsername) {
-                if (trimmedUsername.length < 3) {
-                    setUsernameError('Username must be at least 3 characters');
-                    setIsSavingProfile(false);
-                    return;
-                }
+            // Update displayName locally in onboarding data
+            if (trimmedName !== name) {
+                await updateOnboardingData({ nickname: trimmedName });
 
-                const isAvailable = await userService.checkUsernameAvailable(trimmedUsername);
-                if (!isAvailable) {
-                    setUsernameError('Username is already taken');
-                    setIsSavingProfile(false);
-                    return;
-                }
-
-                await userService.updateUsername(user.id, trimmedUsername);
-                setOriginalUsername(trimmedUsername);
+                // Also sync to Firestore for friend search
+                await userService.updateDisplayName(user.id, trimmedName);
             }
 
             setShowEditProfile(false);
             Alert.alert('Success', 'Profile updated successfully');
         } catch (error) {
             console.error('Error saving profile:', error);
-            setUsernameError('Failed to save profile');
+            Alert.alert('Error', 'Failed to save profile');
         } finally {
             setIsSavingProfile(false);
         }
@@ -377,33 +342,16 @@ export default function ProfileScreen() {
                                 </View>
 
                                 {/* Display Name */}
-                                <Text style={styles.inputLabel}>Display Name</Text>
+                                <Text style={styles.inputLabel}>Your Name</Text>
                                 <TextInput
                                     style={styles.editInput}
                                     value={editNameState}
                                     onChangeText={setEditNameState}
                                     placeholder="Your Name"
                                     placeholderTextColor={looviColors.text.muted}
+                                    autoCapitalize="words"
                                 />
-                                <Text style={styles.fieldHint}>This is how you appear in the app</Text>
-
-                                {/* Username */}
-                                <Text style={styles.inputLabel}>Username (Unique)</Text>
-                                <TextInput
-                                    style={[styles.editInput, usernameError ? { borderColor: '#EF4444', borderWidth: 1 } : {}]}
-                                    value={editUsername}
-                                    onChangeText={(text) => {
-                                        setEditUsername(text.toLowerCase().replace(/[^a-z0-9_]/g, ''));
-                                        setUsernameError('');
-                                    }}
-                                    placeholder="username"
-                                    placeholderTextColor={looviColors.text.muted}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                                {usernameError ? <Text style={styles.errorText}>{usernameError}</Text> : (
-                                    <Text style={styles.fieldHint}>Used for friend connections</Text>
-                                )}
+                                <Text style={styles.fieldHint}>This is how friends can find you in the app</Text>
 
                                 <View style={styles.editModalButtons}>
                                     <TouchableOpacity

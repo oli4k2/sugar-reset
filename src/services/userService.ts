@@ -148,6 +148,8 @@ export const userService = {
 
             await setDoc(doc(db, 'users', userId), {
                 ...newUser,
+                // Store lowercase version for search
+                displayNameLower: displayName?.toLowerCase() || '',
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
                 streak: {
@@ -289,30 +291,15 @@ export const userService = {
     },
 
     /**
-     * Check if a username is available
-     * Phase 1: User Profiles
+     * Update user's display name
+     * This syncs the nickname from onboarding to the Firestore profile
      */
-    async checkUsernameAvailable(username: string): Promise<boolean> {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('username', '==', username), limit(1));
-        const snapshot = await getDocs(q);
-        return snapshot.empty;
-    },
-
-    /**
-     * Update user's username
-     * Phase 1: User Profiles
-     */
-    async updateUsername(userId: string, username: string): Promise<void> {
-        // Double check availability to prevent race conditions
-        const isAvailable = await this.checkUsernameAvailable(username);
-        if (!isAvailable) {
-            throw new Error('Username is already taken');
-        }
-
+    async updateDisplayName(userId: string, displayName: string): Promise<void> {
         const docRef = doc(db, 'users', userId);
         await updateDoc(docRef, {
-            username,
+            displayName,
+            // Store lowercase version for search
+            displayNameLower: displayName.toLowerCase(),
             updatedAt: serverTimestamp(),
         });
     },
@@ -333,44 +320,87 @@ export const userService = {
     },
 
     /**
-     * Search users by username or email
+     * Search users by display name or email
      * Phase 2: Friend System
      */
     async searchUsers(queryText: string): Promise<User[]> {
-        const searchText = queryText.toLowerCase();
-        // Note: Firestore text search is limited. 
-        // We'll search by exact username match first, effectively. 
-        // For a real app, we'd use Algolia or similar.
+        if (!isFirebaseReady()) return [];
+
+        const searchText = queryText.toLowerCase().trim();
+        if (searchText.length < 2) return [];
 
         const usersRef = collection(db, 'users');
-        // Simple exact match on username for now
-        const usernameQuery = query(
-            usersRef,
-            where('username', '>=', searchText),
-            where('username', '<=', searchText + '\uf8ff'),
-            limit(10)
-        );
+        const results: User[] = [];
+        const seenIds = new Set<string>();
 
-        const snapshot = await getDocs(usernameQuery);
+        try {
+            // Search by displayNameLower (prefix match)
+            const nameQuery = query(
+                usersRef,
+                where('displayNameLower', '>=', searchText),
+                where('displayNameLower', '<=', searchText + '\uf8ff'),
+                limit(10)
+            );
 
-        return snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                email: data.email, // In real app, might want to hide email
-                username: data.username,
-                displayName: data.displayName,
-                photoURL: data.photoURL,
-                createdAt: toDate(data.createdAt) as Date,
-                updatedAt: toDate(data.updatedAt) as Date,
-                preferences: data.preferences,
-                streak: {
-                    ...data.streak,
-                    lastCheckIn: toDate(data.streak?.lastCheckIn),
-                    startDate: toDate(data.streak?.startDate) as Date,
-                },
-            };
-        });
+            const nameSnapshot = await getDocs(nameQuery);
+            nameSnapshot.docs.forEach(doc => {
+                if (!seenIds.has(doc.id)) {
+                    seenIds.add(doc.id);
+                    const data = doc.data();
+                    results.push({
+                        id: doc.id,
+                        email: data.email,
+                        displayName: data.displayName,
+                        photoURL: data.photoURL,
+                        createdAt: toDate(data.createdAt) as Date,
+                        updatedAt: toDate(data.updatedAt) as Date,
+                        preferences: data.preferences,
+                        streak: {
+                            ...data.streak,
+                            lastCheckIn: toDate(data.streak?.lastCheckIn),
+                            startDate: toDate(data.streak?.startDate) as Date,
+                        },
+                    });
+                }
+            });
+
+            // Also search by email if it looks like an email
+            if (searchText.includes('@') || searchText.includes('.')) {
+                const emailQuery = query(
+                    usersRef,
+                    where('email', '>=', searchText),
+                    where('email', '<=', searchText + '\uf8ff'),
+                    limit(5)
+                );
+
+                const emailSnapshot = await getDocs(emailQuery);
+                emailSnapshot.docs.forEach(doc => {
+                    if (!seenIds.has(doc.id)) {
+                        seenIds.add(doc.id);
+                        const data = doc.data();
+                        results.push({
+                            id: doc.id,
+                            email: data.email,
+                            displayName: data.displayName,
+                            photoURL: data.photoURL,
+                            createdAt: toDate(data.createdAt) as Date,
+                            updatedAt: toDate(data.updatedAt) as Date,
+                            preferences: data.preferences,
+                            streak: {
+                                ...data.streak,
+                                lastCheckIn: toDate(data.streak?.lastCheckIn),
+                                startDate: toDate(data.streak?.startDate) as Date,
+                            },
+                        });
+                    }
+                });
+            }
+
+            return results;
+        } catch (error) {
+            handleFirestoreError(error, 'searchUsers');
+            return [];
+        }
     },
 };
 

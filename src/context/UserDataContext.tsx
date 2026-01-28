@@ -13,6 +13,8 @@ import { useAuthContext } from './AuthContext';
 import { userService } from '../services/userService';
 import { communityStatsService } from '../services/communityStatsService';
 import { StreakData, DailyCheckIn } from '../types';
+import { calculateStreak, StreakResult, DayStatus } from '../services/streakService';
+import { PlanType } from '../utils/planUtils';
 
 export interface JournalEntry {
     id: string;
@@ -28,10 +30,16 @@ interface UserDataContextType {
     onboardingData: OnboardingData;
     hasCompletedOnboarding: boolean;
 
-    // Streak data
+    // Streak data (legacy format for backward compatibility)
     streakData: StreakData | null;
 
-    // Today's check-in
+    // Food-based streak data (new)
+    streakResult: StreakResult | null;
+    todayStatus: DayStatus | null;
+    hasLoggedFoodToday: boolean;
+    canRecoverStreak: boolean;
+
+    // Today's check-in (legacy - keeping for compatibility)
     todayCheckIn: DailyCheckIn | null;
 
     // Check-in history (for calendar)
@@ -55,6 +63,7 @@ interface UserDataContextType {
     updateOnboardingData: (data: Partial<OnboardingData>) => Promise<void>;
     completeOnboarding: () => Promise<void>;
     refreshData: () => Promise<void>;
+    refreshStreakFromFoodLogs: () => Promise<void>;
     recordCheckIn: (sugarFree: boolean, notes?: string) => Promise<void>;
     recordCheckInForDate: (date: Date, sugarFree: boolean, grams?: number) => Promise<void>;
     resetStreak: () => Promise<void>;
@@ -97,6 +106,7 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
     const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
     const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
     const [streakData, setStreakData] = useState<StreakData | null>(null);
+    const [streakResult, setStreakResult] = useState<StreakResult | null>(null);
     const [todayCheckIn, setTodayCheckIn] = useState<DailyCheckIn | null>(null);
     const [checkInHistory, setCheckInHistory] = useState<Record<string, { status: 'sugar_free' | 'had_sugar'; grams?: number }>>({});
     const [achievements, setAchievements] = useState<string[]>([]);
@@ -166,6 +176,31 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         }
     }, [loadData, hasLoadedOnce]);
 
+    // Calculate streak from food logs after initial load
+    useEffect(() => {
+        if (hasLoadedOnce && onboardingData?.startDate) {
+            // Calculate initial food-based streak
+            const planType = (onboardingData?.plan || 'cold_turkey') as PlanType;
+            const startDate = new Date(onboardingData.startDate);
+
+            calculateStreak(planType, startDate).then(result => {
+                setStreakResult(result);
+
+                // Convert to legacy StreakData format
+                const legacyStreakData: StreakData = {
+                    currentStreak: result.currentStreak,
+                    longestStreak: result.longestStreak,
+                    lastCheckIn: result.lastValidDate ? new Date(result.lastValidDate) : null,
+                    startDate: startDate,
+                    totalDaysSugarFree: result.totalDaysUnderTarget,
+                };
+                setStreakData(legacyStreakData);
+            }).catch(err => {
+                console.error('Error calculating initial streak:', err);
+            });
+        }
+    }, [hasLoadedOnce, onboardingData?.startDate, onboardingData?.plan]);
+
     // Update onboarding data
     const updateOnboardingData = useCallback(async (data: Partial<OnboardingData>) => {
         await onboardingService.saveOnboardingData(data);
@@ -187,12 +222,57 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 startDate: new Date(updated.startDate),
             });
         }
-    }, []);
+
+        // Sync displayName to Firestore for friend search
+        if (isAuthenticated && userId && updated.nickname) {
+            try {
+                await userService.updateDisplayName(userId, updated.nickname);
+            } catch (error) {
+                console.warn('Failed to sync displayName to Firestore:', error);
+            }
+        }
+    }, [isAuthenticated, userId]);
 
     // Refresh all data
     const refreshData = useCallback(async () => {
         setHasLoadedOnce(false); // Allow reload
     }, []);
+
+    // Refresh streak from food logs (new food-based streak calculation)
+    const refreshStreakFromFoodLogs = useCallback(async () => {
+        const planType = (onboardingData?.plan || 'cold_turkey') as PlanType;
+        const startDateString = onboardingData?.startDate;
+        const startDate = startDateString ? new Date(startDateString) : new Date();
+
+        try {
+            const result = await calculateStreak(planType, startDate);
+            setStreakResult(result);
+
+            // Convert to legacy StreakData format for backward compatibility
+            const legacyStreakData: StreakData = {
+                currentStreak: result.currentStreak,
+                longestStreak: result.longestStreak,
+                lastCheckIn: result.lastValidDate ? new Date(result.lastValidDate) : null,
+                startDate: startDate,
+                totalDaysSugarFree: result.totalDaysUnderTarget,
+            };
+            setStreakData(legacyStreakData);
+
+            // Sync to Firestore for leaderboard if authenticated
+            if (isAuthenticated && userId) {
+                try {
+                    await userService.updateStreak(userId, legacyStreakData);
+                    await userService.syncUserStats(userId, {
+                        currentStreak: result.currentStreak,
+                    });
+                } catch (syncError) {
+                    console.warn('Failed to sync streak to Firestore:', syncError);
+                }
+            }
+        } catch (error) {
+            console.error('Error calculating streak from food logs:', error);
+        }
+    }, [onboardingData?.plan, onboardingData?.startDate, isAuthenticated, userId]);
 
     // Record a check-in
     const recordCheckIn = useCallback(async (sugarFree: boolean, notes?: string) => {
@@ -373,6 +453,10 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         onboardingData,
         hasCompletedOnboarding,
         streakData,
+        streakResult,
+        todayStatus: streakResult?.todayStatus || null,
+        hasLoggedFoodToday: streakResult?.todayStatus?.hasLogs || false,
+        canRecoverStreak: streakResult?.canRecoverStreak || false,
         todayCheckIn,
         checkInHistory,
         achievements,
@@ -381,6 +465,7 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         updateOnboardingData,
         completeOnboarding,
         refreshData,
+        refreshStreakFromFoodLogs,
         recordCheckIn,
         recordCheckInForDate,
         resetStreak,

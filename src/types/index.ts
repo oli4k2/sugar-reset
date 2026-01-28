@@ -6,7 +6,6 @@
 export interface User {
     id: string;
     email: string;
-    username?: string; // Phase 1: Unique username
     displayName?: string;
     photoURL?: string;
     createdAt: Date;
@@ -28,7 +27,7 @@ export interface UserStats {
 export interface Friend {
     uid: string;
     displayName: string;
-    username: string;
+    email?: string;
     photoURL?: string;
     addedAt: Date;
 }

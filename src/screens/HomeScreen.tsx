@@ -128,6 +128,11 @@ export default function HomeScreen() {
         updateOnboardingData,
         addJournalEntry,
         updateHealthScore,
+        // New food-based streak data
+        refreshStreakFromFoodLogs,
+        todayStatus,
+        hasLoggedFoodToday: hasLoggedFoodTodayFromContext,
+        canRecoverStreak,
     } = useUserData();
 
     // Get user data from context (with fallbacks)
@@ -504,6 +509,65 @@ export default function HomeScreen() {
                             endDate={new Date(startDate.getTime() + (planType === 'cold_turkey' ? 30 : 42) * 24 * 60 * 60 * 1000)}
                         />
 
+                        {/* Streak Status Banner - Food-based streak info */}
+                        {todayStatus && (
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                onPress={() => setShowFoodScannerModal(true)}
+                                style={styles.streakStatusBanner}
+                            >
+                                <View style={[
+                                    styles.streakStatusContainer,
+                                    !todayStatus.hasLogs && styles.streakStatusWarning,
+                                    todayStatus.hasLogs && !todayStatus.isUnderTarget && styles.streakStatusDanger,
+                                    todayStatus.isStreakDay && styles.streakStatusSuccess,
+                                ]}>
+                                    <View style={styles.streakStatusLeft}>
+                                        <Text style={styles.streakStatusEmoji}>
+                                            {todayStatus.isStreakDay ? '✅' : !todayStatus.hasLogs ? '📝' : '⚠️'}
+                                        </Text>
+                                        <View>
+                                            <Text style={styles.streakStatusTitle}>
+                                                {todayStatus.isStreakDay
+                                                    ? `Day ${streakData?.currentStreak || 0} complete!`
+                                                    : !todayStatus.hasLogs
+                                                        ? 'Log food to build streak'
+                                                        : 'Sugar over target'}
+                                            </Text>
+                                            <Text style={styles.streakStatusSubtitle}>
+                                                {todayStatus.hasLogs
+                                                    ? `${todayStatus.totalSugar}g / ${todayStatus.dailyTarget}g sugar`
+                                                    : `Target: ${todayStatus.dailyTarget}g sugar`}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {!todayStatus.isStreakDay && (
+                                        <Feather name="plus-circle" size={20} color={looviColors.accent.primary} />
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Streak Recovery Prompt */}
+                        {canRecoverStreak && (
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                onPress={() => setShowFoodScannerModal(true)}
+                                style={styles.streakRecoveryBanner}
+                            >
+                                <View style={styles.streakRecoveryContainer}>
+                                    <Text style={styles.streakRecoveryEmoji}>💪</Text>
+                                    <View style={styles.streakRecoveryText}>
+                                        <Text style={styles.streakRecoveryTitle}>Recover your streak!</Text>
+                                        <Text style={styles.streakRecoverySubtitle}>
+                                            Log yesterday's food to get back on track
+                                        </Text>
+                                    </View>
+                                    <Feather name="chevron-right" size={20} color={looviColors.accent.primary} />
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
                         {/* Action Buttons: Pledge, Logging, Journal - Daily Journey */}
                         <View style={styles.dailyFlowContainer}>
                             {/* Carousel of Daily Actions */}
@@ -644,13 +708,6 @@ export default function HomeScreen() {
                                         </View>
                                     );
                                 }}
-
-                                initialScrollIndex={(() => {
-                                    if (!hasPledgedToday) return 0;
-                                    const currentHour = new Date().getHours();
-                                    if (currentHour < 20) return 1;
-                                    return 2;
-                                })()}
                             />
                         </View>
 
@@ -1057,6 +1114,8 @@ export default function HomeScreen() {
                                 );
                                 setHasFoodLoggedToday(hasLoggedToday);
                             });
+                            // Refresh streak calculation based on new food logs
+                            refreshStreakFromFoodLogs();
                         }}
                     />
 
@@ -2251,6 +2310,84 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: looviColors.text.tertiary,
         textAlign: 'center',
+        marginTop: 2,
+    },
+    // Streak Status Banner Styles
+    streakStatusBanner: {
+        marginTop: spacing.md,
+        marginBottom: spacing.sm,
+    },
+    streakStatusContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    streakStatusWarning: {
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    streakStatusDanger: {
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        borderColor: 'rgba(239, 68, 68, 0.3)',
+    },
+    streakStatusSuccess: {
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderColor: 'rgba(16, 185, 129, 0.3)',
+    },
+    streakStatusLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
+    streakStatusEmoji: {
+        fontSize: 24,
+    },
+    streakStatusTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: looviColors.text.primary,
+    },
+    streakStatusSubtitle: {
+        fontSize: 12,
+        fontWeight: '400',
+        color: looviColors.text.tertiary,
+        marginTop: 2,
+    },
+    // Streak Recovery Banner Styles
+    streakRecoveryBanner: {
+        marginTop: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    streakRecoveryContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        borderWidth: 1,
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+    },
+    streakRecoveryEmoji: {
+        fontSize: 24,
+        marginRight: spacing.sm,
+    },
+    streakRecoveryText: {
+        flex: 1,
+    },
+    streakRecoveryTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: looviColors.text.primary,
+    },
+    streakRecoverySubtitle: {
+        fontSize: 12,
+        fontWeight: '400',
+        color: looviColors.text.tertiary,
         marginTop: 2,
     },
 });

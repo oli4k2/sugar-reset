@@ -193,47 +193,40 @@ export default function TrackingScreen() {
                         </View>
 
                         {/* Two Big Action Buttons - ALWAYS reference TODAY */}
-                        <View style={styles.actionButtons}>
+                        {/* Two Big Action Buttons - MATCHING ANALYTICS STYLE */}
+                        <View style={styles.quickActionsRow}>
                             <TouchableOpacity
-                                style={styles.actionButton}
+                                style={[styles.quickActionButton, styles.quickActionPrimary]}
                                 onPress={() => {
                                     handleDateSelect(todayStr);
                                     setShowScannerModal(true);
                                 }}
-                                activeOpacity={0.7}
+                                activeOpacity={0.8}
                             >
-                                <View style={styles.modernButton}>
-                                    <View style={styles.buttonIconCircle}>
-                                        <Ionicons name="restaurant-outline" size={28} color="#FFFFFF" />
+                                <Ionicons name="scan" size={22} color="#FFFFFF" />
+                                <Text style={styles.quickActionPrimaryText}>Log Food</Text>
+                                {todayFoods.length > 0 && (
+                                    <View style={styles.buttonBadge}>
+                                        <Text style={styles.buttonBadgeText}>{todayFoods.length}</Text>
                                     </View>
-                                    <Text style={styles.buttonText}>Log Food</Text>
-                                    {todayFoods.length > 0 && (
-                                        <View style={styles.buttonBadge}>
-                                            <Text style={styles.buttonBadgeText}>{todayFoods.length}</Text>
-                                        </View>
-                                    )}
-                                </View>
+                                )}
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={styles.actionButton}
+                                style={[styles.quickActionButton, styles.quickActionSecondary]}
                                 onPress={() => {
                                     handleDateSelect(todayStr);
                                     setShowWellnessModal(true);
                                 }}
-                                activeOpacity={0.7}
+                                activeOpacity={0.8}
                             >
-                                <View style={[styles.modernButton, { backgroundColor: 'rgba(127, 176, 105, 0.7)' }]}>
-                                    <View style={styles.buttonIconCircle}>
-                                        <Ionicons name="heart-outline" size={28} color="#FFFFFF" />
+                                <Ionicons name="heart" size={22} color={looviColors.coralOrange} />
+                                <Text style={styles.quickActionSecondaryText}>Wellness</Text>
+                                {wellnessDates.includes(todayStr) && (
+                                    <View style={[styles.buttonBadge, { backgroundColor: looviColors.accent.success }]}>
+                                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                                     </View>
-                                    <Text style={styles.buttonText}>Wellness</Text>
-                                    {wellnessDates.includes(todayStr) && (
-                                        <View style={[styles.buttonBadge, { backgroundColor: looviColors.accent.success }]}>
-                                            <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                                        </View>
-                                    )}
-                                </View>
+                                )}
                             </TouchableOpacity>
                         </View>
 
@@ -488,53 +481,23 @@ const styles = StyleSheet.create({
         color: looviColors.text.secondary,
         marginTop: spacing.xs,
     },
-    actionButtons: {
-        flexDirection: 'row',
-        gap: spacing.md,
-        marginBottom: spacing.lg,
-    },
-    actionButton: {
-        flex: 1,
-    },
-    modernButton: {
-        backgroundColor: 'rgba(217, 123, 102, 0.75)',
-        borderRadius: 20,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: looviColors.accent.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
-        position: 'relative',
-        minHeight: 80,
-    },
-    buttonIconCircle: {
-        marginBottom: spacing.xs,
-    },
-    buttonText: {
-        fontFamily: typography.fonts.heading.bold,
-        fontSize: 16,
-        color: '#FFFFFF',
-    },
     buttonBadge: {
         position: 'absolute',
-        top: 8,
-        right: 8,
-        minWidth: 24,
-        height: 24,
+        top: -6,
+        right: -6,
+        minWidth: 22,
+        height: 22,
         paddingHorizontal: 6,
-        borderRadius: 12,
+        borderRadius: 11,
         backgroundColor: looviColors.accent.warning,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
         borderColor: '#FFFFFF',
+        zIndex: 10,
     },
     buttonBadgeText: {
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: '700',
         color: '#FFFFFF',
     },
@@ -692,5 +655,42 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
         color: looviColors.accent.primary,
+    },
+    // Updated Quick Actions Styles (Matching AnalyticsScreen)
+    quickActionsRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginBottom: spacing.lg,
+    },
+    quickActionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: borderRadius.xl,
+        gap: spacing.sm,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 4,
+        position: 'relative', // For badges
+    },
+    quickActionPrimary: {
+        backgroundColor: looviColors.accent.primary,
+    },
+    quickActionSecondary: {
+        backgroundColor: `${looviColors.coralOrange}15`, // Almost transparent orange
+    },
+    quickActionPrimaryText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    quickActionSecondaryText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: looviColors.coralOrange,
     },
 });
