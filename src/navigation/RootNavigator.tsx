@@ -61,6 +61,7 @@ import AlternativesScreen from '../screens/AlternativesScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpScreen from '../screens/HelpScreen';
+import DistractionTaskScreen from '../screens/DistractionTaskScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -121,9 +122,9 @@ function MainTabNavigator() {
                 options={{
                     tabBarLabel: '',
                     tabBarStyle: {
-                        backgroundColor: 'rgba(15, 15, 30, 0.98)',
-                        borderTopColor: 'rgba(255, 255, 255, 0.1)',
-                        borderTopWidth: 1,
+                        backgroundColor: 'rgba(255, 250, 245, 0.98)',
+                        borderTopColor: 'transparent',
+                        borderTopWidth: 0,
                         paddingTop: 6,
                         paddingBottom: Platform.OS === 'ios' ? 22 : 8,
                         height: Platform.OS === 'ios' ? 80 : 60,
@@ -157,7 +158,7 @@ function MainTabNavigator() {
                             <Text style={{
                                 fontSize: 7,
                                 fontWeight: '600',
-                                color: focused ? '#EF4444' : '#E8E8F0',
+                                color: focused ? '#EF4444' : 'rgba(107, 114, 128, 0.7)',
                                 marginTop: 4,
                                 letterSpacing: -0.5,
                             }}>CRAVING</Text>
@@ -311,6 +312,14 @@ export default function RootNavigator() {
                 <RootStack.Screen
                     name="DistractMe"
                     component={DistractMeScreen}
+                    options={{
+                        presentation: 'fullScreenModal',
+                        animation: 'fade',
+                    }}
+                />
+                <RootStack.Screen
+                    name="DistractionTask"
+                    component={DistractionTaskScreen}
                     options={{
                         presentation: 'fullScreenModal',
                         animation: 'fade',

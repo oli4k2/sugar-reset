@@ -22,6 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { spacing, borderRadius } from '../theme';
 import { useUserData } from '../context/UserDataContext';
 
@@ -31,18 +32,18 @@ type ReasonsScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Reasons'>;
 };
 
-// Colors for dark calming theme
-const colors = {
-    bg: '#0F0F1E',
+// Theme: Deep Connection (Matches Inner Circle)
+const THEME = {
+    bgColors: ['#0F172A', '#1E1B4B'], // Deep Slate to Midnight Indigo
     text: '#FFFFFF',
     textSecondary: 'rgba(255, 255, 255, 0.7)',
     textMuted: 'rgba(255, 255, 255, 0.5)',
-    accent: '#E8A87C', // Warm coral
-    progressActive: '#E8A87C',
-    progressInactive: 'rgba(255, 255, 255, 0.2)',
-    factBg: 'rgba(136, 164, 214, 0.15)',
-    dataBg: 'rgba(127, 176, 105, 0.15)',
-    socialBg: 'rgba(245, 180, 97, 0.15)',
+    accent: '#818CF8', // Indigo Accent
+    progressActive: '#818CF8',
+    progressInactive: 'rgba(255, 255, 255, 0.1)',
+    factBg: 'rgba(129, 140, 248, 0.15)',
+    dataBg: 'rgba(52, 211, 153, 0.15)',
+    socialBg: 'rgba(244, 114, 182, 0.15)',
 };
 
 type ReasonType = 'fact' | 'personal' | 'social';
@@ -64,7 +65,7 @@ const generateReasons = (streakDays: number, goals: string[]): Reason[] => {
         reasons.push({
             emoji: '🔥',
             title: `${streakDays} Day${streakDays > 1 ? 's' : ''} Strong`,
-            message: streakDays < 7 
+            message: streakDays < 7
                 ? `You're building momentum! Just ${7 - streakDays} more days to your first week.`
                 : streakDays < 30
                     ? `Amazing progress! ${30 - streakDays} days until your one-month milestone.`
@@ -186,9 +187,9 @@ const generateReasons = (streakDays: number, goals: string[]): Reason[] => {
     });
 
     reasons.push({
-        emoji: '🧘',
-        title: 'Freedom Over Addiction',
-        message: 'Every "no" is a step toward freedom. You\'re proving you control your choices, not cravings.',
+        emoji: '🚀',
+        title: 'Growth Choice',
+        message: 'Every time you choose health over craving, you are literally voting for the person you want to become.',
         type: 'personal',
     });
 
@@ -208,7 +209,7 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
     // Auto-advance timer (optional - can be removed for pure tap navigation)
     useEffect(() => {
         progressAnim.setValue(0);
-        
+
         // Animate progress bar
         Animated.timing(progressAnim, {
             toValue: 1,
@@ -262,9 +263,9 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
 
     const getTypeColor = (type: ReasonType) => {
         switch (type) {
-            case 'fact': return colors.factBg;
-            case 'personal': return colors.dataBg;
-            case 'social': return colors.socialBg;
+            case 'fact': return THEME.factBg;
+            case 'personal': return THEME.dataBg;
+            case 'social': return THEME.socialBg;
         }
     };
 
@@ -278,6 +279,7 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
 
     return (
         <View style={styles.container}>
+            <LinearGradient colors={THEME.bgColors as any} style={StyleSheet.absoluteFillObject} />
             <SafeAreaView style={styles.safeArea}>
                 {/* Stories-style Progress Indicator */}
                 <View style={styles.progressContainer}>
@@ -287,16 +289,16 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
                                 {index < currentIndex ? (
                                     <View style={[styles.progressBarFill, { width: '100%' }]} />
                                 ) : index === currentIndex ? (
-                                    <Animated.View 
+                                    <Animated.View
                                         style={[
-                                            styles.progressBarFill, 
-                                            { 
+                                            styles.progressBarFill,
+                                            {
                                                 width: progressAnim.interpolate({
                                                     inputRange: [0, 1],
                                                     outputRange: ['0%', '100%'],
                                                 })
                                             }
-                                        ]} 
+                                        ]}
                                     />
                                 ) : null}
                             </View>
@@ -304,14 +306,14 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
                     ))}
                 </View>
 
-                {/* Close Button */}
-                <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={() => navigation.goBack()}
-                    activeOpacity={0.7}
-                >
-                    <Feather name="x" size={24} color={colors.text} />
-                </TouchableOpacity>
+                {/* Unified Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                        <Feather name="x" size={24} color={THEME.textMuted} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>MY WHY</Text>
+                    <View style={{ width: 40 }} />
+                </View>
 
                 {/* Main Content - Tap Area */}
                 <Pressable style={styles.tapArea} onPress={handleTap}>
@@ -340,12 +342,12 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
                     <View style={styles.navHints}>
                         <View style={styles.navHintLeft}>
                             {currentIndex > 0 && (
-                                <Feather name="chevron-left" size={20} color={colors.textMuted} />
+                                <Feather name="chevron-left" size={20} color={THEME.textMuted} />
                             )}
                         </View>
                         <Text style={styles.counter}>{currentIndex + 1} / {reasons.length}</Text>
                         <View style={styles.navHintRight}>
-                            <Feather name="chevron-right" size={20} color={colors.textMuted} />
+                            <Feather name="chevron-right" size={20} color={THEME.textMuted} />
                         </View>
                     </View>
                 </Pressable>
@@ -360,7 +362,7 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.bg,
+        backgroundColor: '#0F172A',
     },
     safeArea: {
         flex: 1,
@@ -378,16 +380,32 @@ const styles = StyleSheet.create({
     },
     progressBarBg: {
         flex: 1,
-        backgroundColor: colors.progressInactive,
+        backgroundColor: THEME.progressInactive,
         borderRadius: 2,
         overflow: 'hidden',
     },
     progressBarFill: {
         height: '100%',
-        backgroundColor: colors.progressActive,
+        backgroundColor: THEME.progressActive,
         borderRadius: 2,
     },
-    // Close Button
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        height: 60,
+    },
+    headerTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        letterSpacing: 2,
+        color: '#FFF',
+    },
+    iconBtn: {
+        padding: 8,
+    },
+    // Close Button (Removed replaced by header)
     closeButton: {
         position: 'absolute',
         top: 60,
@@ -421,7 +439,7 @@ const styles = StyleSheet.create({
     typeBadgeText: {
         fontSize: 12,
         fontWeight: '600',
-        color: colors.text,
+        color: THEME.text,
         letterSpacing: 0.5,
     },
     emoji: {
@@ -431,7 +449,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: '700',
-        color: colors.text,
+        color: THEME.text,
         textAlign: 'center',
         marginBottom: spacing.md,
         lineHeight: 34,
@@ -439,14 +457,14 @@ const styles = StyleSheet.create({
     message: {
         fontSize: 18,
         fontWeight: '400',
-        color: colors.textSecondary,
+        color: THEME.textSecondary,
         textAlign: 'center',
         lineHeight: 28,
     },
     source: {
         fontSize: 13,
         fontWeight: '500',
-        color: colors.textMuted,
+        color: THEME.textMuted,
         marginTop: spacing.lg,
         fontStyle: 'italic',
     },
@@ -470,12 +488,12 @@ const styles = StyleSheet.create({
     counter: {
         fontSize: 14,
         fontWeight: '500',
-        color: colors.textMuted,
+        color: THEME.textMuted,
     },
     instruction: {
         fontSize: 13,
         fontWeight: '500',
-        color: colors.textMuted,
+        color: THEME.textMuted,
         textAlign: 'center',
         paddingBottom: spacing.xl,
     },

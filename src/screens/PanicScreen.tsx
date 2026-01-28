@@ -1,13 +1,5 @@
-/**
- * PanicScreen (Craving Support)
- * 
- * Redesigned SOS/Cravings support screen with:
- * - Darker, calming theme for focus
- * - Three central buttons for main actions
- * - Each button leads to dedicated screen
- */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -16,271 +8,256 @@ import {
     Animated,
     Dimensions,
     Easing,
+    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
-import { spacing, borderRadius } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import { StatusBar } from 'expo-status-bar';
+import { spacing } from '../theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-// Calming messages that rotate
-const calmingMessages = [
-    { title: "You've got this", subtitle: "Take a breath. Choose your next step." },
-    { title: "Stay strong", subtitle: "This moment will pass. You're in control." },
-    { title: "You're not alone", subtitle: "Reach out. Find your calm. Stay focused." },
-    { title: "One moment at a time", subtitle: "Choose what helps you most right now." },
-];
+/**
+ * PanicScreen V8 - "The SOS Command Deck"
+ * 
+ * THEME: Serious Cosmos
+ * - Deep Midnight/Indigo base (Serious, SOS vibes)
+ * - Pulsing "Urgency" orbs (Soft Crimson/Orange)
+ * - Glassmorphism UI for high trust
+ */
 
-// Calming dark theme colors
-const calmColors = {
-    darkBg: '#1A1A2E',
-    darkerBg: '#0F0F1E',
-    text: '#E8E8F0',
-    textSecondary: '#B0B0C8',
-    accent1: '#88A4D6', // Calm blue - Inner Circle (swapped)
-    accent2: '#F5B461', // Warm amber - Distract Me
-    accent3: '#7FB069', // Natural green - Alternatives (swapped)
-    cardBg: 'rgba(255, 255, 255, 0.08)',
-    cardBorder: 'rgba(255, 255, 255, 0.12)',
-};
+const BG_GRADIENT = ['#0F172A', '#1E293B'] as const; // Deep Slate/Midnight
 
-// Floating particle component
-const PARTICLE_COUNT = 20;
-
-interface Particle {
-    id: number;
-    x: number;
-    y: number;
-    size: number;
-    duration: number;
-    delay: number;
-}
-
-const generateParticles = (): Particle[] => {
-    return Array.from({ length: PARTICLE_COUNT }).map((_, i) => ({
-        id: i,
-        x: Math.random() * SCREEN_WIDTH,
-        y: Math.random() * SCREEN_HEIGHT,
-        size: Math.random() * 2 + 1,
-        duration: Math.random() * 10000 + 8000,
-        delay: Math.random() * 4000,
-    }));
-};
-
-const particles = generateParticles();
-
-function FloatingParticle({ particle }: { particle: Particle }) {
-    const translateY = useRef(new Animated.Value(0)).current;
-    const translateX = useRef(new Animated.Value(0)).current;
-    const opacity = useRef(new Animated.Value(0)).current;
+// Cosmos Particle Component
+const Particle = ({ delay, duration, size, startX, startY }: any) => {
+    const anim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        const animate = () => {
-            translateY.setValue(0);
-            translateX.setValue(0);
-            opacity.setValue(0);
-
+        Animated.loop(
             Animated.sequence([
-                Animated.delay(particle.delay),
-                Animated.parallel([
-                    Animated.timing(translateY, {
-                        toValue: -100 - Math.random() * 80,
-                        duration: particle.duration,
-                        easing: Easing.inOut(Easing.sin),
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(translateX, {
-                        toValue: (Math.random() - 0.5) * 100,
-                        duration: particle.duration,
-                        easing: Easing.inOut(Easing.sin),
-                        useNativeDriver: true,
-                    }),
-                    Animated.sequence([
-                        Animated.timing(opacity, {
-                            toValue: 0.4,
-                            duration: particle.duration * 0.2,
-                            useNativeDriver: true,
-                        }),
-                        Animated.timing(opacity, {
-                            toValue: 0.4,
-                            duration: particle.duration * 0.5,
-                            useNativeDriver: true,
-                        }),
-                        Animated.timing(opacity, {
-                            toValue: 0,
-                            duration: particle.duration * 0.3,
-                            useNativeDriver: true,
-                        }),
-                    ]),
-                ]),
-            ]).start(() => animate());
-        };
-
-        animate();
+                Animated.delay(delay),
+                Animated.timing(anim, {
+                    toValue: 1,
+                    duration: duration,
+                    easing: Easing.linear,
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
     }, []);
+
+    const translateY = anim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -height],
+    });
+
+    const opacity = anim.interpolate({
+        inputRange: [0, 0.2, 0.8, 1],
+        outputRange: [0, 0.4, 0.4, 0],
+    });
 
     return (
         <Animated.View
-            style={[
-                styles.particle,
-                {
-                    left: particle.x,
-                    top: particle.y,
-                    width: particle.size,
-                    height: particle.size,
-                    opacity,
-                    transform: [{ translateY }, { translateX }],
-                },
-            ]}
+            style={{
+                position: 'absolute',
+                left: startX,
+                top: startY,
+                width: size,
+                height: size,
+                borderRadius: size / 2,
+                backgroundColor: 'rgba(255, 255, 255, 0.6)',
+                transform: [{ translateY }],
+                opacity,
+                shadowColor: '#FFF',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.5,
+                shadowRadius: 2,
+            }}
         />
     );
-}
+};
 
 export default function PanicScreen() {
     const navigation = useNavigation<any>();
-    const [messageIndex, setMessageIndex] = useState(0);
-    const fadeAnim = useState(new Animated.Value(1))[0];
-    const tabBarFadeAnim = useState(new Animated.Value(0))[0];
+
+    // Generate particles
+    const particles = Array.from({ length: 20 }).map((_, i) => ({
+        id: i,
+        size: Math.random() * 3 + 1,
+        startX: Math.random() * width,
+        startY: Math.random() * height + 100,
+        duration: Math.random() * 10000 + 20000,
+        delay: Math.random() * 5000,
+    }));
+
+    const breatheAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        // Fade in tab bar to dark on mount
-        Animated.timing(tabBarFadeAnim, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: false,
-        }).start();
+        const breatheSequence = Animated.loop(
+            Animated.sequence([
+                Animated.timing(breatheAnim, {
+                    toValue: 1,
+                    duration: 5000, // Slightly faster for serious focus
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(breatheAnim, {
+                    toValue: 0,
+                    duration: 5000,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
 
-        // Fade out tab bar to normal on unmount
-        return () => {
-            Animated.timing(tabBarFadeAnim, {
-                toValue: 0,
-                duration: 600,
-                useNativeDriver: false,
-            }).start();
-        };
+        breatheSequence.start();
     }, []);
 
-    useEffect(() => {
-        // Rotate messages every 8 seconds
-        const interval = setInterval(() => {
-            Animated.sequence([
-                Animated.timing(fadeAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
-                Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-            ]).start();
-            setTimeout(() => {
-                setMessageIndex((prev) => (prev + 1) % calmingMessages.length);
-            }, 400);
-        }, 8000);
+    const bgScale = breatheAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.15],
+    });
 
-        return () => clearInterval(interval);
-    }, [fadeAnim]);
+    const circleScale = breatheAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.3],
+    });
 
-    const currentMessage = calmingMessages[messageIndex];
+    const handlePress = (screen: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        navigation.navigate(screen);
+    };
 
     return (
         <View style={styles.container}>
-            {/* Simple solid dark background - no edge issues */}
-            <View style={styles.solidBackground} />
+            <StatusBar style="light" />
+            <LinearGradient colors={BG_GRADIENT as any} style={StyleSheet.absoluteFillObject} />
 
-            {/* Floating particles */}
-            {particles.map((particle) => (
-                <FloatingParticle key={particle.id} particle={particle} />
+            {/* Cosmos Particles Layer */}
+            {particles.map((p) => (
+                <Particle key={p.id} {...p} />
             ))}
 
-            {/* Animated dark overlay for tab bar */}
             <Animated.View
                 style={[
-                    styles.tabBarOverlay,
+                    styles.ambientOrb,
                     {
-                        opacity: tabBarFadeAnim,
-                        backgroundColor: tabBarFadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['rgba(15, 15, 30, 0)', 'rgba(15, 15, 30, 0.95)'],
-                        }),
-                    },
+                        backgroundColor: 'rgba(239, 68, 68, 0.2)', // Slightly brighter SOS pulse
+                        top: -50, right: -50,
+                        transform: [{ scale: bgScale }]
+                    }
                 ]}
-                pointerEvents="none"
+            />
+            <Animated.View
+                style={[
+                    styles.ambientOrb,
+                    {
+                        backgroundColor: 'rgba(99, 102, 241, 0.25)', // Brighter Support Indigo
+                        bottom: -50, left: -50,
+                        transform: [{ scale: bgScale }]
+                    }
+                ]}
             />
 
-            <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-                {/* Calming message - positioned at top, independent of buttons */}
-                <Animated.View style={[styles.messageContainer, { opacity: fadeAnim }]}>
-                    <Text style={styles.messageTitle}>{currentMessage.title}</Text>
-                    <Text style={styles.messageSubtitle}>{currentMessage.subtitle}</Text>
-                </Animated.View>
+            <BlurView intensity={20} style={StyleSheet.absoluteFillObject} tint="dark" />
 
-                {/* Main content - centered buttons */}
-                <View style={styles.content}>
-                    {/* Three round buttons in a row - centered */}
-                    <View style={styles.mainButtonsRow}>
-                        {/* Talk to Inner Circle */}
-                        <TouchableOpacity
-                            style={[styles.floatingButton, { backgroundColor: 'rgba(136, 164, 214, 0.75)' }]}
-                            onPress={() => navigation.navigate('InnerCircle')}
-                            activeOpacity={0.8}
-                        >
-                            <View style={styles.roundButtonIcon}>
-                                <Feather name="users" size={28} color="#FFFFFF" />
-                            </View>
-                            <Text style={styles.roundButtonText}>Inner{'\n'}Circle</Text>
-                        </TouchableOpacity>
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                <View style={styles.contentContainer}>
 
-                        {/* Distract Me */}
-                        <TouchableOpacity
-                            style={[styles.floatingButton, { backgroundColor: 'rgba(245, 180, 97, 0.75)' }]}
-                            onPress={() => navigation.navigate('DistractMe')}
-                            activeOpacity={0.8}
-                        >
-                            <View style={styles.roundButtonIcon}>
-                                <Feather name="target" size={28} color="#FFFFFF" />
-                            </View>
-                            <Text style={styles.roundButtonText}>Distract{'\n'}Me</Text>
-                        </TouchableOpacity>
-
-                        {/* Alternatives */}
-                        <TouchableOpacity
-                            style={[styles.floatingButton, { backgroundColor: 'rgba(127, 176, 105, 0.75)' }]}
-                            onPress={() => navigation.navigate('Alternatives')}
-                            activeOpacity={0.8}
-                        >
-                            <View style={styles.roundButtonIcon}>
-                                <Feather name="refresh-cw" size={28} color="#FFFFFF" />
-                            </View>
-                            <Text style={styles.roundButtonText}>Alter-{'\n'}natives</Text>
-                        </TouchableOpacity>
+                    {/* Serious Header */}
+                    <View style={styles.header}>
+                        <View style={styles.emergencyTag}>
+                            <View style={styles.pulseDot} />
+                            <Text style={styles.headerSubtitle}>SUPPORT MODE ACTIVE</Text>
+                        </View>
                     </View>
 
-                    {/* Secondary buttons - smaller */}
-                    <View style={styles.secondaryButtonsRow}>
-                        {/* Breathe */}
-                        <TouchableOpacity
-                            style={styles.secondaryButton}
-                            onPress={() => navigation.navigate('BreathingExercise')}
-                            activeOpacity={0.85}
-                        >
-                            <Feather name="wind" size={20} color={calmColors.text} style={{ marginRight: 8 }} />
-                            <Text style={styles.secondaryButtonText}>Breathe</Text>
-                        </TouchableOpacity>
+                    {/* HERO: The Explanation & Visual Anchor */}
+                    <View style={styles.heroSection}>
+                        <View style={styles.breathingContainer}>
+                            <Animated.View
+                                style={[
+                                    styles.breathingCircle,
+                                    { transform: [{ scale: circleScale }] }
+                                ]}
+                            >
+                                <LinearGradient
+                                    colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.05)']}
+                                    style={styles.circleGradient}
+                                />
+                            </Animated.View>
 
-                        {/* My Why */}
-                        <TouchableOpacity
-                            style={styles.secondaryButton}
-                            onPress={() => navigation.navigate('Reasons')}
-                            activeOpacity={0.85}
-                        >
-                            <Feather name="heart" size={20} color={calmColors.text} style={{ marginRight: 8 }} />
-                            <Text style={styles.secondaryButtonText}>My Why</Text>
-                        </TouchableOpacity>
-                    </View>
+                            <View style={styles.centerIcon}>
+                                <Feather name="activity" size={32} color="#FFF" />
+                            </View>
+                        </View>
 
-                    {/* Subtle reminder */}
-                    <View style={styles.reminderContainer}>
-                        <View style={styles.reminderDot} />
-                        <Text style={styles.reminderText}>
-                            This craving will pass. You're stronger than you think.
+                        <Text style={styles.heroTitle}>Ride the Wave</Text>
+                        <Text style={styles.heroDescription}>
+                            Cravings peak in 3-5m. This intensity is temporary.
                         </Text>
+                    </View>
+
+                    {/* THE SERIOUS BENTO GRID */}
+                    <View style={styles.bentoGrid}>
+                        {/* 1. Distract Me */}
+                        <TouchableOpacity
+                            style={[styles.bentoCard, styles.cardLarge]}
+                            activeOpacity={0.9}
+                            onPress={() => handlePress('DistractMe')}
+                        >
+                            <LinearGradient
+                                colors={['#4F46E5', '#312E81']} // Warm Indigo (Violin)
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                style={StyleSheet.absoluteFillObject}
+                            />
+                            <View style={styles.cardContent}>
+                                <View style={[styles.iconContainer, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
+                                    <Feather name="zap" size={24} color="#FBBF24" />
+                                </View>
+                                <View style={styles.cardTextContainer}>
+                                    <Text style={styles.cardLabel}>Distract Me</Text>
+                                    <Text style={styles.cardTag}>Shift your focus</Text>
+                                </View>
+                                <Feather name="chevron-right" size={20} color="rgba(255,255,255,0.4)" />
+                            </View>
+                        </TouchableOpacity>
+
+                        <View style={styles.row}>
+                            {/* 2. My Why */}
+                            <TouchableOpacity
+                                style={[styles.bentoCard, styles.cardSquare]}
+                                activeOpacity={0.9}
+                                onPress={() => handlePress('Reasons')}
+                            >
+                                <LinearGradient colors={['#4F46E5', '#312E81']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                                <View style={styles.cardContentSquare}>
+                                    <View style={[styles.iconContainerSmall, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
+                                        <Feather name="anchor" size={22} color="#34D399" />
+                                    </View>
+                                    <Text style={styles.cardLabelSmall}>My Why</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* 3. SOS */}
+                            <TouchableOpacity
+                                style={[styles.bentoCard, styles.cardSquare]}
+                                activeOpacity={0.9}
+                                onPress={() => handlePress('InnerCircle')}
+                            >
+                                <LinearGradient colors={['#4F46E5', '#312E81']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                                <View style={styles.cardContentSquare}>
+                                    <View style={[styles.iconContainerSmall, { backgroundColor: 'rgba(248, 113, 113, 0.15)' }]}>
+                                        <Feather name="users" size={22} color="#F87171" />
+                                    </View>
+                                    <Text style={styles.cardLabelSmall}>Inner Circle</Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </SafeAreaView>
@@ -291,141 +268,169 @@ export default function PanicScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0F0F1E',
-    },
-    solidBackground: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#0F0F1E',
-        zIndex: 0,
-    },
-    particle: {
-        position: 'absolute',
-        backgroundColor: 'rgba(255, 255, 255, 0.6)',
-        borderRadius: 999,
-        shadowColor: '#FFFFFF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.5,
-        shadowRadius: 3,
-        zIndex: 2,
+        backgroundColor: '#0F172A',
     },
     safeArea: {
         flex: 1,
-        zIndex: 10,
     },
-    content: {
+    contentContainer: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: spacing.xl,
-        marginTop: -60, // Offset to keep buttons centered despite message taking top space
+        paddingHorizontal: spacing.lg,
+        paddingBottom: Platform.OS === 'ios' ? 90 : 70,
+        paddingTop: spacing.xs,
     },
-    // Tab Bar Overlay
-    tabBarOverlay: {
+    ambientOrb: {
         position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 100,
-        zIndex: 100,
+        width: 350,
+        height: 350,
+        borderRadius: 175,
+        opacity: 0.6,
     },
-    // Message Section - fixed position at top
-    messageContainer: {
-        alignItems: 'center',
-        paddingTop: spacing.xl,
-        paddingHorizontal: spacing.xl,
-        height: 120, // Fixed height so it doesn't affect layout below
-    },
-    messageTitle: {
-        fontSize: 32,
-        fontWeight: '700',
-        color: calmColors.text,
-        textAlign: 'center',
-        marginBottom: spacing.xs,
-        letterSpacing: -0.5,
-    },
-    messageSubtitle: {
-        fontSize: 15,
-        fontWeight: '400',
-        color: calmColors.textSecondary,
-        textAlign: 'center',
-        lineHeight: 22,
-        maxWidth: SCREEN_WIDTH * 0.85,
-    },
-    // Main Buttons Row - Round buttons
-    mainButtonsRow: {
-        flexDirection: 'row',
+    header: {
+        height: 40,
         justifyContent: 'center',
         alignItems: 'center',
-        gap: spacing.md,
-        marginBottom: spacing.xl,
+        marginBottom: 4,
     },
-    floatingButton: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+    emergencyTag: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.4,
-        shadowRadius: 20,
-        elevation: 15,
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: 'rgba(239, 68, 68, 0.2)',
     },
-    roundButtonIcon: {
-        marginBottom: spacing.xs,
-    },
-    roundButtonText: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: '#FFFFFF',
-        textAlign: 'center',
-        lineHeight: 14,
-        letterSpacing: 0.2,
-    },
-    // Secondary Buttons Row - Smaller horizontal buttons
-    secondaryButtonsRow: {
-        flexDirection: 'row',
-        gap: spacing.md,
-        marginBottom: spacing.xl,
-    },
-    secondaryButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: calmColors.cardBg,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.lg,
-        borderRadius: borderRadius.xl,
-        borderWidth: 1,
-        borderColor: calmColors.cardBorder,
-    },
-    secondaryButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: calmColors.text,
-    },
-    // Reminder
-    reminderContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: spacing.lg,
-        paddingHorizontal: spacing.lg,
-    },
-    reminderDot: {
+    pulseDot: {
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: calmColors.accent1,
-        marginRight: spacing.sm,
-        opacity: 0.6,
+        backgroundColor: '#EF4444',
+        marginRight: 8,
     },
-    reminderText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: calmColors.textSecondary,
-        textAlign: 'center',
+    headerSubtitle: {
+        fontSize: 10,
+        color: '#EF4444',
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 2,
+    },
+    heroSection: {
         flex: 1,
-        opacity: 0.8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 180,
+    },
+    breathingContainer: {
+        width: height < 700 ? 120 : 160,
+        height: height < 700 ? 120 : 160,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: height < 700 ? 12 : 20,
+    },
+    breathingCircle: {
+        width: height < 700 ? 100 : 140,
+        height: height < 700 ? 100 : 140,
+        borderRadius: height < 700 ? 50 : 70,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+        shadowColor: '#FFF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+    },
+    circleGradient: {
+        flex: 1,
+        borderRadius: height < 700 ? 50 : 70,
+    },
+    centerIcon: {
+        position: 'absolute',
+    },
+    heroTitle: {
+        fontSize: height < 700 ? 28 : 34,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        letterSpacing: -1,
+        marginBottom: 4,
+    },
+    heroDescription: {
+        fontSize: 14,
+        color: 'rgba(255, 255, 255, 0.6)',
+        textAlign: 'center',
+        fontWeight: '500',
+        paddingHorizontal: 30,
+        lineHeight: 20,
+    },
+    bentoGrid: {
+        gap: 12,
+        justifyContent: 'flex-end',
+    },
+    row: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    bentoCard: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    cardLarge: {
+        width: '100%',
+        height: height < 700 ? 90 : 110,
+    },
+    cardSquare: {
+        flex: 1,
+        aspectRatio: 1,
+    },
+    cardContent: {
+        flex: 1,
+        padding: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    cardTextContainer: {
+        flex: 1,
+        marginLeft: 16,
+    },
+    cardContentSquare: {
+        flex: 1,
+        padding: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    iconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    iconContainerSmall: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 10,
+    },
+    cardLabel: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#FFF',
+    },
+    cardLabelSmall: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#FFF',
+        textAlign: 'center',
+    },
+    cardTag: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: 'rgba(255, 255, 255, 0.5)',
+        marginTop: 2,
     },
 });

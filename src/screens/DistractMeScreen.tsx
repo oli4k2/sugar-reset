@@ -12,7 +12,10 @@ import {
     TouchableOpacity,
     ScrollView,
     Alert,
+    Dimensions,
 } from 'react-native';
+
+const { width } = Dimensions.get('window');
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
@@ -42,6 +45,7 @@ const distractions = [
         icon: 'navigation' as const,
         title: 'Quick 5-Minute Walk',
         description: 'Movement reduces cravings by 50%',
+        shortDesc: '5 min movement',
         action: 'timer',
         color: '#7FB069',
     },
@@ -50,6 +54,7 @@ const distractions = [
         icon: 'droplet' as const,
         title: 'Drink Water Challenge',
         description: 'Finish a full glass, then reassess',
+        shortDesc: '1 big glass',
         action: 'challenge',
         color: '#88A4D6',
     },
@@ -58,6 +63,7 @@ const distractions = [
         icon: 'phone' as const,
         title: 'Call a Friend',
         description: 'A quick chat can shift your mindset',
+        shortDesc: '2 min connection',
         action: 'call',
         color: '#C997A8',
     },
@@ -66,10 +72,19 @@ const distractions = [
         icon: 'music' as const,
         title: 'Listen to Music',
         description: 'Put on your favorite uplifting song',
+        shortDesc: '1 upbeat song',
         action: 'music',
         color: '#F5B461',
     },
 ];
+
+const THEME = {
+    bgColors: ['#0F172A', '#1E1B4B'],
+    accent: '#818CF8',
+    text: '#F8FAFC',
+    textDim: '#94A3B8',
+    cardBg: 'rgba(255, 255, 255, 0.05)',
+};
 
 export default function DistractMeScreen() {
     const navigation = useNavigation<any>();
@@ -77,100 +92,79 @@ export default function DistractMeScreen() {
     const handleDistractionSelect = (distraction: typeof distractions[0]) => {
         if (distraction.screen) {
             navigation.navigate(distraction.screen);
-        } else if (distraction.action === 'timer') {
-            Alert.alert(
-                'Quick Walk',
-                'Get up and take a quick walk around. Movement releases dopamine and reduces cravings. Set a 5-minute timer on your phone!',
-                [{ text: 'Start Walking!' }]
-            );
-        } else if (distraction.action === 'challenge') {
-            Alert.alert(
-                'Water Challenge',
-                'Drink a full glass of water right now. Thirst is often mistaken for sugar cravings. Once you finish, take a moment to see how you feel.',
-                [{ text: 'Challenge Accepted!' }]
-            );
-        } else if (distraction.action === 'call') {
-            Alert.alert(
-                'Call Someone',
-                'Reach out to a friend or family member. Even a brief conversation can help shift your focus and provide support.',
-                [{ text: 'Got It!' }]
-            );
-        } else if (distraction.action === 'music') {
-            Alert.alert(
-                'Music Therapy',
-                'Put on a song that makes you feel good. Music can instantly shift your mood and help you through this moment.',
-                [{ text: 'Let\'s Go!' }]
-            );
+        } else {
+            // Navigate to unified task screen instead of system alert
+            navigation.navigate('DistractionTask', { taskId: distraction.id });
         }
     };
 
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={[calmColors.darkerBg, calmColors.darkBg, calmColors.darkerBg]}
-                locations={[0, 0.5, 1]}
-                style={styles.gradient}
+                colors={THEME.bgColors as any}
+                style={StyleSheet.absoluteFillObject}
             />
 
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-                {/* Header */}
+                {/* Unified Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
-                    >
-                        <Feather name="arrow-left" size={24} color={calmColors.text} />
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                        <Feather name="x" size={24} color={THEME.textDim} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Distract Me</Text>
+                    <Text style={styles.headerTitle}>DISTRACT ME</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
-                <ScrollView 
+                <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.content}
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Icon */}
-                    <View style={styles.iconContainer}>
-                        <View style={styles.iconBg}>
-                            <Feather name="target" size={48} color={calmColors.accent} />
+                    {/* Compact Title Area */}
+                    <View style={styles.titleContainer}>
+                        <Text style={styles.title}>Choose a Distraction</Text>
+                        <Text style={styles.subtitle}>
+                            Shift your focus for just a few minutes. Cravings typically pass quickly.
+                        </Text>
+                    </View>
+
+                    {/* Hero Tool: Breathing (Interactive) */}
+                    <TouchableOpacity
+                        style={styles.heroCard}
+                        onPress={() => navigation.navigate('BreathingExercise')}
+                        activeOpacity={0.9}
+                    >
+                        <LinearGradient
+                            colors={['rgba(99, 102, 241, 0.2)', 'rgba(67, 56, 202, 0.1)']}
+                            style={StyleSheet.absoluteFillObject}
+                        />
+                        <View style={styles.heroIconBg}>
+                            <Feather name="wind" size={32} color="#818CF8" />
+                        </View>
+                        <View style={styles.heroInfo}>
+                            <Text style={styles.heroLabel}>PRIMARY TOOL</Text>
+                            <Text style={styles.heroTitle}>Breathing Exercise</Text>
+                            <Text style={styles.heroDesc}>A 4-minute guided session to reset your neurochemistry.</Text>
+                        </View>
+                        <Feather name="chevron-right" size={24} color="#818CF8" />
+                    </TouchableOpacity>
+
+                    {/* Compact 2x2 Suggestions Grid */}
+                    <View style={styles.gridSection}>
+                        <Text style={styles.sectionLabel}>QUICK SUGGESTIONS</Text>
+                        <View style={styles.suggestionList}>
+                            {distractions.filter(d => d.id !== 'breathing').map((item: any) => (
+                                <View key={item.id} style={styles.suggestionItem}>
+                                    <View style={[styles.suggestionIcon, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                                        <Feather name={item.icon} size={20} color={THEME.textDim} />
+                                    </View>
+                                    <Text style={styles.suggestionTitle}>{item.title}</Text>
+                                    <Text style={styles.suggestionDesc}>{item.shortDesc}</Text>
+                                </View>
+                            ))}
                         </View>
                     </View>
 
-                    {/* Title */}
-                    <Text style={styles.title}>Choose a Distraction</Text>
-                    <Text style={styles.subtitle}>
-                        Shift your focus for just a few minutes. Cravings typically pass quickly.
-                    </Text>
-
-                    {/* Distraction Options */}
-                    <View style={styles.optionsContainer}>
-                        {distractions.map((distraction) => (
-                            <TouchableOpacity
-                                key={distraction.id}
-                                style={styles.optionCard}
-                                onPress={() => handleDistractionSelect(distraction)}
-                                activeOpacity={0.85}
-                            >
-                                <View style={[styles.optionIcon, { backgroundColor: `${distraction.color}20` }]}>
-                                    <Feather name={distraction.icon} size={24} color={distraction.color} />
-                                </View>
-                                <View style={styles.optionInfo}>
-                                    <Text style={styles.optionTitle}>{distraction.title}</Text>
-                                    <Text style={styles.optionDescription}>{distraction.description}</Text>
-                                </View>
-                                <Feather name="chevron-right" size={20} color={calmColors.textSecondary} />
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-
-                    {/* Tip */}
-                    <View style={styles.tipCard}>
-                        <Feather name="lightbulb" size={20} color={calmColors.accent} style={{ marginRight: spacing.md }} />
-                        <Text style={styles.tipText}>
-                            Research shows most cravings pass within 3-5 minutes when distracted.
-                        </Text>
-                    </View>
                 </ScrollView>
             </SafeAreaView>
         </View>
@@ -180,10 +174,7 @@ export default function DistractMeScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: calmColors.darkerBg,
-    },
-    gradient: {
-        ...StyleSheet.absoluteFillObject,
+        backgroundColor: '#0F172A',
     },
     safeArea: {
         flex: 1,
@@ -192,107 +183,138 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 20,
+        height: 60,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '700',
-        color: calmColors.text,
+        letterSpacing: 2,
+        color: '#FFF',
+    },
+    iconBtn: {
+        padding: 8,
     },
     scrollView: {
         flex: 1,
     },
     content: {
-        paddingHorizontal: spacing.xl,
-        paddingTop: spacing.xl,
-        paddingBottom: spacing.xxl,
-        alignItems: 'center',
+        paddingHorizontal: 30,
+        paddingTop: 10,
+        paddingBottom: 40,
     },
-    iconContainer: {
-        marginBottom: spacing.xl,
-    },
-    iconBg: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: calmColors.cardBg,
+    titleContainer: {
+        marginBottom: 24,
         alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: calmColors.accent,
     },
     title: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '700',
-        color: calmColors.text,
+        color: THEME.text,
         textAlign: 'center',
-        marginBottom: spacing.sm,
+        marginBottom: 8,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '400',
-        color: calmColors.textSecondary,
+        color: THEME.textDim,
         textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: spacing.xxl,
+        lineHeight: 20,
+        paddingHorizontal: 20,
     },
-    optionsContainer: {
+    // Hero Card (Interactive)
+    heroCard: {
         width: '100%',
-        marginBottom: spacing.xl,
-    },
-    optionCard: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        padding: 20,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: calmColors.cardBg,
-        borderRadius: borderRadius.xl,
-        padding: spacing.lg,
-        marginBottom: spacing.md,
+        marginBottom: 32,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(129, 140, 248, 0.3)',
     },
-    optionIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+    heroIconBg: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(129, 140, 248, 0.2)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: spacing.md,
+        marginRight: 16,
     },
-    optionInfo: {
+    heroInfo: {
         flex: 1,
     },
-    optionTitle: {
-        fontSize: 16,
+    heroLabel: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#818CF8',
+        letterSpacing: 1,
+        marginBottom: 4,
+    },
+    heroTitle: {
+        fontSize: 18,
         fontWeight: '700',
-        color: calmColors.text,
+        color: '#FFF',
         marginBottom: 2,
     },
-    optionDescription: {
+    heroDesc: {
         fontSize: 13,
-        color: calmColors.textSecondary,
+        color: THEME.textDim,
+        lineHeight: 18,
     },
-    tipCard: {
-        flexDirection: 'row',
-        backgroundColor: calmColors.cardBg,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
-        borderWidth: 1,
-        borderColor: `${calmColors.accent}30`,
-    },
-    tipText: {
-        flex: 1,
-        fontSize: 14,
-        color: calmColors.textSecondary,
-        lineHeight: 20,
-    },
-});
 
+
+    // Ideas Grid (Instructional)
+    gridSection: {
+        width: '100%',
+        marginBottom: 24,
+    },
+    sectionLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: THEME.textDim,
+        letterSpacing: 1.5,
+        marginBottom: 12,
+        paddingLeft: 4,
+    },
+    suggestionList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    suggestionItem: {
+        width: (width - 60 - 12) / 2, // 2-column grid
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    suggestionIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    suggestionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: THEME.text,
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    suggestionDesc: {
+        fontSize: 11,
+        color: THEME.textDim,
+        textAlign: 'center',
+    },
+
+});
 
 

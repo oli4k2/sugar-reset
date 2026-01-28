@@ -20,13 +20,12 @@ import { Feather } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const calmColors = {
-    darkBg: '#1A1A2E',
-    darkerBg: '#0F0F1E',
-    text: '#E8E8F0',
-    textSecondary: '#B0B0C8',
-    accent: '#88A4D6',
-    cardBg: 'rgba(255, 255, 255, 0.08)',
+const THEME = {
+    bgColors: ['#0F172A', '#1E1B4B'],
+    accent: '#818CF8',
+    text: '#F8FAFC',
+    textDim: '#94A3B8',
+    cardBg: 'rgba(255, 255, 255, 0.05)',
 };
 
 const emergencyContacts = [
@@ -52,9 +51,10 @@ const emergencyContacts = [
 ];
 
 export default function EmergencyCallScreen() {
-    const navigation = useNavigation();
+    const navigation = useNavigation<any>();
 
     const handleCall = (contact: typeof emergencyContacts[0]) => {
+        // ... (existing alert logic)
         if (contact.isText) {
             Alert.alert(
                 'Text Support',
@@ -78,26 +78,19 @@ export default function EmergencyCallScreen() {
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={[calmColors.darkerBg, calmColors.darkBg, calmColors.darkerBg]}
-                locations={[0, 0.5, 1]}
-                style={styles.gradient}
-            />
+            <LinearGradient colors={THEME.bgColors as any} style={StyleSheet.absoluteFillObject} />
 
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-                {/* Header */}
+                {/* Unified Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
-                    >
-                        <Feather name="arrow-left" size={24} color={calmColors.text} />
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                        <Feather name="x" size={24} color={THEME.textDim} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Emergency Support</Text>
+                    <Text style={styles.headerTitle}>EMERGENCY</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
-                <ScrollView 
+                <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.content}
                     showsVerticalScrollIndicator={false}
@@ -105,7 +98,7 @@ export default function EmergencyCallScreen() {
                     {/* Icon */}
                     <View style={styles.iconContainer}>
                         <View style={styles.iconBg}>
-                            <Feather name="phone" size={48} color={calmColors.accent} />
+                            <Feather name="phone" size={48} color={THEME.accent} />
                         </View>
                     </View>
 
@@ -125,10 +118,10 @@ export default function EmergencyCallScreen() {
                                 activeOpacity={0.85}
                             >
                                 <View style={styles.contactIcon}>
-                                    <Feather 
-                                        name={contact.isText ? "message-circle" : "phone"} 
-                                        size={24} 
-                                        color={calmColors.accent} 
+                                    <Feather
+                                        name={contact.isText ? "message-circle" : "phone"}
+                                        size={24}
+                                        color={THEME.accent}
                                     />
                                 </View>
                                 <View style={styles.contactInfo}>
@@ -140,14 +133,14 @@ export default function EmergencyCallScreen() {
                                         <Text style={styles.availabilityText}>{contact.availability}</Text>
                                     </View>
                                 </View>
-                                <Feather name="arrow-right" size={20} color={calmColors.textSecondary} />
+                                <Feather name="arrow-right" size={20} color={THEME.textDim} />
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     {/* Reminder */}
                     <View style={styles.reminderCard}>
-                        <Feather name="info" size={20} color={calmColors.accent} style={{ marginRight: spacing.md }} />
+                        <Feather name="info" size={20} color={THEME.accent} style={{ marginRight: spacing.md }} />
                         <Text style={styles.reminderText}>
                             These services are free, confidential, and available anytime you need support.
                         </Text>
@@ -161,10 +154,7 @@ export default function EmergencyCallScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: calmColors.darkerBg,
-    },
-    gradient: {
-        ...StyleSheet.absoluteFillObject,
+        backgroundColor: '#0F172A',
     },
     safeArea: {
         flex: 1,
@@ -173,27 +163,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 20,
+        height: 60,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '700',
-        color: calmColors.text,
+        letterSpacing: 2,
+        color: '#FFF',
+    },
+    iconBtn: {
+        padding: 8,
     },
     scrollView: {
         flex: 1,
     },
     content: {
-        paddingHorizontal: spacing.xl,
-        paddingTop: spacing.xl,
-        paddingBottom: spacing.xxl,
+        paddingHorizontal: 30,
+        paddingTop: 20,
+        paddingBottom: 40,
         alignItems: 'center',
     },
     iconContainer: {
@@ -203,26 +191,26 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: calmColors.cardBg,
+        backgroundColor: THEME.cardBg,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: calmColors.accent,
+        borderColor: THEME.accent,
     },
     title: {
         fontSize: 28,
         fontWeight: '700',
-        color: calmColors.text,
+        color: THEME.text,
         textAlign: 'center',
         marginBottom: spacing.sm,
     },
     subtitle: {
         fontSize: 16,
         fontWeight: '400',
-        color: calmColors.textSecondary,
+        color: THEME.textDim,
         textAlign: 'center',
         lineHeight: 24,
-        marginBottom: spacing.xxl,
+        marginBottom: 40,
     },
     contactsContainer: {
         width: '100%',
@@ -231,21 +219,21 @@ const styles = StyleSheet.create({
     contactCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: calmColors.cardBg,
-        borderRadius: borderRadius.xl,
-        padding: spacing.lg,
-        marginBottom: spacing.md,
+        backgroundColor: THEME.cardBg,
+        borderRadius: 24,
+        padding: 20,
+        marginBottom: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(255, 255, 255, 0.05)',
     },
     contactIcon: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: 'rgba(136, 164, 214, 0.15)',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: spacing.md,
+        marginRight: 16,
     },
     contactInfo: {
         flex: 1,
@@ -253,19 +241,19 @@ const styles = StyleSheet.create({
     contactName: {
         fontSize: 16,
         fontWeight: '700',
-        color: calmColors.text,
+        color: THEME.text,
         marginBottom: 2,
     },
     contactNumber: {
         fontSize: 15,
         fontWeight: '600',
-        color: calmColors.accent,
+        color: THEME.accent,
         marginBottom: 4,
     },
     contactDescription: {
         fontSize: 13,
-        color: calmColors.textSecondary,
-        marginBottom: spacing.xs,
+        color: THEME.textDim,
+        marginBottom: 8,
     },
     availabilityBadge: {
         flexDirection: 'row',
@@ -275,29 +263,32 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#7FB069',
+        backgroundColor: '#34D399',
         marginRight: 6,
     },
     availabilityText: {
         fontSize: 12,
         fontWeight: '500',
-        color: calmColors.textSecondary,
+        color: THEME.textDim,
     },
     reminderCard: {
         flexDirection: 'row',
-        backgroundColor: calmColors.cardBg,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
-        borderWidth: 1,
-        borderColor: 'rgba(136, 164, 214, 0.2)',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 16,
+        padding: 20,
+        width: '100%',
     },
     reminderText: {
         flex: 1,
         fontSize: 14,
-        color: calmColors.textSecondary,
+        color: THEME.textDim,
         lineHeight: 20,
     },
 });
+<<<<<<< HEAD
 
 
 
+=======
+>>>>>>> f103d1b049c26dfb268670ff16e9dc4f2180a5e2

@@ -16,7 +16,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../theme';
-import LooviBackground, { looviColors } from '../components/LooviBackground';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
+
+const THEME = {
+    bgColors: ['#0F172A', '#1E1B4B'],
+    accent: '#818CF8', // Indigo
+    text: '#F8FAFC',
+    textDim: '#94A3B8',
+    success: '#34D399',
+};
 
 type BreathingExerciseScreenProps = {
     navigation: NativeStackNavigationProp<any, 'BreathingExercise'>;
@@ -97,12 +106,22 @@ export default function BreathingExerciseScreen({ navigation }: BreathingExercis
     const instruction = PHASE_INSTRUCTIONS[phase];
 
     return (
-        <LooviBackground variant="blueTop">
-            <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
+            <LinearGradient colors={THEME.bgColors as any} style={StyleSheet.absoluteFillObject} />
+            <SafeAreaView style={styles.safeArea}>
+
+                {/* Unified Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                        <Feather name="x" size={24} color={THEME.textDim} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>BREATHING</Text>
+                    <View style={{ width: 40 }} />
+                </View>
+
                 <View style={styles.content}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <Text style={styles.title}>Box Breathing</Text>
+                    <View style={styles.topInfo}>
+                        <Text style={styles.cycleText}>Cycle {cycleCount + 1}</Text>
                         <Text style={styles.subtitle}>
                             Cravings typically pass in 3-5 minutes
                         </Text>
@@ -116,69 +135,87 @@ export default function BreathingExerciseScreen({ navigation }: BreathingExercis
                                 {
                                     transform: [{ scale: scaleAnim }],
                                     opacity: opacityAnim,
+                                    backgroundColor: THEME.accent,
                                 },
                             ]}
                         />
                         <View style={styles.instructionContainer}>
-                            <Text style={styles.instruction}>{instruction}</Text>
-                            <Text style={styles.countdown}>{countdown}</Text>
+                            <Text style={styles.instructionText}>{instruction}</Text>
+                            <Text style={styles.countdownText}>{countdown}</Text>
                         </View>
                     </View>
 
-                    {/* Progress */}
-                    <View style={styles.progressContainer}>
-                        <Text style={styles.cycleText}>Cycle {cycleCount + 1}</Text>
-                        <Text style={styles.tipText}>
-                            💡 Focus on the rhythm. Let thoughts pass like clouds.
-                        </Text>
+                    <View style={styles.bottomInfo}>
+                        <View style={styles.tipCard}>
+                            <Feather name="info" size={16} color={THEME.textDim} style={{ marginRight: 8 }} />
+                            <Text style={styles.tipText}>
+                                Focus on the rhythm. Let thoughts pass like clouds.
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.doneButton}
+                            onPress={() => navigation.goBack()}
+                            activeOpacity={0.9}
+                        >
+                            <LinearGradient
+                                colors={['#6366F1', '#4338CA']}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                                style={StyleSheet.absoluteFillObject}
+                            />
+                            <Text style={styles.doneButtonText}>I'm Calm Now</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
-
-                {/* Done Button */}
-                <TouchableOpacity
-                    style={styles.doneButton}
-                    onPress={() => navigation.goBack()}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.doneText}>I'm Calm Now</Text>
-                </TouchableOpacity>
-
-                {/* Exit Button */}
-                <TouchableOpacity
-                    style={styles.exitButton}
-                    onPress={() => navigation.goBack()}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.exitText}>✕</Text>
-                </TouchableOpacity>
             </SafeAreaView>
-        </LooviBackground>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#0F172A',
+    },
+    safeArea: {
+        flex: 1,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        height: 60,
+    },
+    headerTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        letterSpacing: 2,
+        color: '#FFF',
+    },
+    iconBtn: {
+        padding: 8,
     },
     content: {
         flex: 1,
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: spacing['3xl'],
+        paddingVertical: 20,
     },
-    header: {
+    topInfo: {
         alignItems: 'center',
     },
-    title: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: looviColors.text.primary,
-        marginBottom: spacing.xs,
+    cycleText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: THEME.accent,
+        letterSpacing: 1.5,
+        marginBottom: 8,
     },
     subtitle: {
         fontSize: 14,
-        fontWeight: '400',
-        color: looviColors.text.secondary,
+        color: THEME.textDim,
+        lineHeight: 20,
         textAlign: 'center',
     },
     circleContainer: {
@@ -192,65 +229,58 @@ const styles = StyleSheet.create({
         width: 250,
         height: 250,
         borderRadius: 125,
-        backgroundColor: looviColors.accent.primary,
     },
     instructionContainer: {
         alignItems: 'center',
     },
-    instruction: {
+    instructionText: {
         fontSize: 24,
-        fontWeight: '600',
-        color: '#FFFFFF',
-        marginBottom: spacing.sm,
-    },
-    countdown: {
-        fontSize: 48,
         fontWeight: '700',
         color: '#FFFFFF',
+        marginBottom: 4,
     },
-    progressContainer: {
+    countdownText: {
+        fontSize: 64,
+        fontWeight: '800',
+        color: '#FFFFFF',
+    },
+    bottomInfo: {
+        width: '100%',
+        paddingHorizontal: 24,
         alignItems: 'center',
     },
-    cycleText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: looviColors.text.primary,
-        marginBottom: spacing.md,
+    tipCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 32,
+        width: '100%',
     },
     tipText: {
-        fontSize: 14,
-        fontWeight: '400',
-        color: looviColors.text.secondary,
-        textAlign: 'center',
-        paddingHorizontal: spacing.xl,
+        flex: 1,
+        fontSize: 13,
+        color: THEME.textDim,
+        lineHeight: 18,
     },
     doneButton: {
-        marginHorizontal: spacing.xl,
-        marginBottom: spacing.xl,
-        paddingVertical: spacing.md,
-        backgroundColor: looviColors.accent.success,
-        borderRadius: 12,
+        height: 56,
+        width: '100%',
+        borderRadius: 28,
+        overflow: 'hidden',
         alignItems: 'center',
-    },
-    doneText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FFFFFF',
-    },
-    exitButton: {
-        position: 'absolute',
-        top: spacing.xl,
-        right: spacing.xl,
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(0, 0, 0, 0.2)',
         justifyContent: 'center',
-        alignItems: 'center',
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+        elevation: 8,
     },
-    exitText: {
-        fontSize: 24,
-        fontWeight: '300',
-        color: '#FFFFFF',
+    doneButtonText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#FFF',
+        letterSpacing: 0.5,
     },
 });

@@ -1,82 +1,105 @@
-/**
- * InnerCircleScreen - Talk to Inner Circle
- * 
- * Dedicated screen for contacting inner circle during cravings
- */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
-    TextInput,
     Alert,
-    ScrollView,
+    Dimensions,
+    Image,
+    Animated,
+    Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
-import { spacing, borderRadius } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
 import { notificationService } from '../services/notificationService';
+import { spacing } from '../theme';
 
-const calmColors = {
-    darkBg: '#1A1A2E',
-    darkerBg: '#0F0F1E',
-    text: '#E8E8F0',
-    textSecondary: '#B0B0C8',
-    accent: '#7FB069',
-    cardBg: 'rgba(255, 255, 255, 0.08)',
-    inputBg: 'rgba(255, 255, 255, 0.05)',
+const { width } = Dimensions.get('window');
+
+// Theme: Deep Connection (Indigo/Violet)
+const THEME = {
+    bg: ['#0F172A', '#1E1B4B'],
+    accent: '#818CF8',
+    text: '#F8FAFC',
+    textDim: '#94A3B8',
+    cardBg: 'rgba(255, 255, 255, 0.05)',
+    success: '#34D399',
 };
 
+const CONTEXT_CHIPS = [
+    { id: 'store', label: 'At the store 🛒', message: "I'm at the grocery store and it's tough." },
+    { id: 'home', label: 'Home alone 🏠', message: "I'm home alone and struggling with a craving." },
+    { id: 'talk', label: 'Need to talk 🗣️', message: "Just need a 5-min distraction call." },
+];
+
 export default function InnerCircleScreen() {
-    const navigation = useNavigation();
+    const navigation = useNavigation<any>();
     const { user } = useAuthContext();
-    const { onboardingData } = useUserData();
-    const [message, setMessage] = useState('');
+    const { onboardingData, innerCircle: friends } = useUserData();
     const [isSending, setIsSending] = useState(false);
+    const [selectedChip, setSelectedChip] = useState<string | null>(null);
 
-    const handleSendSOS = async () => {
-        if (!user) {
-            Alert.alert('Error', 'You must be logged in to send an SOS');
-            return;
-        }
+    // Pulse animation for the connection lines
+    const pulseAnim = useRef(new Animated.Value(0)).current;
 
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1,
+                    duration: 3000,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 0,
+                    duration: 3000,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    }, []);
+
+
+
+    const handleNotifyCircle = async () => {
+        if (!user) return;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setIsSending(true);
+
         try {
-            const userName = onboardingData.nickname || user.displayName || 'A friend';
+            const userName = onboardingData.nickname || user.displayName || 'Friend';
+
+            // Construct message with context if selected
+            const contextMsg = selectedChip
+                ? CONTEXT_CHIPS.find(c => c.id === selectedChip)?.message
+                : "Need a hand with a craving. Are you free?";
+
             const result = await notificationService.sendSOSAlert(
                 user.id,
                 userName,
-                message.trim() || undefined
+                contextMsg
             );
 
-            if (result.success && result.notifiedCount > 0) {
-                Alert.alert(
-                    'Message Sent',
-                    `Your Inner Circle (${result.notifiedCount} friend${result.notifiedCount > 1 ? 's' : ''}) has been notified. Stay strong! 💪`,
-                    [{ text: 'OK', onPress: () => navigation.goBack() }]
-                );
-                setMessage('');
-            } else if (result.notifiedCount === 0) {
-                Alert.alert(
-                    'No Friends Yet',
-                    'Add friends to your Inner Circle so they can support you when you need it!',
-                    [
-                        { text: 'Later', style: 'cancel' },
-                        { text: 'Add Friends', onPress: () => navigation.navigate('Social') }
-                    ]
-                );
+            if (result.success) {
+                Alert.alert('Sent!', 'Your circle has been notified.');
+                navigation.goBack();
             } else {
-                Alert.alert('Error', 'Failed to send message. Please try again.');
+                Alert.alert('Tips', 'Add friends to your circle first!', [
+                    { text: 'Add Friends', onPress: () => navigation.navigate('Social') }
+                ]);
             }
         } catch (error) {
-            console.error('SOS error:', error);
-            Alert.alert('Error', 'Failed to send message. Please try again.');
+            Alert.alert('Error', 'Could not reach circle.');
         } finally {
             setIsSending(false);
         }
@@ -84,103 +107,123 @@ export default function InnerCircleScreen() {
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={[calmColors.darkerBg, calmColors.darkBg, calmColors.darkerBg]}
-                locations={[0, 0.5, 1]}
-                style={styles.gradient}
-            />
+            <LinearGradient colors={THEME.bg as any} style={StyleSheet.absoluteFillObject} />
 
-            <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+            <SafeAreaView style={styles.safeArea}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
-                    >
-                        <Feather name="arrow-left" size={24} color={calmColors.text} />
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                        <Feather name="x" size={24} color={THEME.textDim} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Inner Circle</Text>
+                    <Text style={styles.headerTitle}>INNER CIRCLE</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
-                <ScrollView 
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.content}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Icon */}
-                    <View style={styles.iconContainer}>
-                        <View style={styles.iconBg}>
-                            <Feather name="users" size={48} color={calmColors.accent} />
+                <View style={styles.content}>
+
+                    {/* The Squad Visualization (Scalable Grid) */}
+                    <View style={styles.gridContainer}>
+                        <View style={styles.squadGrid}>
+                            {/* User Node (Always First) */}
+                            <View style={[styles.avatarNode, styles.userNode]}>
+                                <Feather name="user" size={24} color="#FFF" />
+                            </View>
+
+                            {/* Friend Nodes */}
+                            {friends.map((friend) => (
+                                <View key={friend.id} style={[styles.avatarNode, { backgroundColor: friend.color }]}>
+                                    <Text style={styles.initial}>{friend.name[0]}</Text>
+                                </View>
+                            ))}
+                        </View>
+
+                        {/* Decorative Connection Line */}
+                        <Animated.View style={[styles.pulseLine, { opacity: pulseAnim }]} />
+                    </View>
+
+                    {/* Context Chips (Actionable Prompt) */}
+                    <View style={styles.contextContainer}>
+                        <Text style={styles.contextLabel}>I AM...</Text>
+                        <View style={styles.chipRow}>
+                            {CONTEXT_CHIPS.map(chip => (
+                                <TouchableOpacity
+                                    key={chip.id}
+                                    style={[
+                                        styles.chip,
+                                        selectedChip === chip.id && styles.chipSelected
+                                    ]}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setSelectedChip(selectedChip === chip.id ? null : chip.id);
+                                    }}
+                                >
+                                    <View style={styles.chipContent}>
+                                        <Feather
+                                            name={selectedChip === chip.id ? "check" : "plus"}
+                                            size={12}
+                                            color={selectedChip === chip.id ? "#FFF" : THEME.textDim}
+                                            style={{ marginRight: 6 }}
+                                        />
+                                        <Text style={[
+                                            styles.chipText,
+                                            selectedChip === chip.id && styles.chipTextSelected
+                                        ]}>
+                                            {chip.label}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
                         </View>
                     </View>
 
-                    {/* Title */}
-                    <Text style={styles.title}>Reach Out for Support</Text>
-                    <Text style={styles.subtitle}>
-                        Your inner circle is here to help. Send them a quick message.
-                    </Text>
-
-                    {/* Message Input */}
-                    <View style={styles.inputCard}>
-                        <Text style={styles.inputLabel}>Your Message (Optional)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Having a tough moment..."
-                            placeholderTextColor={calmColors.textSecondary}
-                            value={message}
-                            onChangeText={setMessage}
-                            multiline
-                            numberOfLines={4}
-                            maxLength={200}
-                            textAlignVertical="top"
-                        />
-                        <Text style={styles.charCount}>{message.length}/200</Text>
-                    </View>
-
-                    {/* Quick Templates */}
-                    <View style={styles.templatesContainer}>
-                        <Text style={styles.templatesTitle}>Quick Messages</Text>
-                        <TouchableOpacity
-                            style={styles.template}
-                            onPress={() => setMessage("Having a craving right now. Could use some support.")}
-                        >
-                            <Text style={styles.templateText}>
-                                Having a craving right now. Could use some support.
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.template}
-                            onPress={() => setMessage("Need someone to talk to for a few minutes.")}
-                        >
-                            <Text style={styles.templateText}>
-                                Need someone to talk to for a few minutes.
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.template}
-                            onPress={() => setMessage("Struggling today. Just wanted to reach out.")}
-                        >
-                            <Text style={styles.templateText}>
-                                Struggling today. Just wanted to reach out.
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-
-                {/* Send Button */}
-                <View style={styles.footer}>
-                    <TouchableOpacity
-                        style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
-                        onPress={handleSendSOS}
-                        disabled={isSending}
-                        activeOpacity={0.85}
-                    >
-                        <Feather name="send" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                        <Text style={styles.sendButtonText}>
-                            {isSending ? 'Sending...' : 'Send to Inner Circle'}
+                    {/* Status Text */}
+                    <View style={styles.statusContainer}>
+                        <Text style={styles.statusTitle}>
+                            {friends.length} {friends.length === 1 ? 'Ally' : 'Allies'} Connected
                         </Text>
-                    </TouchableOpacity>
+                    </View>
+
+                    {/* Primary Action */}
+                    <View style={styles.footer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.notifyBtn,
+                                (isSending || friends.length === 0) && { opacity: 0.7 }
+                            ]}
+                            activeOpacity={0.9}
+                            onPress={handleNotifyCircle}
+                            disabled={isSending || friends.length === 0}
+                        >
+                            <LinearGradient
+                                colors={friends.length === 0
+                                    ? ['#475569', '#334155'] // Grey for disabled
+                                    : ['#6366F1', '#4338CA'] // Indigo for active
+                                }
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                                style={StyleSheet.absoluteFillObject}
+                            />
+                            <Feather
+                                name="bell"
+                                size={24}
+                                color={friends.length === 0 ? 'rgba(255,255,255,0.5)' : '#FFF'}
+                                style={{ marginRight: 12 }}
+                            />
+                            <Text style={[
+                                styles.notifyText,
+                                friends.length === 0 && { color: 'rgba(255,255,255,0.5)' }
+                            ]}>
+                                {isSending ? 'Signaling...' : 'Alert My Circle'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <Text style={styles.disclaimer}>
+                            {friends.length === 0
+                                ? 'Add allies to your circle to alert them.'
+                                : 'This sends a push notification to their devices.'
+                            }
+                        </Text>
+                    </View>
+
                 </View>
             </SafeAreaView>
         </View>
@@ -190,10 +233,7 @@ export default function InnerCircleScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: calmColors.darkerBg,
-    },
-    gradient: {
-        ...StyleSheet.absoluteFillObject,
+        backgroundColor: '#0F172A',
     },
     safeArea: {
         flex: 1,
@@ -202,134 +242,179 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
+        paddingHorizontal: 20,
+        height: 60,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '700',
-        color: calmColors.text,
+        letterSpacing: 2,
+        color: '#FFF',
     },
-    scrollView: {
-        flex: 1,
+    iconBtn: {
+        padding: 8,
     },
     content: {
-        paddingHorizontal: spacing.xl,
-        paddingTop: spacing.xl,
-        paddingBottom: spacing.xxl,
+        flex: 1,
+        justifyContent: 'space-between',
+        paddingVertical: 40,
+    },
+    // Squad Grid Styles
+    gridContainer: {
         alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 200,
+        marginVertical: 20,
     },
-    iconContainer: {
-        marginBottom: spacing.xl,
+    squadGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 16,
+        maxWidth: width * 0.8,
+        zIndex: 10,
     },
-    iconBg: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: calmColors.cardBg,
+    avatarNode: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
-        borderColor: calmColors.accent,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: '700',
-        color: calmColors.text,
-        textAlign: 'center',
-        marginBottom: spacing.sm,
-    },
-    subtitle: {
-        fontSize: 16,
-        fontWeight: '400',
-        color: calmColors.textSecondary,
-        textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: spacing.xxl,
-    },
-    inputCard: {
-        width: '100%',
-        backgroundColor: calmColors.cardBg,
-        borderRadius: borderRadius.xl,
-        padding: spacing.lg,
-        marginBottom: spacing.xl,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    inputLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: calmColors.text,
-        marginBottom: spacing.sm,
-    },
-    input: {
-        backgroundColor: calmColors.inputBg,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        fontSize: 15,
-        color: calmColors.text,
-        minHeight: 100,
-        marginBottom: spacing.xs,
-    },
-    charCount: {
-        fontSize: 12,
-        color: calmColors.textSecondary,
-        textAlign: 'right',
-    },
-    templatesContainer: {
-        width: '100%',
-    },
-    templatesTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: calmColors.text,
-        marginBottom: spacing.md,
-    },
-    template: {
-        backgroundColor: calmColors.cardBg,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        marginBottom: spacing.sm,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.05)',
-    },
-    templateText: {
-        fontSize: 14,
-        color: calmColors.textSecondary,
-        lineHeight: 20,
-    },
-    footer: {
-        paddingHorizontal: spacing.xl,
-        paddingBottom: spacing.lg,
-    },
-    sendButton: {
-        backgroundColor: calmColors.accent,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: borderRadius.xl,
+        borderColor: '#0F172A',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
-        elevation: 6,
+        elevation: 5,
     },
-    sendButtonDisabled: {
-        opacity: 0.6,
+    userNode: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderColor: 'rgba(255,255,255,0.2)',
+        borderWidth: 2,
     },
-    sendButtonText: {
-        fontSize: 16,
+    addNode: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderStyle: 'dashed',
+    },
+    initial: {
+        color: '#FFF',
         fontWeight: '700',
-        color: '#FFFFFF',
+        fontSize: 20,
+    },
+    pulseLine: {
+        position: 'absolute',
+        width: '120%',
+        height: 1,
+        backgroundColor: 'rgba(129, 140, 248, 0.4)',
+        top: '50%',
+        zIndex: 0,
+    },
+
+    // Empty State
+    emptyStateContainer: {
+        padding: 12,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    emptyText: {
+        color: THEME.textDim,
+        fontSize: 14,
+    },
+    // Text Status
+    statusContainer: {
+        alignItems: 'center',
+        paddingHorizontal: 40,
+    },
+    statusTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#FFF',
+        marginBottom: 8,
+    },
+    // Context Chips
+    contextContainer: {
+        paddingHorizontal: 24,
+        marginBottom: 20,
+    },
+    contextLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: THEME.textDim,
+        letterSpacing: 1,
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    chipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 10,
+    },
+    chip: {
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        overflow: 'hidden',
+    },
+    chipContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+    },
+    chipSelected: {
+        backgroundColor: 'rgba(129, 140, 248, 0.2)',
+        borderColor: '#818CF8',
+    },
+    chipText: {
+        color: THEME.textDim,
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    chipTextSelected: {
+        color: '#FFF',
+    },
+    // Footer
+    footer: {
+        paddingHorizontal: 24,
+        paddingBottom: 20,
+    },
+    notifyBtn: {
+        height: 56,
+        width: '100%',
+        borderRadius: 28,
+        overflow: 'hidden',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+        elevation: 8,
+    },
+    notifyText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#FFF',
+        letterSpacing: 0.5,
+    },
+    disclaimer: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.3)',
+        textAlign: 'center',
     },
 });
+<<<<<<< HEAD
 
 
 
+=======
+>>>>>>> f103d1b049c26dfb268670ff16e9dc4f2180a5e2

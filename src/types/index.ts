@@ -110,6 +110,7 @@ export type RootStackParamList = {
     Alternatives: undefined;
     InnerCircle: undefined;
     EmergencyCall: undefined;
+    DistractionTask: { taskId: string };
     PostDetail: { post: Post };
 };
 
