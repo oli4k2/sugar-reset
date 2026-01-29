@@ -14,9 +14,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Sugar Reset",
+  title: "Craveless",
   description: "Reset your sugar habits.",
-  description: "Reset your sugar habits.",
+  icons: {
+    icon: "/craveless_icon.png",
+  },
 };
 
 export default function RootLayout({
