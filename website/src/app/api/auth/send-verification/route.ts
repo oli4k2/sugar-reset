@@ -7,31 +7,22 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // Initialize Firebase Admin (prevent re-initialization)
 if (!admin.apps.length) {
     try {
-        const projectId = process.env.FIREBASE_PROJECT_ID;
-        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-        const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
+        // Robustly extract the private key, handling cases where the user pasted "KEY=VALUE"
+        // or included extra quotes/spaces in the Vercel dashboard.
+        const privateKeyMatch = process.env.FIREBASE_PRIVATE_KEY?.match(/-----BEGIN PRIVATE KEY-----[\s\S]+-----END PRIVATE KEY-----/);
+        const privateKey = privateKeyMatch
+            ? privateKeyMatch[0].replace(/\\n/g, "\n")
+            : undefined;
 
-        console.log("Initializing Firebase Admin...");
-        console.log("Project ID exists:", !!projectId, projectId);
-        console.log("Client Email exists:", !!clientEmail, clientEmail);
-        console.log("Private Key exists:", !!privateKeyRaw);
-
-        // Sanitize key
-        const privateKey = privateKeyRaw?.replace(/^"|"$/g, '')?.replace(/\\n/g, "\n");
-
-        if (privateKey) {
-            console.log("Private Key Length:", privateKey.length);
-            console.log("Private Key Start:", privateKey.substring(0, 20)); // Should be -----BEGIN PRIVATE
-            console.log("Private Key End:", privateKey.substring(privateKey.length - 20)); // Should be ND PRIVATE KEY-----
-        } else {
-            console.error("Private Key is empty after sanitization!");
+        if (!privateKey) {
+            console.error("FIREBASE_PRIVATE_KEY is missing or malformed");
         }
 
         admin.initializeApp({
             credential: admin.credential.cert({
-                projectId,
-                clientEmail,
-                privateKey,
+                projectId: process.env.FIREBASE_PROJECT_ID,
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                privateKey: privateKey,
             }),
         });
         console.log("Firebase Admin initialized successfully");

@@ -270,7 +270,10 @@ export function useAuth(): UseAuthReturn {
 
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.error || 'Failed to send email');
+                const errorMessage = typeof data.error === 'object'
+                    ? JSON.stringify(data.error)
+                    : data.error || 'Failed to send email';
+                throw new Error(errorMessage);
             }
 
             return true;
