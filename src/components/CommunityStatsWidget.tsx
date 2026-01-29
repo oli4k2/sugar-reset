@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { communityStatsService, CommunityStats } from '../services/communityStatsService';
+import { GlassCard } from './GlassCard';
 
 interface CommunityStatsWidgetProps {
     onStatsLoaded?: (stats: CommunityStats) => void;
@@ -57,7 +58,7 @@ export function CommunityStatsWidget({ onStatsLoaded }: CommunityStatsWidgetProp
     }
 
     return (
-        <View style={styles.container}>
+        <GlassCard variant="light" padding="md" style={styles.container}>
             {/* Simple 3-stat horizontal layout */}
             <View style={styles.statsRow}>
                 <View style={styles.statItem}>
@@ -88,22 +89,13 @@ export function CommunityStatsWidget({ onStatsLoaded }: CommunityStatsWidgetProp
                     <Text style={styles.statLabel}>Top Streak</Text>
                 </View>
             </View>
-        </View>
+        </GlassCard>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderRadius: borderRadius.xl,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.lg,
         marginBottom: spacing.lg,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
     },
     statsRow: {
         flexDirection: 'row',

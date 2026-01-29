@@ -55,6 +55,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             id: fbUser.uid,
             email: fbUser.email || '',
             displayName: fbUser.displayName || 'User',
+            photoURL: fbUser.photoURL || undefined,
             createdAt: new Date(),
             updatedAt: new Date(),
             preferences: {
@@ -89,6 +90,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
                         ]);
 
                         if (profile) {
+                            // Ensure photoURL from Auth is available
+                            if (!profile.photoURL && fbUser.photoURL) {
+                                profile.photoURL = fbUser.photoURL;
+                            }
                             console.log('✅ User profile loaded from Firestore');
                             return profile;
                         }
@@ -137,12 +142,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (auth.currentUser) {
             await auth.currentUser.reload();
             // Force state update by creating a new reference or just setting it again
-            // We use the auth.currentUser directly as it is the source of truth
-            setFirebaseUser({ ...auth.currentUser } as FirebaseUser);
-
-            // Also refresh the local user profile just in case
-            if (user && auth.currentUser.uid === user.id) {
-                // optional: refetch profile
+            // Fetch latest user profile from Firestore
+            try {
+                const profile = await userService.getUserProfile(auth.currentUser.uid);
+                if (profile) {
+                    // Ensure photoURL from Auth is available in user profile if not explicitly saved
+                    if (!profile.photoURL && auth.currentUser.photoURL) {
+                        profile.photoURL = auth.currentUser.photoURL;
+                    }
+                    setUser(profile);
+                    console.log('✅ User profile refreshed');
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to refresh user profile:', error);
             }
         }
     };

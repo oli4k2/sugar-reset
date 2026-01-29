@@ -37,6 +37,9 @@ export interface Comment {
     postId: string;
     authorId: string;
     authorName: string;
+    photoURL?: string;
+    avatarType?: 'photo' | 'emoji' | 'initial' | null;
+    avatarValue?: string | null;
     content: string;
     createdAt: Date;
 }
@@ -74,7 +77,12 @@ export const postService = {
         authorUsername: string | undefined,
         title: string,
         content: string,
-        tags: string[] = []
+        tags: string[] = [],
+        avatarData?: {
+            photoURL?: string;
+            avatarType?: 'photo' | 'emoji' | 'initial' | null;
+            avatarValue?: string | null;
+        }
     ): Promise<string> {
         const postsRef = collection(db, 'posts');
 
@@ -82,6 +90,9 @@ export const postService = {
             authorId,
             authorName,
             authorUsername: authorUsername || null,
+            photoURL: avatarData?.photoURL || null,
+            avatarType: avatarData?.avatarType || null,
+            avatarValue: avatarData?.avatarValue || null,
             title: title.trim(),
             content: content.trim(),
             tags: tags.map(t => t.toLowerCase().trim()).filter(Boolean),
@@ -146,6 +157,9 @@ export const postService = {
             authorId: data.authorId,
             authorName: data.authorName,
             authorUsername: data.authorUsername,
+            photoURL: data.photoURL,
+            avatarType: data.avatarType,
+            avatarValue: data.avatarValue,
             title: data.title,
             content: data.content,
             tags: data.tags || [],
@@ -171,6 +185,9 @@ export const postService = {
             authorId: data.authorId,
             authorName: data.authorName,
             authorUsername: data.authorUsername,
+            photoURL: data.photoURL,
+            avatarType: data.avatarType,
+            avatarValue: data.avatarValue,
             title: data.title,
             content: data.content,
             tags: data.tags || [],
@@ -228,7 +245,12 @@ export const postService = {
         postId: string,
         authorId: string,
         authorName: string,
-        content: string
+        content: string,
+        avatarData?: {
+            photoURL?: string;
+            avatarType?: 'photo' | 'emoji' | 'initial' | null;
+            avatarValue?: string | null;
+        }
     ): Promise<string> {
         const commentsRef = collection(db, 'posts', postId, 'comments');
 
@@ -236,6 +258,9 @@ export const postService = {
             postId,
             authorId,
             authorName,
+            photoURL: avatarData?.photoURL || null,
+            avatarType: avatarData?.avatarType || null,
+            avatarValue: avatarData?.avatarValue || null,
             content: content.trim(),
             createdAt: serverTimestamp(),
         };
@@ -265,6 +290,9 @@ export const postService = {
                 postId: data.postId,
                 authorId: data.authorId,
                 authorName: data.authorName,
+                photoURL: data.photoURL,
+                avatarType: data.avatarType,
+                avatarValue: data.avatarValue,
                 content: data.content,
                 createdAt: toDate(data.createdAt),
             };

@@ -107,6 +107,13 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
             // Debug: List all users to see what's in the database
             userService.listAllUsers(10);
 
+            // Backfill search fields for current user
+            userService.backfillSearchFields(user.id).then(() => {
+                console.log('✅ Search fields check complete');
+            }).catch(err => {
+                console.warn('⚠️ Failed to check search fields:', err);
+            });
+
             const displayName = onboardingData.nickname || user.displayName;
             if (displayName) {
                 userService.updateDisplayName(user.id, displayName).then(() => {
@@ -127,7 +134,9 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                 user.id,
                 onboardingData.nickname || user.displayName || user.email,
                 undefined, // username - will be fetched from profile
-                toUser.id
+                toUser.id,
+                toUser.displayName, // recipient's name
+                toUser.email // recipient's email
             );
             Alert.alert('Success', `Friend request sent to ${toUser.displayName || toUser.email}!`);
             onRequestSent?.();
@@ -296,6 +305,7 @@ const styles = StyleSheet.create({
         paddingTop: spacing.lg,
         paddingBottom: spacing.xl,
         maxHeight: '80%',
+        overflow: 'hidden', // Ensure content stays within bounds
     },
     header: {
         flexDirection: 'row',
@@ -326,8 +336,10 @@ const styles = StyleSheet.create({
         color: looviColors.text.primary,
     },
     resultsContainer: {
-        flex: 1,
+        flexGrow: 1,
+        flexShrink: 1,
         marginTop: spacing.lg,
+        maxHeight: 300, // Max height for scrollable area
     },
     resultsList: {
         gap: spacing.sm,

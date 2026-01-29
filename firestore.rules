@@ -33,10 +33,10 @@ service cloud.firestore {
         // User can read their own friends
         allow read: if isOwner(userId);
         
-        // Friends are added via Cloud Function or by both users
-        // For now, allow the user to manage their own friends list
-        allow create: if isOwner(userId);
-        allow delete: if isOwner(userId);
+        // Allow user to manage their own friends list (isOwner)
+        // AND allow other users to add THEMSELVES to this user's friend list (for accepting requests)
+        allow create: if isOwner(userId) || (isAuthenticated() && friendId == request.auth.uid);
+        allow delete: if isOwner(userId) || (isAuthenticated() && friendId == request.auth.uid);
         
         // No updates needed - just create/delete
         allow update: if false;
@@ -133,6 +133,10 @@ service cloud.firestore {
           request.resource.data.content is string &&
           request.resource.data.content.size() > 0 &&
           request.resource.data.content.size() <= 1000;
+        
+        // Author can update their own comments (for name propagation)
+        allow update: if isAuthenticated() && 
+          resource.data.authorId == request.auth.uid;
           
         allow delete: if isAuthenticated() && 
           resource.data.authorId == request.auth.uid;

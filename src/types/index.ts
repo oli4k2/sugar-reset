@@ -8,6 +8,8 @@ export interface User {
     email: string;
     displayName?: string;
     photoURL?: string;
+    avatarType?: 'photo' | 'emoji' | 'initial' | null;
+    avatarValue?: string | null;
     createdAt: Date;
     updatedAt: Date;
     preferences: UserPreferences;
@@ -29,6 +31,8 @@ export interface Friend {
     displayName: string;
     email?: string;
     photoURL?: string;
+    avatarType?: 'photo' | 'emoji' | 'initial' | null;
+    avatarValue?: string | null;
     addedAt: Date;
 }
 
@@ -36,8 +40,10 @@ export interface FriendRequest {
     id: string;
     fromUid: string;
     fromName: string;
-    fromUsername?: string;
+    fromUsername?: string | null; // Optional, can be null for Firestore compatibility
     toUid: string;
+    toName?: string | null; // Recipient's name for display in pending requests
+    toEmail?: string | null; // Recipient's email for display
     status: 'pending' | 'accepted' | 'declined';
     createdAt: Date;
 }
@@ -115,11 +121,15 @@ export type RootStackParamList = {
     VerificationPending: undefined;
 };
 
+// Community Posts
 export interface Post {
     id: string;
     authorId: string;
     authorName: string;
-    authorUsername?: string;
+    authorUsername?: string; // Optional, might be deprecated
+    photoURL?: string;
+    avatarType?: 'photo' | 'emoji' | 'initial' | null;
+    avatarValue?: string | null;
     title: string;
     content: string;
     tags: string[];

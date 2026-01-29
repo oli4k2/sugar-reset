@@ -28,18 +28,33 @@ import { spacing, borderRadius } from '../theme';
 import LooviBackground, { looviColors } from '../components/LooviBackground';
 import { GlassCard } from '../components/GlassCard';
 import { useAuthContext } from '../context/AuthContext';
+import { useUserData } from '../context/UserDataContext';
 import postService, { Comment } from '../services/postService';
 import { Post } from '../types';
+import { UserAvatar } from '../components/UserAvatar';
+
+type PostDTO = Omit<Post, 'createdAt' | 'updatedAt'> & {
+    createdAt: string;
+    updatedAt: string;
+};
 
 type RootStackParamList = {
-    PostDetail: { post: Post };
+    PostDetail: { post: Post | PostDTO };
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostDetail'>;
 
 export default function PostDetailScreen({ route, navigation }: Props) {
-    const { post: initialPost } = route.params;
+    const { post: paramsPost } = route.params;
     const { user } = useAuthContext();
+    const { onboardingData } = useUserData();
+
+    // Helper to hydrate post from params (handles string dates from serialization)
+    const initialPost: Post = {
+        ...paramsPost,
+        createdAt: typeof paramsPost.createdAt === 'string' ? new Date(paramsPost.createdAt) : paramsPost.createdAt,
+        updatedAt: typeof paramsPost.updatedAt === 'string' ? new Date(paramsPost.updatedAt) : paramsPost.updatedAt,
+    };
 
     const [post, setPost] = useState<Post>(initialPost);
     const [comments, setComments] = useState<Comment[]>([]);
@@ -86,7 +101,20 @@ export default function PostDetailScreen({ route, navigation }: Props) {
         Keyboard.dismiss();
         setSubmitting(true);
         try {
-            await postService.addComment(post.id, user.id, user.displayName || 'Anonymous', newComment);
+            // Use onboarding nickname first, then user displayName, then email, fallback            
+            const authorName = onboardingData?.nickname || user.displayName || user.email || 'Anonymous';
+
+            await postService.addComment(
+                post.id,
+                user.id,
+                authorName,
+                newComment,
+                {
+                    photoURL: user.photoURL,
+                    avatarType: user.avatarType,
+                    avatarValue: user.avatarValue
+                }
+            );
             setNewComment('');
             // Refresh comments
             await loadData();
@@ -113,9 +141,13 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             {/* Author */}
             <View style={styles.postHeader}>
                 <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarText}>
-                        {post.authorName?.[0]?.toUpperCase() || '?'}
-                    </Text>
+                    <UserAvatar
+                        size={40}
+                        photoURL={post.photoURL}
+                        avatarType={post.avatarType}
+                        avatarValue={post.avatarValue}
+                        name={post.authorName}
+                    />
                 </View>
                 <View style={styles.authorInfo}>
                     <Text style={styles.authorName}>{post.authorName}</Text>
@@ -150,8 +182,19 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const renderComment = ({ item }: { item: Comment }) => (
         <GlassCard variant="light" padding="md" style={styles.commentCard}>
             <View style={styles.commentHeader}>
-                <Text style={styles.commentAuthor}>{item.authorName}</Text>
-                <Text style={styles.commentTime}>{postService.getTimeAgo(item.createdAt)}</Text>
+                <View style={styles.commentAvatarContainer}>
+                    <UserAvatar
+                        size={32}
+                        photoURL={item.photoURL}
+                        avatarType={item.avatarType}
+                        avatarValue={item.avatarValue}
+                        name={item.authorName}
+                    />
+                </View>
+                <View style={styles.commentHeaderInfo}>
+                    <Text style={styles.commentAuthor}>{item.authorName}</Text>
+                    <Text style={styles.commentTime}>{postService.getTimeAgo(item.createdAt)}</Text>
+                </View>
             </View>
             <Text style={styles.commentContent}>{item.content}</Text>
         </GlassCard>
@@ -252,18 +295,7 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
     },
     avatarPlaceholder: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: looviColors.accent.secondary,
-        alignItems: 'center',
-        justifyContent: 'center',
         marginRight: spacing.sm,
-    },
-    avatarText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: looviColors.accent.primary,
     },
     authorInfo: {
         flex: 1,
@@ -336,8 +368,14 @@ const styles = StyleSheet.create({
     },
     commentHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: spacing.xs,
+        marginBottom: spacing.sm,
+        alignItems: 'center', // Changed to center alignment
+    },
+    commentAvatarContainer: {
+        marginRight: spacing.sm,
+    },
+    commentHeaderInfo: {
+        flex: 1,
     },
     commentAuthor: {
         fontSize: 13,

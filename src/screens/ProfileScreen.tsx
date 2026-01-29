@@ -26,6 +26,8 @@ import LooviBackground, { looviColors } from '../components/LooviBackground';
 import { GlassCard } from '../components/GlassCard';
 import PlanDetailsModal from '../components/PlanDetailsModal';
 import EditGoalsModal from '../components/EditGoalsModal';
+import { UserAvatar } from '../components/UserAvatar';
+import { AVATAR_EMOJIS } from '../constants/avatarConfig';
 
 import { useUserData } from '../context/UserDataContext';
 import { userService } from '../services/userService';
@@ -74,23 +76,34 @@ const menuSections = [
 
 export default function ProfileScreen() {
     const { onboardingData, streakData, updateOnboardingData } = useUserData();
-    const { user, isAuthenticated, firebaseUser } = useAuthContext();
+    const { user, isAuthenticated, firebaseUser, refreshUser } = useAuthContext();
     const { signOut } = useAuth();
     const navigation = useNavigation<any>();
     const [showPlanDetails, setShowPlanDetails] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [selectedAvatarType, setSelectedAvatarType] = useState<'photo' | 'emoji' | 'initial'>('initial');
+    const [selectedAvatarValue, setSelectedAvatarValue] = useState<string>('');
+    const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
     // Determine auth provider type
     const authProvider = useMemo((): 'google' | 'apple' | 'email' | 'unknown' => {
         if (!firebaseUser || !firebaseUser.providerData || firebaseUser.providerData.length === 0) {
             return 'unknown';
         }
-        const providerId = firebaseUser.providerData[0]?.providerId || '';
-        if (providerId.includes('google')) return 'google';
-        if (providerId.includes('apple')) return 'apple';
-        if (providerId.includes('password')) return 'email';
+
+        // Debug: log all providers
+        console.log('🔑 Provider data:', firebaseUser.providerData.map(p => p?.providerId));
+
+        // Check ALL providers in the array, not just the first one
+        for (const provider of firebaseUser.providerData) {
+            const providerId = provider?.providerId || '';
+            if (providerId.includes('google')) return 'google';
+            if (providerId.includes('apple')) return 'apple';
+            if (providerId.includes('password')) return 'email';
+        }
+
         return 'unknown';
     }, [firebaseUser]);
 
@@ -161,7 +174,16 @@ export default function ProfileScreen() {
     const handleEditProfile = async () => {
         if (!user) return;
         setEditNameState(name);
+        // Set current avatar selection
+        setSelectedAvatarType(user.avatarType || (user.photoURL ? 'photo' : 'initial'));
+        setSelectedAvatarValue(user.avatarValue || user.photoURL || '');
         setShowEditProfile(true);
+    };
+
+    const handleSelectAvatar = (type: 'photo' | 'emoji', value: string) => {
+        setSelectedAvatarType(type);
+        setSelectedAvatarValue(value);
+        setShowAvatarPicker(false);
     };
 
     const handleSaveProfile = async () => {
@@ -178,6 +200,14 @@ export default function ProfileScreen() {
                 // Also sync to Firestore for friend search
                 await userService.updateDisplayName(user.id, trimmedName);
             }
+
+            // Save avatar if changed
+            if (selectedAvatarType && selectedAvatarValue) {
+                await userService.updateAvatar(user.id, selectedAvatarType, selectedAvatarValue);
+            }
+
+            // Refresh user data to update UI immediately
+            await refreshUser();
 
             setShowEditProfile(false);
             Alert.alert('Success', 'Profile updated successfully');
@@ -206,7 +236,13 @@ export default function ProfileScreen() {
                         {/* User Card */}
                         <GlassCard variant="light" padding="lg" style={styles.userCard}>
                             <View style={styles.avatarContainer}>
-                                <AppIcon emoji="🧑" size={40} />
+                                <UserAvatar
+                                    size={64}
+                                    photoURL={user?.photoURL}
+                                    avatarType={user?.avatarType}
+                                    avatarValue={user?.avatarValue}
+                                    name={name}
+                                />
                             </View>
                             <Text style={styles.userName}>{name}</Text>
                             <Text style={styles.userEmail}>{email}</Text>
@@ -329,6 +365,59 @@ export default function ProfileScreen() {
                                         <Text style={styles.authProviderText}>
                                             Signed in with {authProvider === 'google' ? 'Google' : authProvider === 'apple' ? 'Apple' : 'Email'}
                                         </Text>
+                                    </View>
+                                )}
+
+                                {/* Avatar Selection */}
+                                <Text style={styles.inputLabel}>Profile Picture</Text>
+                                <View style={styles.avatarPickerSection}>
+                                    <TouchableOpacity
+                                        style={styles.currentAvatarPreview}
+                                        onPress={() => setShowAvatarPicker(!showAvatarPicker)}
+                                    >
+                                        <UserAvatar
+                                            size={56}
+                                            photoURL={selectedAvatarType === 'photo' ? selectedAvatarValue : undefined}
+                                            avatarType={selectedAvatarType}
+                                            avatarValue={selectedAvatarValue}
+                                            name={name}
+                                        />
+                                        <Text style={styles.changeAvatarText}>Tap to change</Text>
+                                    </TouchableOpacity>
+
+                                    {/* Google/Apple Photo Option */}
+                                    {firebaseUser?.photoURL && (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.photoOption,
+                                                selectedAvatarType === 'photo' && selectedAvatarValue === firebaseUser.photoURL && styles.avatarOptionSelected
+                                            ]}
+                                            onPress={() => handleSelectAvatar('photo', firebaseUser.photoURL!)}
+                                        >
+                                            <UserAvatar size={40} photoURL={firebaseUser.photoURL} avatarType="photo" avatarValue={firebaseUser.photoURL} name={name} />
+                                            <Text style={styles.photoOptionText}>Use {authProvider === 'google' ? 'Google' : 'Apple'} photo</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                {/* Emoji Picker Grid */}
+                                {showAvatarPicker && (
+                                    <View style={styles.emojiPickerGrid}>
+                                        <Text style={styles.emojiPickerTitle}>Choose an emoji</Text>
+                                        <View style={styles.emojiGrid}>
+                                            {AVATAR_EMOJIS.map((emoji) => (
+                                                <TouchableOpacity
+                                                    key={emoji}
+                                                    style={[
+                                                        styles.emojiOption,
+                                                        selectedAvatarType === 'emoji' && selectedAvatarValue === emoji && styles.avatarOptionSelected
+                                                    ]}
+                                                    onPress={() => handleSelectAvatar('emoji', emoji)}
+                                                >
+                                                    <Text style={styles.emojiText}>{emoji}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
                                     </View>
                                 )}
 
@@ -731,5 +820,66 @@ const styles = StyleSheet.create({
         color: looviColors.text.muted,
         textAlign: 'center',
         marginTop: spacing.sm,
+    },
+    // Avatar picker styles
+    avatarPickerSection: {
+        alignItems: 'center',
+        marginBottom: spacing.md,
+        gap: spacing.md,
+    },
+    currentAvatarPreview: {
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    changeAvatarText: {
+        fontSize: 12,
+        color: looviColors.accent.primary,
+        fontWeight: '500',
+    },
+    photoOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.lg,
+        gap: spacing.sm,
+    },
+    avatarOptionSelected: {
+        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        borderWidth: 2,
+        borderColor: looviColors.accent.primary,
+    },
+    photoOptionText: {
+        fontSize: 14,
+        color: looviColors.text.secondary,
+        fontWeight: '500',
+    },
+    emojiPickerGrid: {
+        marginBottom: spacing.md,
+    },
+    emojiPickerTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: looviColors.text.secondary,
+        marginBottom: spacing.sm,
+        textAlign: 'center',
+    },
+    emojiGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: spacing.xs,
+    },
+    emojiOption: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    },
+    emojiText: {
+        fontSize: 24,
     },
 });

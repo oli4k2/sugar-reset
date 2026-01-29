@@ -56,7 +56,9 @@ export const friendService = {
         fromUid: string,
         fromName: string,
         fromUsername: string | undefined,
-        toUid: string
+        toUid: string,
+        toName?: string,
+        toEmail?: string
     ): Promise<string> {
         // Check if request already exists
         const requestsRef = collection(db, 'friendRequests');
@@ -98,8 +100,10 @@ export const friendService = {
         const newRequest: Omit<FriendRequest, 'id'> = {
             fromUid,
             fromName,
-            fromUsername,
+            fromUsername: fromUsername || null, // Use null instead of undefined
             toUid,
+            toName: toName || null,
+            toEmail: toEmail || null,
             status: 'pending',
             createdAt: new Date(),
         };
@@ -147,9 +151,11 @@ export const friendService = {
         const receiverFriendRef = doc(db, 'users', acceptingUid, 'friends', requestData.fromUid);
         batch.set(receiverFriendRef, {
             uid: requestData.fromUid,
-            displayName: senderProfile.displayName || senderProfile.email,
-            email: senderProfile.email,
+            displayName: senderProfile.displayName || senderProfile.email || 'Unknown',
+            email: senderProfile.email || null,
             photoURL: senderProfile.photoURL || null,
+            avatarType: senderProfile.avatarType || 'initial',
+            avatarValue: senderProfile.avatarValue || null,
             addedAt: serverTimestamp(),
         });
 
@@ -157,9 +163,11 @@ export const friendService = {
         const senderFriendRef = doc(db, 'users', requestData.fromUid, 'friends', acceptingUid);
         batch.set(senderFriendRef, {
             uid: acceptingUid,
-            displayName: receiverProfile.displayName || receiverProfile.email,
-            email: receiverProfile.email,
+            displayName: receiverProfile.displayName || receiverProfile.email || 'Unknown',
+            email: receiverProfile.email || null,
             photoURL: receiverProfile.photoURL || null,
+            avatarType: receiverProfile.avatarType || 'initial',
+            avatarValue: receiverProfile.avatarValue || null,
             addedAt: serverTimestamp(),
         });
 
@@ -242,6 +250,8 @@ export const friendService = {
                 displayName: data.displayName,
                 email: data.email,
                 photoURL: data.photoURL,
+                avatarType: data.avatarType,
+                avatarValue: data.avatarValue,
                 addedAt: toDate(data.addedAt) as Date,
             };
         });
@@ -350,6 +360,8 @@ export const friendService = {
                 fromName: data.fromName,
                 fromUsername: data.fromUsername,
                 toUid: data.toUid,
+                toName: data.toName || null,
+                toEmail: data.toEmail || null,
                 status: data.status,
                 createdAt: toDate(data.createdAt) as Date,
             };

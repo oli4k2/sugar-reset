@@ -81,7 +81,12 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
                 undefined, // username no longer used
                 title.trim(),
                 content.trim(),
-                selectedTags
+                selectedTags,
+                {
+                    photoURL: user.photoURL,
+                    avatarType: user.avatarType,
+                    avatarValue: user.avatarValue
+                }
             );
 
             Alert.alert('Posted!', 'Your post has been shared with the community', [

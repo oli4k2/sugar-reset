@@ -36,6 +36,7 @@ import { friendService } from '../services/friendService';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
+import { UserAvatar } from '../components/UserAvatar';
 import { Friend, FriendRequest, UserStats, User, Post } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -54,6 +55,9 @@ interface LeaderboardEntry {
     score: number;
     streak: number;
     badge: string;
+    photoURL?: string;
+    avatarType?: 'photo' | 'emoji' | 'initial' | null;
+    avatarValue?: string | null;
 }
 
 export default function SocialScreen() {
@@ -72,6 +76,7 @@ export default function SocialScreen() {
     const [posts, setPosts] = useState<Post[]>([]);
     const [friends, setFriends] = useState<FriendWithStats[]>([]);
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+    const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [userVotes, setUserVotes] = useState<Map<string, 'up' | 'down'>>(new Map());
@@ -94,6 +99,7 @@ export default function SocialScreen() {
                 loadPosts(),
                 loadFriends(),
                 loadFriendRequests(),
+                loadOutgoingRequests(),
                 loadLeaderboard(),
             ]);
         } catch (error) {
@@ -154,6 +160,17 @@ export default function SocialScreen() {
         }
     };
 
+    const loadOutgoingRequests = async () => {
+        if (!user) return;
+
+        try {
+            const requests = await friendService.getOutgoingRequests(user.id);
+            setOutgoingRequests(requests);
+        } catch (error) {
+            console.error('Error loading outgoing requests:', error);
+        }
+    };
+
     const loadLeaderboard = async () => {
         try {
             const stats = await friendService.getLeaderboard(10);
@@ -171,6 +188,9 @@ export default function SocialScreen() {
                     score: stat.healthScore,
                     streak: stat.currentStreak,
                     badge,
+                    photoURL: userInfo?.photoURL,
+                    avatarType: userInfo?.avatarType,
+                    avatarValue: userInfo?.avatarValue,
                 };
             });
 
@@ -245,6 +265,18 @@ export default function SocialScreen() {
         setShowSearchModal(true);
     };
 
+    const handleCancelRequest = async (requestId: string) => {
+        if (!user) return;
+
+        try {
+            await friendService.cancelFriendRequest(requestId, user.id);
+            setOutgoingRequests(prev => prev.filter(r => r.id !== requestId));
+        } catch (error) {
+            console.error('Error cancelling request:', error);
+            Alert.alert('Error', 'Failed to cancel friend request');
+        }
+    };
+
     // Calculate user's rank in leaderboard
     const userRank = leaderboard.findIndex(e => e.userId === user?.id) + 1;
     const userScore = latestHealthScore || 0;
@@ -305,16 +337,32 @@ export default function SocialScreen() {
                         <TouchableOpacity
                             key={post.id}
                             activeOpacity={0.9}
-                            onPress={() => navigation.navigate('PostDetail', { post })}
+                            onPress={() => navigation.navigate('PostDetail', {
+                                post: {
+                                    ...post,
+                                    createdAt: post.createdAt.toISOString(),
+                                    updatedAt: post.updatedAt.toISOString(),
+                                }
+                            })}
                         >
-                            <GlassCard padding="lg" style={styles.postCard}>
+                            <GlassCard variant="light" padding="lg" style={styles.postCard}>
                                 {/* Post Header */}
                                 <View style={styles.postHeader}>
                                     <View style={styles.authorInfo}>
-                                        <Text style={styles.authorName}>{post.authorName}</Text>
-                                        <Text style={styles.postDot}>•</Text>
-                                        <Text style={styles.postTime}>{postService.getTimeAgo(post.createdAt)}</Text>
+                                        <View style={styles.postAvatarContainer}>
+                                            <UserAvatar
+                                                size={32}
+                                                photoURL={post.photoURL}
+                                                avatarType={post.avatarType}
+                                                avatarValue={post.avatarValue}
+                                                name={post.authorName}
+                                            />
+                                        </View>
+                                        <View>
+                                            <Text style={styles.authorName}>{post.authorName}</Text>
+                                        </View>
                                     </View>
+                                    <Text style={styles.postTime}>{postService.getTimeAgo(post.createdAt)}</Text>
                                 </View>
 
                                 {/* Post Content */}
@@ -329,27 +377,35 @@ export default function SocialScreen() {
                                         ))}
                                     </View>
 
-                                    <TouchableOpacity
-                                        style={styles.minimalUpvoteButton}
-                                        onPress={() => handleUpvote(post.id)}
-                                    >
-                                        <Ionicons name="arrow-up" size={16} color={looviColors.text.secondary} />
-                                        <Text style={styles.minimalUpvoteText}>{post.upvotes}</Text>
-                                    </TouchableOpacity>
+                                    <View style={styles.postActions}>
+                                        <View style={styles.commentIndicator}>
+                                            <Ionicons name="chatbubble-outline" size={14} color={looviColors.text.secondary} />
+                                            <Text style={styles.commentCountText}>{post.commentCount || 0}</Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={styles.minimalUpvoteButton}
+                                            onPress={() => handleUpvote(post.id)}
+                                        >
+                                            <Ionicons name="arrow-up" size={16} color={looviColors.text.secondary} />
+                                            <Text style={styles.minimalUpvoteText}>{post.upvotes}</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </GlassCard>
                         </TouchableOpacity>
                     ))
-                )}
+                )
+                }
 
 
-            </View>
+            </View >
         );
     };
 
     const renderInnerCircleTab = () => (
         <View style={styles.tabContent}>
-            {/* Friend Requests Section */}
+            {/* Incoming Friend Requests Section */}
             {friendRequests.length > 0 && (
                 <View style={styles.requestsSection}>
                     <View style={styles.sectionHeader}>
@@ -365,6 +421,41 @@ export default function SocialScreen() {
                             onAccept={handleAcceptRequest}
                             onDecline={handleDeclineRequest}
                         />
+                    ))}
+                </View>
+            )}
+
+            {/* Outgoing (Pending) Friend Requests Section */}
+            {outgoingRequests.length > 0 && (
+                <View style={styles.requestsSection}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Pending</Text>
+                        <View style={[styles.badge, { backgroundColor: looviColors.accent.secondary }]}>
+                            <Text style={styles.badgeText}>{outgoingRequests.length}</Text>
+                        </View>
+                    </View>
+                    {outgoingRequests.map((request) => (
+                        <GlassCard key={request.id} variant="light" padding="md" style={styles.pendingCard}>
+                            <View style={styles.friendRow}>
+                                <View style={[styles.friendAvatar, { backgroundColor: looviColors.accent.warning }]}>
+                                    <Ionicons name="hourglass-outline" size={18} color="#FFFFFF" />
+                                </View>
+                                <View style={styles.friendInfo}>
+                                    <Text style={styles.friendName}>
+                                        {request.toName || 'User'}
+                                    </Text>
+                                    <Text style={styles.friendUsername}>
+                                        {request.toEmail || 'Awaiting response...'}
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={styles.cancelButton}
+                                    onPress={() => handleCancelRequest(request.id)}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </GlassCard>
                     ))}
                 </View>
             )}
@@ -393,16 +484,18 @@ export default function SocialScreen() {
                     >
                         <GlassCard variant="light" padding="md" style={styles.friendCard}>
                             <View style={styles.friendRow}>
-                                <View style={[styles.friendAvatar, { backgroundColor: looviColors.accent.secondary }]}>
-                                    <Text style={styles.friendInitial}>
-                                        {friend.displayName?.[0]?.toUpperCase() || '?'}
-                                    </Text>
-                                </View>
+                                <UserAvatar
+                                    size={44}
+                                    photoURL={friend.photoURL}
+                                    avatarType={friend.avatarType}
+                                    avatarValue={friend.avatarValue}
+                                    name={friend.displayName}
+                                    backgroundColor={looviColors.accent.secondary}
+                                />
                                 <View style={styles.friendInfo}>
-                                    <Text style={styles.friendName}>{friend.displayName}</Text>
-                                    {friend.email && (
-                                        <Text style={styles.friendUsername}>{friend.email}</Text>
-                                    )}
+                                    <Text style={styles.friendName}>
+                                        {friend.displayName || 'Unknown'}
+                                    </Text>
                                 </View>
                                 <View style={styles.friendStats}>
                                     <View style={styles.miniStat}>
@@ -461,8 +554,19 @@ export default function SocialScreen() {
                                     )}
                                 </View>
                                 <View style={styles.leaderboardInfo}>
-                                    <Text style={styles.leaderboardName}>{entry.name}</Text>
-                                    <Text style={styles.leaderboardScore}>{entry.score} pts</Text>
+                                    <View style={styles.leaderboardUserRow}>
+                                        <UserAvatar
+                                            size={32}
+                                            photoURL={entry.photoURL}
+                                            avatarType={entry.avatarType}
+                                            avatarValue={entry.avatarValue}
+                                            name={entry.name}
+                                        />
+                                        <View style={{ marginLeft: spacing.sm }}>
+                                            <Text style={styles.leaderboardName}>{entry.name}</Text>
+                                            <Text style={styles.leaderboardScore}>{entry.score} pts</Text>
+                                        </View>
+                                    </View>
                                 </View>
                                 <View style={styles.streakBadge}>
                                     <Ionicons name="flame" size={14} color="#FFFFFF" />
@@ -472,30 +576,44 @@ export default function SocialScreen() {
                         </GlassCard>
                     ))}
                 </>
-            )}
+            )
+            }
 
             {/* Your Rank */}
-            {userRank > 0 && (
-                <View style={styles.yourRankContainer}>
-                    <Text style={styles.yourRankLabel}>Your Rank</Text>
-                    <GlassCard variant="light" padding="md" style={[styles.leaderboardCard, styles.yourRankCard]}>
-                        <View style={styles.leaderboardRow}>
-                            <View style={styles.rankBadge}>
-                                <Text style={styles.rankNumber}>{userRank}</Text>
+            {
+                userRank > 0 && (
+                    <View style={styles.yourRankContainer}>
+                        <Text style={styles.yourRankLabel}>Your Rank</Text>
+                        <GlassCard variant="light" padding="md" style={[styles.leaderboardCard, styles.yourRankCard]}>
+                            <View style={styles.leaderboardRow}>
+                                <View style={styles.rankBadge}>
+                                    <Text style={styles.rankNumber}>{userRank}</Text>
+                                </View>
+                                <View style={styles.leaderboardInfo}>
+                                    <View style={styles.leaderboardUserRow}>
+                                        <UserAvatar
+                                            size={32}
+                                            photoURL={user?.photoURL}
+                                            avatarType={user?.avatarType}
+                                            avatarValue={user?.avatarValue}
+                                            name={'You'}
+                                        />
+                                        <View style={{ marginLeft: spacing.sm }}>
+                                            <Text style={styles.leaderboardName}>You</Text>
+                                            <Text style={styles.leaderboardScore}>{userScore} pts</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                                <View style={styles.streakBadge}>
+                                    <Ionicons name="flame" size={14} color="#FFFFFF" />
+                                    <Text style={styles.streakBadgeText}>{userStreak}</Text>
+                                </View>
                             </View>
-                            <View style={styles.leaderboardInfo}>
-                                <Text style={styles.leaderboardName}>You</Text>
-                                <Text style={styles.leaderboardScore}>{userScore} pts</Text>
-                            </View>
-                            <View style={styles.streakBadge}>
-                                <Ionicons name="flame" size={14} color="#FFFFFF" />
-                                <Text style={styles.streakBadgeText}>{userStreak}</Text>
-                            </View>
-                        </View>
-                    </GlassCard>
-                </View>
-            )}
-        </View>
+                        </GlassCard>
+                    </View>
+                )
+            }
+        </View >
     );
 
     return (
@@ -507,15 +625,13 @@ export default function SocialScreen() {
                         style={styles.profileButton}
                         onPress={handleProfilePress}
                     >
-                        {user?.photoURL ? (
-                            <Image source={{ uri: user.photoURL }} style={styles.profileAvatarImage} />
-                        ) : (
-                            <View style={styles.profileAvatarPlaceholder}>
-                                <Text style={styles.profileInitial}>
-                                    {user?.displayName?.[0]?.toUpperCase() || 'U'}
-                                </Text>
-                            </View>
-                        )}
+                        <UserAvatar
+                            size={36}
+                            photoURL={user?.photoURL}
+                            avatarType={user?.avatarType}
+                            avatarValue={user?.avatarValue}
+                            name={user?.displayName || 'User'}
+                        />
                     </TouchableOpacity>
                 </View>
 
@@ -756,10 +872,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
+    postAvatarContainer: {
+        marginRight: spacing.sm,
+    },
     authorName: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
-        color: looviColors.text.secondary,
+        color: looviColors.text.primary,
     },
     postDot: {
         marginHorizontal: 6,
@@ -810,6 +929,21 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: looviColors.text.primary,
+    },
+    postActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+    },
+    commentIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    commentCountText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
     },
     /* Floating Action Button */
     floatingFab: {
@@ -922,6 +1056,20 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: looviColors.accent.primary,
     },
+    pendingCard: {
+        marginBottom: spacing.sm,
+    },
+    cancelButton: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.md,
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    cancelButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: looviColors.text.tertiary,
+    },
     /* Leaderboard Styles */
     leaderboardHeader: {
         marginBottom: spacing.md,
@@ -997,5 +1145,9 @@ const styles = StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
+    },
+    leaderboardUserRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
 });
