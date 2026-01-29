@@ -286,9 +286,3 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 });
-<<<<<<< HEAD
-
-
-
-=======
->>>>>>> f103d1b049c26dfb268670ff16e9dc4f2180a5e2

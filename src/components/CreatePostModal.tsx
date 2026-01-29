@@ -78,7 +78,7 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
             await postService.createPost(
                 user.id,
                 authorName,
-                user.username,
+                undefined, // username no longer used
                 title.trim(),
                 content.trim(),
                 selectedTags

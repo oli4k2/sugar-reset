@@ -320,82 +320,118 @@ export const userService = {
     },
 
     /**
+     * Debug: List all users in the database (for troubleshooting)
+     */
+    async listAllUsers(limitCount: number = 5): Promise<void> {
+        if (!isFirebaseReady()) {
+            console.log('📴 Firebase not ready');
+            return;
+        }
+
+        try {
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, limit(limitCount));
+            const snapshot = await getDocs(q);
+
+            console.log(`📊 Found ${snapshot.docs.length} users in database:`);
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                console.log(`  - ${doc.id}:`);
+                console.log(`    email: ${data.email}`);
+                console.log(`    displayName: ${data.displayName || '(none)'}`);
+                console.log(`    displayNameLower: ${data.displayNameLower || '(none)'}`);
+            });
+        } catch (error) {
+            console.error('❌ listAllUsers failed:', error);
+        }
+    },
+
+    /**
      * Search users by display name or email
      * Phase 2: Friend System
+     *
+     * Searches multiple fields for flexibility:
+     * - displayNameLower (indexed, lowercase)
+     * - email (always searched, not just when @ present)
      */
+
     async searchUsers(queryText: string): Promise<User[]> {
-        if (!isFirebaseReady()) return [];
+        if (!isFirebaseReady()) {
+            console.log('🔍 searchUsers: Firebase not ready, returning empty');
+            return [];
+        }
 
         const searchText = queryText.toLowerCase().trim();
-        if (searchText.length < 2) return [];
+        if (searchText.length < 2) {
+            console.log('🔍 searchUsers: Query too short:', searchText);
+            return [];
+        }
 
         const usersRef = collection(db, 'users');
         const results: User[] = [];
         const seenIds = new Set<string>();
 
+        const addUserToResults = (docSnapshot: any) => {
+            if (!seenIds.has(docSnapshot.id)) {
+                seenIds.add(docSnapshot.id);
+                const data = docSnapshot.data();
+                results.push({
+                    id: docSnapshot.id,
+                    email: data.email,
+                    displayName: data.displayName,
+                    photoURL: data.photoURL,
+                    createdAt: toDate(data.createdAt) as Date,
+                    updatedAt: toDate(data.updatedAt) as Date,
+                    preferences: data.preferences,
+                    streak: {
+                        ...data.streak,
+                        lastCheckIn: toDate(data.streak?.lastCheckIn),
+                        startDate: toDate(data.streak?.startDate) as Date,
+                    },
+                });
+            }
+        };
+
         try {
-            // Search by displayNameLower (prefix match)
+            console.log('🔍 userService.searchUsers:', searchText);
+
+            // Run all queries in parallel for speed
+            const queries: Promise<any>[] = [];
+
+            // 1. Search by displayNameLower (prefix match)
             const nameQuery = query(
                 usersRef,
                 where('displayNameLower', '>=', searchText),
                 where('displayNameLower', '<=', searchText + '\uf8ff'),
                 limit(10)
             );
+            queries.push(getDocs(nameQuery).catch(e => {
+                console.log('⚠️ displayNameLower query failed:', e?.code);
+                return { docs: [] };
+            }));
 
-            const nameSnapshot = await getDocs(nameQuery);
-            nameSnapshot.docs.forEach(doc => {
-                if (!seenIds.has(doc.id)) {
-                    seenIds.add(doc.id);
-                    const data = doc.data();
-                    results.push({
-                        id: doc.id,
-                        email: data.email,
-                        displayName: data.displayName,
-                        photoURL: data.photoURL,
-                        createdAt: toDate(data.createdAt) as Date,
-                        updatedAt: toDate(data.updatedAt) as Date,
-                        preferences: data.preferences,
-                        streak: {
-                            ...data.streak,
-                            lastCheckIn: toDate(data.streak?.lastCheckIn),
-                            startDate: toDate(data.streak?.startDate) as Date,
-                        },
-                    });
-                }
-            });
+            // 2. Always search by email (prefix match)
+            const emailQuery = query(
+                usersRef,
+                where('email', '>=', searchText),
+                where('email', '<=', searchText + '\uf8ff'),
+                limit(10)
+            );
+            queries.push(getDocs(emailQuery).catch(e => {
+                console.log('⚠️ email query failed:', e?.code);
+                return { docs: [] };
+            }));
 
-            // Also search by email if it looks like an email
-            if (searchText.includes('@') || searchText.includes('.')) {
-                const emailQuery = query(
-                    usersRef,
-                    where('email', '>=', searchText),
-                    where('email', '<=', searchText + '\uf8ff'),
-                    limit(5)
-                );
+            // Execute all queries in parallel
+            const [nameSnapshot, emailSnapshot] = await Promise.all(queries);
 
-                const emailSnapshot = await getDocs(emailQuery);
-                emailSnapshot.docs.forEach(doc => {
-                    if (!seenIds.has(doc.id)) {
-                        seenIds.add(doc.id);
-                        const data = doc.data();
-                        results.push({
-                            id: doc.id,
-                            email: data.email,
-                            displayName: data.displayName,
-                            photoURL: data.photoURL,
-                            createdAt: toDate(data.createdAt) as Date,
-                            updatedAt: toDate(data.updatedAt) as Date,
-                            preferences: data.preferences,
-                            streak: {
-                                ...data.streak,
-                                lastCheckIn: toDate(data.streak?.lastCheckIn),
-                                startDate: toDate(data.streak?.startDate) as Date,
-                            },
-                        });
-                    }
-                });
-            }
+            console.log('🔍 Results - name:', nameSnapshot.docs.length, 'email:', emailSnapshot.docs.length);
 
+            // Add results from all queries
+            nameSnapshot.docs.forEach(addUserToResults);
+            emailSnapshot.docs.forEach(addUserToResults);
+
+            console.log('🔍 Total unique results:', results.length);
             return results;
         } catch (error) {
             handleFirestoreError(error, 'searchUsers');

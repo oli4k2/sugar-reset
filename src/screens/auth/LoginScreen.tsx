@@ -14,9 +14,14 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 
 import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
@@ -28,10 +33,12 @@ type LoginScreenProps = {
 };
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
-    const { signIn } = useAuth();
+    const { signIn, signInWithGoogle, signInWithApple } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [appleLoading, setAppleLoading] = useState(false);
     const [error, setError] = useState('');
 
     const handleLogin = async () => {
@@ -65,6 +72,80 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         }
     };
 
+    const handleGoogleSignIn = async () => {
+        setGoogleLoading(true);
+        setError('');
+
+        try {
+            await GoogleSignin.hasPlayServices();
+            const userInfo = await GoogleSignin.signIn();
+            const idToken = userInfo.data?.idToken;
+
+            if (idToken) {
+                const success = await signInWithGoogle(idToken);
+                if (success) {
+                    navigation.getParent()?.reset({
+                        index: 0,
+                        routes: [{ name: 'Main' }],
+                    });
+                } else {
+                    setError('Google sign-in failed');
+                }
+            } else {
+                setError('Failed to get Google ID token');
+            }
+        } catch (err: any) {
+            console.error('Google sign-in error:', err);
+            setError('Google sign-in failed. Please try again.');
+        } finally {
+            setGoogleLoading(false);
+        }
+    };
+
+    const handleAppleSignIn = async () => {
+        setAppleLoading(true);
+        setError('');
+
+        try {
+            const nonce = Math.random().toString(36).substring(2, 10);
+            const hashedNonce = await Crypto.digestStringAsync(
+                Crypto.CryptoDigestAlgorithm.SHA256,
+                nonce
+            );
+
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                ],
+                nonce: hashedNonce,
+            });
+
+            if (credential.identityToken) {
+                const success = await signInWithApple(credential.identityToken, nonce);
+                if (success) {
+                    navigation.getParent()?.reset({
+                        index: 0,
+                        routes: [{ name: 'Main' }],
+                    });
+                } else {
+                    setError('Apple sign-in failed');
+                }
+            } else {
+                setError('Failed to get Apple identity token');
+            }
+        } catch (err: any) {
+            if (err.code === 'ERR_CANCELED') {
+                // User canceled, do nothing
+            } else {
+                console.error('Apple sign-in error:', err);
+                setError('Apple sign-in failed. Please try again.');
+            }
+        } finally {
+            setAppleLoading(false);
+        }
+    };
+
     const handleForgotPassword = () => {
         navigation.navigate('ForgotPassword');
     };
@@ -74,6 +155,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     };
 
     const isValid = email.includes('@') && password.length >= 6;
+    const isAppleSignInAvailable = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 13;
 
     return (
         <LooviBackground variant="coralTop">
@@ -93,6 +175,50 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                             <Text style={styles.emoji}>👋</Text>
                             <Text style={styles.title}>Welcome back</Text>
                             <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+                        </View>
+
+                        {/* Social Sign-In */}
+                        {Platform.OS === 'ios' && isAppleSignInAvailable && (
+                            <TouchableOpacity
+                                style={[styles.socialButton, styles.appleButton]}
+                                onPress={handleAppleSignIn}
+                                disabled={appleLoading || loading || googleLoading}
+                                activeOpacity={0.8}
+                            >
+                                {appleLoading ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                                        <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.socialButton, styles.googleButton]}
+                            onPress={handleGoogleSignIn}
+                            disabled={googleLoading || loading || appleLoading}
+                            activeOpacity={0.8}
+                        >
+                            {googleLoading ? (
+                                <ActivityIndicator size="small" color={looviColors.text.primary} />
+                            ) : (
+                                <>
+                                    <Ionicons name="logo-google" size={20} color="#EA4335" />
+                                    <Text style={[styles.socialButtonText, styles.googleButtonText]}>
+                                        Continue with Google
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+
+                        {/* Divider */}
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>or</Text>
+                            <View style={styles.dividerLine} />
                         </View>
 
                         {/* Form */}
@@ -261,5 +387,46 @@ const styles = StyleSheet.create({
         color: looviColors.accent.error,
         textAlign: 'center',
         marginTop: spacing.md,
+    },
+    socialButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        paddingVertical: 14,
+        borderRadius: borderRadius.lg,
+        marginBottom: spacing.md,
+    },
+    appleButton: {
+        backgroundColor: '#000000',
+    },
+    googleButton: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+    },
+    socialButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    googleButtonText: {
+        color: looviColors.text.primary,
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: spacing.xl,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    },
+    dividerText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: looviColors.text.tertiary,
+        marginHorizontal: spacing.md,
     },
 });

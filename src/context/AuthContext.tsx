@@ -51,7 +51,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             id: fbUser.uid,
             email: fbUser.email || '',
             displayName: fbUser.displayName || 'User',
-            username: undefined,
             createdAt: new Date(),
             updatedAt: new Date(),
             preferences: {

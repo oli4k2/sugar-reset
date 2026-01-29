@@ -51,7 +51,6 @@ interface LeaderboardEntry {
     rank: number;
     userId: string;
     name: string;
-    username?: string;
     score: number;
     streak: number;
     badge: string;
@@ -168,8 +167,7 @@ export default function SocialScreen() {
                 return {
                     rank: index + 1,
                     userId: stat.userId,
-                    name: userInfo?.displayName || userInfo?.username || 'Anonymous',
-                    username: userInfo?.username,
+                    name: userInfo?.displayName || 'Anonymous',
                     score: stat.healthScore,
                     streak: stat.currentStreak,
                     badge,
@@ -402,7 +400,9 @@ export default function SocialScreen() {
                                 </View>
                                 <View style={styles.friendInfo}>
                                     <Text style={styles.friendName}>{friend.displayName}</Text>
-                                    <Text style={styles.friendUsername}>@{friend.username}</Text>
+                                    {friend.email && (
+                                        <Text style={styles.friendUsername}>{friend.email}</Text>
+                                    )}
                                 </View>
                                 <View style={styles.friendStats}>
                                     <View style={styles.miniStat}>

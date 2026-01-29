@@ -4,10 +4,11 @@
  * A modern, minimal, science-driven habit app for quitting sugar.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { AuthProvider } from './src/context/AuthContext';
 import { UserDataProvider } from './src/context/UserDataContext';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -36,6 +37,14 @@ export default function App() {
     Inter_500Medium,
     Inter_600SemiBold,
   });
+
+  // Configure Google Sign-In
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+      offlineAccess: true,
+    });
+  }, []);
 
   if (!fontsLoaded) {
     return null; // Keep splash screen visible or show loading

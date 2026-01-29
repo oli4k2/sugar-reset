@@ -4,7 +4,7 @@
  * Modal for searching and adding friends by name or email.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -15,12 +15,17 @@ import {
     FlatList,
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
+    TouchableWithoutFeedback,
+    Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { GlassCard } from './GlassCard';
 import { friendService } from '../services/friendService';
+import { userService } from '../services/userService';
 import { User } from '../types';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
@@ -38,26 +43,80 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
     const [searchResults, setSearchResults] = useState<User[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [sendingTo, setSendingTo] = useState<string | null>(null);
+    const [hasSearched, setHasSearched] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
+    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleSearch = useCallback(async () => {
-        if (!searchQuery.trim() || searchQuery.length < 2) {
+    const handleSearch = useCallback(async (query: string) => {
+        const trimmedQuery = query.trim();
+        if (!trimmedQuery || trimmedQuery.length < 2) {
             setSearchResults([]);
+            setHasSearched(false);
+            setSearchError(null);
             return;
         }
 
         setIsSearching(true);
+        setHasSearched(true);
+        setSearchError(null);
         try {
-            const results = await friendService.searchUsers(searchQuery.trim());
+            console.log('🔍 FriendSearchModal: Searching for:', trimmedQuery);
+            const results = await friendService.searchUsers(trimmedQuery);
+            console.log('🔍 FriendSearchModal: Got results:', results.length, results.map(r => r.email));
             // Filter out current user
             const filtered = results.filter(u => u.id !== user?.id);
+            console.log('🔍 FriendSearchModal: After filtering self:', filtered.length);
             setSearchResults(filtered);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Search error:', error);
-            Alert.alert('Error', 'Failed to search users');
+            setSearchError(error?.message || 'Search failed');
+            Alert.alert('Error', 'Failed to search users. Please check your internet connection.');
         } finally {
             setIsSearching(false);
         }
-    }, [searchQuery, user?.id]);
+    }, [user?.id]);
+
+    // Auto-search with debounce as user types
+    useEffect(() => {
+        if (debounceTimer.current) {
+            clearTimeout(debounceTimer.current);
+        }
+
+        if (searchQuery.trim().length >= 2) {
+            debounceTimer.current = setTimeout(() => {
+                handleSearch(searchQuery);
+            }, 300); // 300ms debounce
+        } else {
+            setSearchResults([]);
+            setHasSearched(false);
+        }
+
+        return () => {
+            if (debounceTimer.current) {
+                clearTimeout(debounceTimer.current);
+            }
+        };
+    }, [searchQuery, handleSearch]);
+
+    // Ensure current user has displayNameLower when modal opens
+    const hasSyncedSelf = useRef(false);
+    useEffect(() => {
+        if (visible && !hasSyncedSelf.current && user?.id) {
+            hasSyncedSelf.current = true;
+
+            // Debug: List all users to see what's in the database
+            userService.listAllUsers(10);
+
+            const displayName = onboardingData.nickname || user.displayName;
+            if (displayName) {
+                userService.updateDisplayName(user.id, displayName).then(() => {
+                    console.log('✅ Synced own displayNameLower for search');
+                }).catch(err => {
+                    console.warn('⚠️ Failed to sync displayNameLower:', err);
+                });
+            }
+        }
+    }, [visible, user, onboardingData.nickname]);
 
     const handleSendRequest = async (toUser: User) => {
         if (!user) return;
@@ -92,6 +151,8 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
     const handleClose = () => {
         setSearchQuery('');
         setSearchResults([]);
+        setHasSearched(false);
+        setSearchError(null);
         onClose();
     };
 
@@ -133,81 +194,86 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
         <Modal
             visible={visible}
             transparent
-            animationType="slide"
+            animationType="fade"
             onRequestClose={handleClose}
         >
-            <View style={styles.overlay}>
-                <View style={styles.container}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <Text style={styles.title}>Find Friends</Text>
-                        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={24} color={looviColors.text.primary} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Search Input */}
-                    <View style={styles.searchContainer}>
-                        <Ionicons name="search" size={20} color={looviColors.text.muted} />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search by name or email..."
-                            placeholderTextColor={looviColors.text.muted}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            onSubmitEditing={handleSearch}
-                            returnKeyType="search"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <Ionicons name="close-circle" size={20} color={looviColors.text.muted} />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-
-                    {/* Search Button */}
-                    <TouchableOpacity
-                        style={styles.searchButton}
-                        onPress={handleSearch}
-                        disabled={isSearching || searchQuery.length < 2}
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={styles.overlay}>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.keyboardAvoid}
                     >
-                        {isSearching ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.searchButtonText}>Search</Text>
-                        )}
-                    </TouchableOpacity>
-
-                    {/* Results */}
-                    <View style={styles.resultsContainer}>
-                        {searchResults.length === 0 && !isSearching && searchQuery.length >= 2 && (
-                            <View style={styles.noResultsContainer}>
-                                <Text style={styles.noResults}>No users found for "{searchQuery}"</Text>
-                                <Text style={styles.noResultsHint}>
-                                    Make sure your friend has signed up for SugarReset.
-                                </Text>
-                                <Text style={styles.noResultsTip}>
-                                    Tip: Try searching by their email address
-                                </Text>
+                        <View style={styles.container}>
+                            {/* Header */}
+                            <View style={styles.header}>
+                                <Text style={styles.title}>Find Friends</Text>
+                                <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                                    <Ionicons name="close" size={24} color={looviColors.text.primary} />
+                                </TouchableOpacity>
                             </View>
-                        )}
-                        <FlatList
-                            data={searchResults}
-                            keyExtractor={(item) => item.id}
-                            renderItem={renderUserItem}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={styles.resultsList}
-                        />
-                    </View>
 
-                    {/* Hint */}
-                    <Text style={styles.hint}>
-                        Search for friends by their name or email to add them to your Inner Circle
-                    </Text>
+                            {/* Search Input */}
+                            <View style={styles.searchContainer}>
+                                <Ionicons name="search" size={20} color={looviColors.text.muted} />
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search by name or email..."
+                                    placeholderTextColor={looviColors.text.muted}
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    onSubmitEditing={() => handleSearch(searchQuery)}
+                                    returnKeyType="search"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    autoFocus
+                                />
+                                {isSearching ? (
+                                    <ActivityIndicator size="small" color={looviColors.text.muted} />
+                                ) : searchQuery.length > 0 ? (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                        <Ionicons name="close-circle" size={20} color={looviColors.text.muted} />
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+
+                            {/* Results */}
+                            <View style={styles.resultsContainer}>
+                                {searchError && (
+                                    <View style={styles.noResultsContainer}>
+                                        <Text style={styles.noResults}>Search error</Text>
+                                        <Text style={styles.noResultsHint}>{searchError}</Text>
+                                    </View>
+                                )}
+                                {!searchError && searchResults.length === 0 && !isSearching && hasSearched && (
+                                    <View style={styles.noResultsContainer}>
+                                        <Text style={styles.noResults}>No users found</Text>
+                                        <Text style={styles.noResultsHint}>
+                                            Search matches the start of names or emails.
+                                            Try typing the first few letters of their email.
+                                        </Text>
+                                        <Text style={styles.noResultsTip}>
+                                            Example: "john" finds "john@email.com"
+                                        </Text>
+                                    </View>
+                                )}
+                                <FlatList
+                                    data={searchResults}
+                                    keyExtractor={(item) => item.id}
+                                    renderItem={renderUserItem}
+                                    showsVerticalScrollIndicator={false}
+                                    contentContainerStyle={styles.resultsList}
+                                    keyboardShouldPersistTaps="handled"
+                                />
+                            </View>
+
+                            {/* Hint */}
+                            <Text style={styles.hint}>
+                                Enter the beginning of their name or email address
+                            </Text>
+                        </View>
+                    </KeyboardAvoidingView>
                 </View>
-            </View>
+            </TouchableWithoutFeedback>
         </Modal>
     );
 }
@@ -216,16 +282,20 @@ const styles = StyleSheet.create({
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.md,
+    },
+    keyboardAvoid: {
+        flex: 1,
+        justifyContent: 'center',
     },
     container: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: borderRadius['2xl'],
-        borderTopRightRadius: borderRadius['2xl'],
+        borderRadius: borderRadius['2xl'],
         paddingHorizontal: spacing.lg,
         paddingTop: spacing.lg,
-        paddingBottom: spacing['3xl'],
-        maxHeight: '85%',
+        paddingBottom: spacing.xl,
+        maxHeight: '80%',
     },
     header: {
         flexDirection: 'row',
@@ -254,18 +324,6 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         color: looviColors.text.primary,
-    },
-    searchButton: {
-        backgroundColor: looviColors.accent.primary,
-        borderRadius: borderRadius.lg,
-        paddingVertical: spacing.md,
-        alignItems: 'center',
-        marginTop: spacing.md,
-    },
-    searchButtonText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FFFFFF',
     },
     resultsContainer: {
         flex: 1,

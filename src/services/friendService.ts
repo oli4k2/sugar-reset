@@ -39,7 +39,7 @@ const toDate = (timestamp: Timestamp | null): Date | null => {
 
 export const friendService = {
     /**
-     * Search for users by username
+     * Search for users by name or email
      * Delegates to userService.searchUsers
      */
     async searchUsers(queryText: string): Promise<User[]> {
@@ -148,7 +148,7 @@ export const friendService = {
         batch.set(receiverFriendRef, {
             uid: requestData.fromUid,
             displayName: senderProfile.displayName || senderProfile.email,
-            username: senderProfile.username || '',
+            email: senderProfile.email,
             photoURL: senderProfile.photoURL || null,
             addedAt: serverTimestamp(),
         });
@@ -158,7 +158,7 @@ export const friendService = {
         batch.set(senderFriendRef, {
             uid: acceptingUid,
             displayName: receiverProfile.displayName || receiverProfile.email,
-            username: receiverProfile.username || '',
+            email: receiverProfile.email,
             photoURL: receiverProfile.photoURL || null,
             addedAt: serverTimestamp(),
         });
@@ -240,7 +240,7 @@ export const friendService = {
             return {
                 uid: doc.id,
                 displayName: data.displayName,
-                username: data.username,
+                email: data.email,
                 photoURL: data.photoURL,
                 addedAt: toDate(data.addedAt) as Date,
             };
@@ -262,7 +262,7 @@ export const friendService = {
                 return {
                     uid: doc.id,
                     displayName: data.displayName,
-                    username: data.username,
+                    email: data.email,
                     photoURL: data.photoURL,
                     addedAt: toDate(data.addedAt) as Date,
                 };

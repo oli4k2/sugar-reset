@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* Dark mode preference avoided for simplicity */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Fonts */
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-dm-sans);
+
+  /* Loovi Colors */
+  --color-loovi-background: #F5F0EB;
+
+  /* Coral */
+  --color-loovi-coral-orange: #E8A87C;
+  --color-loovi-coral-dark: #D4896A;
+  --color-loovi-coral-soft: #EEC4A0;
+
+  /* Blue */
+  --color-loovi-sky-blue: #A8D8E8;
+  --color-loovi-sky-blue-soft: #C5E4F0;
+  --color-loovi-sky-blue-dark: #7BC0D4;
+
+  /* Neutral */
+  --color-loovi-warm-beige: #F2E4D8;
+
+  /* Text */
+  --color-loovi-text-primary: #2D2D2D;
+  --color-loovi-text-secondary: #4A4A4A;
+  --color-loovi-text-tertiary: #6B6B6B;
+  --color-loovi-text-muted: #9A9A9A;
+  --color-loovi-text-light: #FFFFFF;
+  --color-loovi-text-on-dark: #FFFFFF;
+  --color-loovi-text-coral: #C97B5D;
+  --color-loovi-text-blue: #5BA3B8;
+
+  /* Accents */
+  --color-loovi-accent-primary: #E8A87C;
+  --color-loovi-accent-secondary: #A8D8E8;
+  --color-loovi-accent-success: #7FB069;
+  --color-loovi-accent-warning: #F5B461;
+  --color-loovi-accent-error: #E57373;
+}
+
+body {
+  background-color: var(--color-loovi-background);
+  color: var(--color-loovi-text-primary);
+  font-family: var(--font-inter);
+}

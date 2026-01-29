@@ -412,9 +412,3 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 });
-<<<<<<< HEAD
-
-
-
-=======
->>>>>>> f103d1b049c26dfb268670ff16e9dc4f2180a5e2
