@@ -16,9 +16,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Sugar Reset",
   description: "Reset your sugar habits.",
-  icons: {
-    icon: "/craveless_icon.png",
-  },
+  description: "Reset your sugar habits.",
 };
 
 export default function RootLayout({
