@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
         // 4. Send email via Resend
         const { data, error } = await resend.emails.send({
-            from: "Craveless <auth@craveless.info>",
+            from: process.env.RESEND_FROM_EMAIL || "Craveless <auth@craveless.info>",
             to: email,
             subject: "Verify your email for Craveless",
             html: `
