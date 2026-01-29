@@ -255,10 +255,12 @@ export function useAuth(): UseAuthReturn {
             const user = auth.currentUser;
             if (!user) throw new Error('No user logged in');
 
-            const idToken = await user.getIdToken();
+            console.log('Fetching ID token for user:', user.uid);
+            const idToken = await user.getIdToken(true);
+            console.log('ID Token fetched, length:', idToken?.length);
 
             // Call website API
-            const response = await fetch('https://craveless.info/api/auth/send-verification', {
+            const response = await fetch('https://www.craveless.info/api/auth/send-verification', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

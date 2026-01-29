@@ -56,12 +56,8 @@ export default function SignUpScreen({ navigation }: SignUpScreenProps) {
                 // Send verification email
                 await sendVerificationEmail();
 
-                // Navigate to Main app after successful signup
-                console.log('Sign up successful - navigating to Main');
-                navigation.getParent()?.reset({
-                    index: 0,
-                    routes: [{ name: 'Main' }],
-                });
+                // Navigation is handled automatically by RootNavigator listening to auth state
+                console.log('Sign up successful - waiting for RootNavigator to switch stack');
             } else {
                 setError('Failed to create account');
                 setLoading(false);
