@@ -84,7 +84,7 @@ export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScr
                         ]}
                     >
                         <Animated.Image
-                            source={require('../../public/sugarestlogo.png')}
+                            source={require('../../public/cravelesslogo.png')}
                             style={styles.logo}
                             resizeMode="contain"
                         />
@@ -93,7 +93,7 @@ export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScr
                     {/* Welcome Message */}
                     <View style={styles.welcomeSection}>
                         <GradientText
-                            text="Welcome to Sugarest"
+                            text="Welcome to Craveless"
                             colors={['#FF6B35', '#E8A87C', '#D4896A']}
                             fontSize={getResponsiveFontSize(28)}
                             fontWeight="900"

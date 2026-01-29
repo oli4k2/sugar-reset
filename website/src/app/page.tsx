@@ -1,6 +1,25 @@
+"use client";
+
 import Image from "next/image";
+import { useState, useEffect } from "react";
 
 export default function Home() {
+  const [modalContent, setModalContent] = useState<{ title: string; content: string } | null>(null);
+
+  const openModal = (type: "privacy" | "terms") => {
+    if (type === "privacy") {
+      setModalContent({
+        title: "Privacy Policy",
+        content: "Welcome to Craveless ('we', 'our', or 'us'). We are committed to protecting your personal information and your right to privacy. \n\n1. Information we collect: We collect personal information that you voluntarily provide to us when you register on the Craveless app.\n\n2. How we use your information: We use your information to provide, improve, and administer our services.\n\n3. Contact us: If you have questions or comments about this policy, you may email us at contact@craveless.info.",
+      });
+    } else {
+      setModalContent({
+        title: "Terms of Service",
+        content: "Welcome to Craveless! These terms and conditions outline the rules and regulations for the use of the Craveless application.\n\n1. Acceptance of Terms: By accessing this app we assume you accept these terms and conditions.\n\n2. License: Craveless owns the intellectual property rights for all material on Craveless.\n\n3. User Comments: Certain parts of this app offer the opportunity for users to post and exchange opinions and information.",
+      });
+    }
+  };
+
   return (
     <main className="min-h-screen bg-loovi-background overflow-hidden relative selection:bg-loovi-coral-soft selection:text-loovi-text-primary">
       {/* Background Gradients & Blobs */}
@@ -8,16 +27,19 @@ export default function Home() {
       <div className="absolute -top-[200px] -right-[200px] w-[600px] h-[600px] bg-loovi-sky-blue/15 rounded-full blur-[120px] pointer-events-none animate-pulse-slow" />
       <div className="absolute top-[40%] -left-[200px] w-[500px] h-[500px] bg-loovi-coral-orange/10 rounded-full blur-[100px] pointer-events-none" />
 
+      {/* Particles */}
+      <Particles />
+
       <div className="container mx-auto px-6 py-8 relative z-10">
         {/* Header/Nav */}
-        <nav className="flex justify-between items-center mb-24">
+        <nav className="flex justify-between items-center mb-12 sm:mb-16">
           <div className="flex items-center gap-2">
             <Image
               src="/craveless_logo_website.png"
-              alt="Sugar Reset Logo"
-              width={180}
-              height={50}
-              className="h-12 w-auto object-contain"
+              alt="Craveless Logo"
+              width={300}
+              height={100}
+              className="h-16 md:h-20 w-auto object-contain"
               priority
             />
           </div>
@@ -30,17 +52,17 @@ export default function Home() {
         </nav>
 
         {/* Hero Section */}
-        <div className="text-center max-w-4xl mx-auto mb-24">
-          <div className="inline-block px-4 py-1.5 rounded-full bg-white/50 border border-white/60 backdrop-blur-sm text-sm font-medium text-loovi-text-secondary mb-8 shadow-sm">
+        <div className="text-center max-w-4xl mx-auto mb-20">
+          <div className="inline-block px-4 py-1.5 rounded-full bg-white/50 border border-white/60 backdrop-blur-sm text-sm font-medium text-loovi-text-secondary mb-6 shadow-sm">
             ✨ Your journey to a healthier relationship with sugar
           </div>
-          <h1 className="font-heading text-5xl md:text-7xl lg:text-8xl font-bold text-loovi-text-primary mb-8 leading-[1.1] tracking-tight">
+          <h1 className="font-heading text-4xl md:text-6xl lg:text-7xl font-bold text-loovi-text-primary mb-6 leading-[1.1] tracking-tight">
             Reset your habits. <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-loovi-coral-dark to-loovi-coral-orange">
               Reclaim your health.
             </span>
           </h1>
-          <p className="font-sans text-xl text-loovi-text-secondary mb-12 max-w-2xl mx-auto leading-relaxed text-balance">
+          <p className="font-sans text-lg text-loovi-text-secondary mb-8 max-w-2xl mx-auto leading-relaxed text-balance">
             A gentle, supportive companion to help you track sugar intake,
             journal your feelings, and build healthier habits without the guilt.
           </p>
@@ -102,9 +124,9 @@ export default function Home() {
           <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-loovi-coral-orange/20 rounded-full blur-[60px] translate-y-1/2 -translate-x-1/2" />
 
           <div className="relative z-10">
-            <h2 className="font-heading text-4xl md:text-5xl font-bold mb-6">Ready to reset?</h2>
+            <h2 className="font-heading text-4xl md:text-5xl font-bold mb-6">Ready to crave less?</h2>
             <p className="text-loovi-text-muted text-lg mb-10 max-w-xl mx-auto">
-              Join thousands of others who are reclaiming their energy and health with Sugar Reset.
+              Join thousands of others who are reclaiming their energy and health with Craveless.
             </p>
             <button className="px-10 py-4 bg-loovi-coral-orange text-white rounded-full font-bold text-lg hover:bg-loovi-coral-dark transition-all hover:shadow-lg hover:-translate-y-1">
               Download on App Store
@@ -113,15 +135,42 @@ export default function Home() {
         </div>
 
         {/* Footer */}
+        {/* Footer */}
         <footer className="py-12 border-t border-loovi-text-primary/5 text-center text-loovi-text-tertiary">
           <div className="flex justify-center gap-8 mb-8 font-medium">
-            <a href="#" className="hover:text-loovi-text-primary transition-colors">Privacy</a>
-            <a href="#" className="hover:text-loovi-text-primary transition-colors">Terms</a>
-            <a href="#" className="hover:text-loovi-text-primary transition-colors">Contact</a>
+            <button onClick={() => openModal('privacy')} className="hover:text-loovi-text-primary transition-colors">Privacy</button>
+            <button onClick={() => openModal('terms')} className="hover:text-loovi-text-primary transition-colors">Terms</button>
+            <a href="mailto:hello@scriptcollective.com" className="hover:text-loovi-text-primary transition-colors">Contact</a>
           </div>
-          <p className="text-sm">© {new Date().getFullYear()} Sugar Reset. All rights reserved.</p>
+          <p className="text-sm">© {new Date().getFullYear()} Craveless. All rights reserved.</p>
         </footer>
       </div>
+
+      {/* Modal */}
+      {modalContent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setModalContent(null)}>
+          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setModalContent(null)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+            >
+              ✕
+            </button>
+            <h2 className="font-heading text-2xl font-bold text-loovi-text-primary mb-4">{modalContent.title}</h2>
+            <div className="prose prose-sm text-loovi-text-secondary whitespace-pre-line">
+              <p>{modalContent.content}</p>
+            </div>
+            <div className="mt-8 flex justify-end">
+              <button
+                onClick={() => setModalContent(null)}
+                className="px-6 py-2 bg-loovi-coral-orange text-white rounded-full font-bold text-sm hover:bg-loovi-coral-dark transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -153,3 +202,49 @@ function FeatureCard({
     </div>
   );
 }
+
+function Particles() {
+  const [items, setItems] = useState<Array<{
+    top: string;
+    left: string;
+    width: string;
+    height: string;
+    duration: string;
+    delay: string;
+  }>>([]);
+
+  useEffect(() => {
+    const newItems = [...Array(20)].map(() => ({
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+      width: `${Math.random() * 4 + 2}px`,
+      height: `${Math.random() * 4 + 2}px`,
+      duration: `${Math.random() * 10 + 10}s`,
+      delay: `${Math.random() * 5}s`,
+    }));
+    setItems(newItems);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {items.map((item, i) => (
+        <div
+          key={i}
+          className="absolute bg-white rounded-full opacity-20 animate-float"
+          style={{
+            top: item.top,
+            left: item.left,
+            width: item.width,
+            height: item.height,
+            animationDuration: item.duration,
+            animationDelay: item.delay,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+// Wait, I should do this in two steps or careful replacement.
+// I will replace the whole component and THEN add imports at the top.
+// Or I can use a suppressHydrationWarning if it was simple text, but for random attributes, it's safer to dual-pass or just client-render.
+

@@ -290,7 +290,7 @@ export default function ProfileScreen() {
 
                         {/* Logo */}
                         <Image
-                            source={require('../public/sugarestlogo.png')}
+                            source={require('../public/cravelesslogo.png')}
                             style={styles.footerLogo}
                             resizeMode="contain"
                         />

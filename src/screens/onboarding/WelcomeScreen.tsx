@@ -124,7 +124,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
             {showSplash && (
                 <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
                     <Animated.Image
-                        source={require('../../public/sugarest_icon.png')}
+                        source={require('../../public/craveless_icon.png')}
                         style={[
                             styles.splashLogo,
                             {
@@ -157,7 +157,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
                             ]}
                         >
                             <Animated.Image
-                                source={require('../../public/sugarest_slogan.png')}
+                                source={require('../../public/craveless_slogan.png')}
                                 style={[
                                     styles.logoSmall,
                                     {

@@ -211,8 +211,8 @@ export default function QualificationQuizScreen({ navigation }: QualificationQui
                             </Text>
                             <Text style={styles.resultText}>
                                 {yesCount >= 2
-                                    ? 'Based on your answers, Sugar Reset is designed exactly for people like you.'
-                                    : 'Sugar Reset can help you build healthier habits, even if you\'re just starting out.'}
+                                    ? 'Based on your answers, Craveless is designed exactly for people like you.'
+                                    : 'Craveless can help you build healthier habits, even if you\'re just starting out.'}
                             </Text>
 
                             {/* Stats */}

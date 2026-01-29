@@ -41,10 +41,10 @@ interface IntroSlide {
 const introSlides: IntroSlide[] = [
     {
         id: '1',
-        title: 'Welcome to SugarReset!',
+        title: 'Welcome to Craveless!',
         subtitle: "Here's how it works in a nutshell.",
         phoneContent: {
-            logo: 'SUGAR\nRESET',
+            logo: 'CRAVE\nLESS',
             tagline: 'Embrace this pause.\nReflect before you consume.',
         },
     },
@@ -131,7 +131,7 @@ export default function LaunchScreen({ navigation }: LaunchScreenProps) {
             <SafeAreaView style={styles.container}>
                 {/* Top Branding */}
                 <View style={styles.topBar}>
-                    <Text style={styles.topLogo}>SUGAR RESET</Text>
+                    <Text style={styles.topLogo}>CRAVELESS</Text>
                 </View>
 
                 {/* Slides */}

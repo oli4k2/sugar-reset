@@ -16,6 +16,7 @@ interface AuthContextType {
     firebaseUser: FirebaseUser | null;
     isLoading: boolean;
     isAuthenticated: boolean;
+    isUnverified: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
     firebaseUser: null,
     isLoading: true,
     isAuthenticated: false,
+    isUnverified: false,
 });
 
 export const useAuthContext = () => {
@@ -45,7 +47,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     useEffect(() => {
         console.log('🔄 Setting up auth state listener...');
         let isMounted = true;
-        
+
         // Helper to create local user from Firebase Auth
         const createLocalUser = (fbUser: FirebaseUser): User => ({
             id: fbUser.uid,
@@ -68,14 +70,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             if (!isMounted) return;
-            
+
             console.log('👤 Auth state changed:', fbUser ? `User: ${fbUser.uid}` : 'No user');
             setFirebaseUser(fbUser);
 
             if (fbUser) {
                 // Set local user immediately so app can proceed
                 const localUser = createLocalUser(fbUser);
-                
+
                 // Try to fetch profile with a short timeout - don't block the app
                 const fetchWithTimeout = async (): Promise<User> => {
                     try {
@@ -83,7 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                             userService.getUserProfile(fbUser.uid, 0), // No retries - fast fail
                             new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
                         ]);
-                        
+
                         if (profile) {
                             console.log('✅ User profile loaded from Firestore');
                             return profile;
@@ -104,7 +106,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 // Register for push notifications (don't block on this)
                 notificationService.registerForPushNotifications(fbUser.uid)
                     .then(token => token && console.log('Push notifications registered'))
-                    .catch(() => {});
+                    .catch(() => { });
             } else {
                 setUser(null);
                 setIsLoading(false);
@@ -127,11 +129,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
     }, []);
 
+    const isUnverified = !!firebaseUser && !firebaseUser.emailVerified;
+
     const value: AuthContextType = {
         user,
         firebaseUser,
         isLoading,
-        isAuthenticated: !!firebaseUser,
+        isAuthenticated: !!firebaseUser && !isUnverified, // Only authenticated if verified
+        isUnverified,
     };
 
     return (

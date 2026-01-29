@@ -1,5 +1,5 @@
 /**
- * Type Definitions for SugarReset
+ * Type Definitions for Craveless
  */
 
 // User profile
@@ -112,6 +112,7 @@ export type RootStackParamList = {
     EmergencyCall: undefined;
     DistractionTask: { taskId: string };
     PostDetail: { post: Post };
+    VerificationPending: undefined;
 };
 
 export interface Post {

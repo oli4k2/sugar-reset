@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SugarReset",
-    "slug": "sugar-reset",
+    "name": "Craveless",
+    "slug": "craveless",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,7 +15,7 @@
     "ios": {
       "icon": "./src/public/appstore.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.sugarreset.app",
+      "bundleIdentifier": "com.craveless.app",
       "appleTeamId": "LX5566JXPP",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D0F12"
       },
-      "package": "com.sugarreset.app",
+      "package": "com.craveless.app",
       "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

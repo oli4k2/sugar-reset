@@ -40,6 +40,7 @@ import {
     LoginScreen,
     SignUpScreen,
     ForgotPasswordScreen,
+    VerificationPendingScreen,
 } from '../screens/auth';
 
 // Main Screens
@@ -202,10 +203,20 @@ function LoadingScreen() {
 
 // Root Navigation - Shows appropriate flow based on auth state
 export default function RootNavigator() {
-    const { isLoading, isAuthenticated } = useAuthContext();
+    const { isLoading, isAuthenticated, isUnverified } = useAuthContext();
 
     if (isLoading) {
         return <LoadingScreen />;
+    }
+
+    if (isUnverified) {
+        return (
+            <NavigationContainer>
+                <RootStack.Navigator screenOptions={{ headerShown: false }}>
+                    <RootStack.Screen name="VerificationPending" component={VerificationPendingScreen} />
+                </RootStack.Navigator>
+            </NavigationContainer>
+        );
     }
 
     // If authenticated, skip onboarding and auth screens

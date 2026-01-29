@@ -32,6 +32,8 @@ interface UseAuthReturn {
     resetPassword: (email: string) => Promise<boolean>;
     signInWithGoogle: (idToken: string) => Promise<boolean>;
     signInWithApple: (identityToken: string, nonce: string) => Promise<boolean>;
+    sendVerificationEmail: () => Promise<boolean>;
+    reloadUser: () => Promise<void>;
     clearError: () => void;
 }
 
@@ -233,6 +235,55 @@ export function useAuth(): UseAuthReturn {
         }
     }, []);
 
+    /**
+     * Reload user to refresh token and verification status
+     */
+    const reloadUser = useCallback(async (): Promise<void> => {
+        if (auth.currentUser) {
+            await auth.currentUser.reload();
+        }
+    }, []);
+
+    /**
+     * Send verification email via website API
+     */
+    const sendVerificationEmail = useCallback(async (): Promise<boolean> => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const user = auth.currentUser;
+            if (!user) throw new Error('No user logged in');
+
+            const idToken = await user.getIdToken();
+
+            // Call website API
+            const response = await fetch('https://craveless.info/api/auth/send-verification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to send email');
+            }
+
+            return true;
+        } catch (err: any) {
+            console.error('Send verification error:', err);
+            setError({
+                code: 'verification-failed',
+                message: err.message || 'Failed to send verification email',
+            });
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
     return {
         isLoading,
         error,
@@ -243,6 +294,8 @@ export function useAuth(): UseAuthReturn {
         signInWithGoogle,
         signInWithApple,
         clearError,
+        sendVerificationEmail,
+        reloadUser,
     };
 }
 

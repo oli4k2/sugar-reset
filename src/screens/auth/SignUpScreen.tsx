@@ -33,7 +33,7 @@ type SignUpScreenProps = {
 };
 
 export default function SignUpScreen({ navigation }: SignUpScreenProps) {
-    const { signUp, signInWithGoogle, signInWithApple } = useAuth();
+    const { signUp, signInWithGoogle, signInWithApple, sendVerificationEmail } = useAuth();
     const { onboardingData } = useUserData();
 
     const [email, setEmail] = useState('');
@@ -53,6 +53,9 @@ export default function SignUpScreen({ navigation }: SignUpScreenProps) {
         try {
             const success = await signUp(email.trim(), password, nickname);
             if (success) {
+                // Send verification email
+                await sendVerificationEmail();
+
                 // Navigate to Main app after successful signup
                 console.log('Sign up successful - navigating to Main');
                 navigation.getParent()?.reset({

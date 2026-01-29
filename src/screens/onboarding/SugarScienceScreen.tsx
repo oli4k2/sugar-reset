@@ -132,7 +132,7 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
     );
 
     const isLastSlide = currentIndex === scienceSlides.length - 1;
-    
+
     // Determine background variant based on current slide
     const currentSlide = scienceSlides[currentIndex];
     const backgroundVariant = currentSlide?.backgroundColor === 'navy' ? 'solidNavy' : 'solidCrimson';
@@ -200,7 +200,7 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
                         activeOpacity={0.8}
                     >
                         <Text style={styles.nextButtonText}>
-                            {isLastSlide ? "Let's start the Sugar Reset!" : 'Next'}
+                            {isLastSlide ? "Let's start Craveless!" : 'Next'}
                         </Text>
                     </TouchableOpacity>
                 </View>
