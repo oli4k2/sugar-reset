@@ -53,8 +53,8 @@ export default function Home() {
 
         {/* Hero Section */}
         <div className="text-center max-w-4xl mx-auto mb-20">
-          <div className="inline-block px-4 py-1.5 rounded-full bg-white/50 border border-white/60 backdrop-blur-sm text-sm font-medium text-loovi-text-secondary mb-6 shadow-sm">
-            ✨ Your journey to a healthier relationship with sugar
+          <div className="inline-block px-3 py-1 md:px-4 md:py-1.5 rounded-full bg-white/50 border border-white/60 backdrop-blur-sm text-xs md:text-sm font-medium text-loovi-text-secondary mb-6 shadow-sm">
+            ✨ Your journey to better habits
           </div>
           <h1 className="font-heading text-4xl md:text-6xl lg:text-7xl font-bold text-loovi-text-primary mb-6 leading-[1.1] tracking-tight">
             Reset your habits. <br />
@@ -62,9 +62,8 @@ export default function Home() {
               Reclaim your health.
             </span>
           </h1>
-          <p className="font-sans text-lg text-loovi-text-secondary mb-8 max-w-2xl mx-auto leading-relaxed text-balance">
-            A gentle, supportive companion to help you track sugar intake,
-            journal your feelings, and build healthier habits without the guilt.
+          <p className="font-sans text-sm md:text-lg text-loovi-text-secondary mb-8 max-w-2xl mx-auto leading-relaxed text-balance">
+            Track sugar, journal feelings, and build healthy habits—guilt-free.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button className="w-full sm:w-auto px-8 py-4 bg-loovi-coral-orange text-white rounded-full font-bold text-lg shadow-lg shadow-loovi-coral-orange/20 hover:shadow-xl hover:bg-loovi-coral-dark transition-all hover:-translate-y-1">

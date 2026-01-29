@@ -17,6 +17,7 @@ interface AuthContextType {
     isLoading: boolean;
     isAuthenticated: boolean;
     isUnverified: boolean;
+    refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
     isLoading: true,
     isAuthenticated: false,
     isUnverified: false,
+    refreshUser: async () => { },
 });
 
 export const useAuthContext = () => {
@@ -131,12 +133,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const isUnverified = !!firebaseUser && !firebaseUser.emailVerified;
 
+    const refreshUser = async () => {
+        if (auth.currentUser) {
+            await auth.currentUser.reload();
+            // Force state update by creating a new reference or just setting it again
+            // We use the auth.currentUser directly as it is the source of truth
+            setFirebaseUser({ ...auth.currentUser } as FirebaseUser);
+
+            // Also refresh the local user profile just in case
+            if (user && auth.currentUser.uid === user.id) {
+                // optional: refetch profile
+            }
+        }
+    };
+
     const value: AuthContextType = {
         user,
         firebaseUser,
         isLoading,
-        isAuthenticated: !!firebaseUser && !isUnverified, // Only authenticated if verified
+        isAuthenticated: !!firebaseUser && !isUnverified,
         isUnverified,
+        refreshUser,
     };
 
     return (

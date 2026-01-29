@@ -9,8 +9,8 @@ import { GlassCard } from '../../components/GlassCard';
 import { spacing, borderRadius } from '../../theme';
 
 export default function VerificationPendingScreen() {
-    const { user, firebaseUser } = useAuthContext();
-    const { sendVerificationEmail, reloadUser } = useAuth();
+    const { user, firebaseUser, refreshUser } = useAuthContext();
+    const { sendVerificationEmail } = useAuth();
     const [sending, setSending] = useState(false);
     const [verifying, setVerifying] = useState(false);
 
@@ -30,9 +30,8 @@ export default function VerificationPendingScreen() {
     const handleCheckVerification = async () => {
         setVerifying(true);
         try {
-            // Reload the user data from Firebase Auth to check emailVerified status
-            await reloadUser();
-            // The AuthContext listener needs to pick this up, or we force a refresh manually if needed
+            // Reload user and force context update
+            await refreshUser();
         } catch (error) {
             Alert.alert('Not Verified', 'We still can\'t confirm your email. Please verify and click this button again.');
         } finally {
