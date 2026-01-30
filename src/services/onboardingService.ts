@@ -13,7 +13,23 @@ import { storageService } from './storageService';
 export interface OnboardingData {
     // Comprehensive Quiz fields
     gender?: 'male' | 'female' | 'other';
-    sugarFrequency?: string; // 'rarely', 'weekly', 'daily', 'multiple'
+    ageGroup?: string;
+    sugarFrequency?: string; // 'rarely', 'few-times-week', 'daily', 'multiple-daily'
+    dailySweetTimes?: string; // '0-1', '2-3', '4-5', '6+'
+    unconsciousSugar?: string; // '1', '2', '3', '4'
+    sugarChoiceFeeling?: string; // 'choose', 'give-in', 'already-eating'
+    reduceSugarAttempt?: string; // 'succeed', 'few-days', 'old-habits', 'never-tried'
+    craveWhenNotHungry?: string; // '1', '2', '3', '4'
+    craveIntensity?: string; // '1', '2', '3', '4'
+    avoidSugarDifficulty?: string; // '1', '2', '3', '4'
+    sugarVisibility?: string; // '1', '2', '3', '4'
+    sugarDependencyScore?: number; // calculated total
+    triggers?: string[]; // stress, boredom, after-meals, late-night, social, no-pattern
+    nickname?: string;
+    age?: string;
+    symptoms?: string[];
+    
+    // Legacy fields (kept for backwards compatibility)
     consumptionShift?: string;
     dailySugarGrams?: number;
     hardToGoWithout?: number; // 1-4 scale
@@ -23,11 +39,7 @@ export interface OnboardingData {
     otherReason?: string;
     stressEating?: number; // 1-4 scale
     boredomEating?: number; // 1-4 scale
-    sugarDependencyScore?: number; // calculated total
     goals?: string[];
-    triggers?: string[]; // stress, boredom, tired, emotional, social, reward, habit, menstrual
-    nickname?: string;
-    age?: string;
 
     // Plan screen
     plan?: 'cold_turkey' | 'gradual';

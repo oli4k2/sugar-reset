@@ -151,11 +151,13 @@ export type OnboardingStackParamList = {
     Welcome: undefined;
     QuizIntro: undefined;
     ComprehensiveQuiz: undefined;
+    Symptoms: undefined;
 
     // Phase 2: Education & Social Proof
     SugarDangers: undefined;
     SugarestWelcome: undefined;
     SuccessStories: undefined;
+    SugarResetGraph: undefined;
     FeatureShowcase: undefined;
 
     // Phase 3: Commitment
@@ -171,7 +173,6 @@ export type OnboardingStackParamList = {
     SugarScience: undefined;
     AppBenefits: undefined;
     IntentSelection: undefined;
-    SugarDefinition: undefined;
     ScienceFraming: undefined;
     BaselineSetup: undefined;
     SugarSpending: { dailySugarGrams?: number };

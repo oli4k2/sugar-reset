@@ -46,7 +46,7 @@ export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
     }, []);
 
     const handleStart = () => {
-        navigation.navigate('SugarDefinition');
+        navigation.navigate('ComprehensiveQuiz');
     };
 
     const handleSkip = () => {
