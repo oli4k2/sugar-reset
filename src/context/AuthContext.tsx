@@ -56,6 +56,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             email: fbUser.email || '',
             displayName: fbUser.displayName || 'User',
             photoURL: fbUser.photoURL || undefined,
+            avatarType: null,
+            avatarValue: null,
             createdAt: new Date(),
             updatedAt: new Date(),
             preferences: {

@@ -136,9 +136,13 @@ export default function HomeScreen() {
     } = useUserData();
 
     // Get user data from context (with fallbacks)
-    // Use ref for stable fallback to prevent infinite loops
-    const startDateString = onboardingData.startDate || fallbackDateRef.current;
-    const startDate = useMemo(() => new Date(startDateString), [startDateString]);
+    // Use streakData.startDate for timer accuracy (updates when streak resets)
+    const streakStartDateString = streakData?.startDate
+        ? (streakData.startDate instanceof Date
+            ? streakData.startDate.toISOString()
+            : String(streakData.startDate))
+        : onboardingData.startDate || fallbackDateRef.current;
+    const startDate = useMemo(() => new Date(streakStartDateString), [streakStartDateString]);
     const dailySpendingCents = onboardingData.dailySpendingCents || 300;
     const dailySugarGrams = onboardingData.dailySugarGrams || 77;
     const savingsGoal = onboardingData.savingsGoal || 'Something amazing';

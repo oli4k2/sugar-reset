@@ -126,13 +126,70 @@ export default function PostDetailScreen({ route, navigation }: Props) {
         }
     };
 
+    const handleDeletePost = async () => {
+        if (!user || user.id !== post.authorId) return;
+
+        Alert.alert(
+            'Delete Post',
+            'Are you sure you want to delete this post? This cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await postService.deletePost(post.id, user.id);
+                            navigation.goBack();
+                        } catch (error) {
+                            console.error('Error deleting post:', error);
+                            Alert.alert('Error', 'Failed to delete post.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleDeleteComment = async (comment: Comment) => {
+        if (!user || user.id !== comment.authorId) return;
+
+        Alert.alert(
+            'Delete Comment',
+            'Are you sure you want to delete this comment?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await postService.deleteComment(post.id, comment.id, user.id);
+                            // Refresh comments
+                            await loadData();
+                        } catch (error) {
+                            console.error('Error deleting comment:', error);
+                            Alert.alert('Error', 'Failed to delete comment.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const renderHeader = () => (
         <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                 <Ionicons name="arrow-back" size={24} color={looviColors.text.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Post</Text>
-            <View style={{ width: 24 }} />
+            {user?.id === post.authorId ? (
+                <TouchableOpacity onPress={handleDeletePost} style={styles.backButton}>
+                    <Ionicons name="trash-outline" size={22} color={looviColors.accent.warning} />
+                </TouchableOpacity>
+            ) : (
+                <View style={{ width: 24 }} />
+            )}
         </View>
     );
 
@@ -195,6 +252,14 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                     <Text style={styles.commentAuthor}>{item.authorName}</Text>
                     <Text style={styles.commentTime}>{postService.getTimeAgo(item.createdAt)}</Text>
                 </View>
+                {user?.id === item.authorId && (
+                    <TouchableOpacity
+                        onPress={() => handleDeleteComment(item)}
+                        style={styles.deleteCommentButton}
+                    >
+                        <Ionicons name="trash-outline" size={16} color={looviColors.text.tertiary} />
+                    </TouchableOpacity>
+                )}
             </View>
             <Text style={styles.commentContent}>{item.content}</Text>
         </GlassCard>
@@ -231,8 +296,8 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                         )}
                     />
 
-                    {/* Input Area */}
-                    <GlassCard variant="light" padding="sm" style={styles.inputContainer}>
+                    {/* Input Area - Solid background for readability */}
+                    <View style={styles.inputContainer}>
                         <TextInput
                             style={styles.input}
                             placeholder="Add a comment..."
@@ -253,7 +318,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                                 <Ionicons name="send" size={20} color="#FFF" />
                             )}
                         </TouchableOpacity>
-                    </GlassCard>
+                    </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
         </LooviBackground>
@@ -396,21 +461,32 @@ const styles = StyleSheet.create({
         color: looviColors.text.tertiary,
         marginTop: spacing.xl,
     },
+    deleteCommentButton: {
+        padding: spacing.xs,
+    },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        position: 'absolute',
-        bottom: 20,
-        left: spacing.screen.horizontal,
-        right: spacing.screen.horizontal,
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: spacing.screen.horizontal,
+        marginBottom: spacing.md,
+        borderRadius: borderRadius.lg,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     input: {
         flex: 1,
-        paddingHorizontal: spacing.md,
+        paddingHorizontal: spacing.sm,
         paddingVertical: spacing.sm,
         fontSize: 15,
         color: looviColors.text.primary,
         maxHeight: 100,
+        minHeight: 40,
     },
     sendButton: {
         width: 40,

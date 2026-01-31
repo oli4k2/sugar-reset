@@ -314,6 +314,26 @@ export const postService = {
     },
 
     /**
+     * Delete a comment (only by author)
+     */
+    async deleteComment(postId: string, commentId: string, userId: string): Promise<boolean> {
+        const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+        const commentSnap = await getDoc(commentRef);
+
+        if (!commentSnap.exists()) return false;
+        if (commentSnap.data().authorId !== userId) return false;
+
+        await deleteDoc(commentRef);
+
+        // Decrement comment count on post
+        await updateDoc(doc(db, 'posts', postId), {
+            commentCount: increment(-1)
+        });
+
+        return true;
+    },
+
+    /**
      * Helper: Get time ago string
      */
     getTimeAgo,

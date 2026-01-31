@@ -91,6 +91,8 @@ export const userService = {
                 email: data.email,
                 displayName: data.displayName,
                 photoURL: data.photoURL,
+                avatarType: data.avatarType || null,
+                avatarValue: data.avatarValue || null,
                 createdAt: toDate(data.createdAt) as Date,
                 updatedAt: toDate(data.updatedAt) as Date,
                 preferences: data.preferences,

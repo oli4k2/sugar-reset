@@ -106,11 +106,17 @@ service cloud.firestore {
         // Verify common fields
         (!('tags' in request.resource.data) || request.resource.data.tags is list);
       
-      // Only author can update, but cannot change critical fields like authorId
-      allow update: if isAuthenticated() && 
-        resource.data.authorId == request.auth.uid &&
-        request.resource.data.authorId == request.auth.uid &&
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt']));
+      // Author can update their own post (but not critical fields)
+      // OR any authenticated user can update ONLY the commentCount or upvotes fields
+      allow update: if isAuthenticated() && (
+        // Author can update most fields
+        (resource.data.authorId == request.auth.uid &&
+         request.resource.data.authorId == request.auth.uid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt']))
+        ||
+        // Any authenticated user can only update commentCount or upvotes
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentCount', 'upvotes']))
+      );
       
       // Only author can delete their own post
       allow delete: if isAuthenticated() && 

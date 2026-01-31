@@ -300,6 +300,66 @@ export const notificationService = {
     },
 
     /**
+     * Send streak milestone notification to friends
+     */
+    async sendStreakMilestoneNotification(
+        userId: string,
+        userName: string,
+        streak: number
+    ): Promise<void> {
+        // Only send for milestone numbers
+        const milestones = [7, 14, 21, 30, 60, 90, 100, 180, 365];
+        if (!milestones.includes(streak)) return;
+
+        const friends = await friendService.getInnerCircle(userId);
+        const emoji = streak >= 30 ? '🏆' : streak >= 14 ? '🌟' : '🔥';
+
+        const notifications: { to: string; title: string; body: string; data: any }[] = [];
+
+        for (const friend of friends) {
+            const token = await this.getUserPushToken(friend.uid);
+            if (token) {
+                notifications.push({
+                    to: token,
+                    title: `${emoji} ${userName} hit ${streak} days!`,
+                    body: `Send them some encouragement to keep going!`,
+                    data: {
+                        type: 'streak_milestone',
+                        fromUserId: userId,
+                        streak,
+                    },
+                });
+            }
+        }
+
+        if (notifications.length > 0) {
+            await this.sendExpoPushNotifications(notifications);
+        }
+    },
+
+    /**
+     * Schedule a local daily check-in reminder
+     */
+    async scheduleDailyReminder(hour: number = 20, minute: number = 0): Promise<void> {
+        // Cancel existing reminders first
+        await Notifications.cancelAllScheduledNotificationsAsync();
+
+        // Schedule daily reminder at specified time
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: '📝 Daily Check-in',
+                body: "How are you doing today? Log your progress!",
+                sound: true,
+            },
+            trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.DAILY,
+                hour,
+                minute,
+            },
+        });
+    },
+
+    /**
      * Send friend request notification
      */
     async sendFriendRequestNotification(

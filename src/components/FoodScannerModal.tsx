@@ -39,6 +39,7 @@ import {
     pinItem,
     unpinItem,
 } from '../services/scannerService';
+import { useUserData } from '../context/UserDataContext';
 
 interface FoodScannerModalProps {
     visible: boolean;
@@ -65,6 +66,7 @@ export default function FoodScannerModal({
     const [isEditing, setIsEditing] = useState(false);
     const [recentFoods, setRecentFoods] = useState<ScannedItem[]>([]);
     const [pinnedFoods, setPinnedFoods] = useState<ScannedItem[]>([]);
+    const { refreshStreakFromFoodLogs } = useUserData();
 
     useEffect(() => {
         if (visible) {
@@ -216,6 +218,12 @@ export default function FoodScannerModal({
         };
 
         await saveScannedItem(scannedItem);
+
+        // Refresh streak immediately to reflect new sugar totals
+        if (refreshStreakFromFoodLogs) {
+            refreshStreakFromFoodLogs();
+        }
+
         onScanComplete(scannedItem);
         handleClose();
     };

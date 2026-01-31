@@ -253,12 +253,31 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             const result = await calculateStreak(planType, startDate);
             setStreakResult(result);
 
+            // Calculate effective start date for the timer
+            let effectiveStartDate = new Date();
+            if (result.currentStreak > 0) {
+                const onboardingStart = new Date(onboardingData.startDate || new Date());
+                const daysSinceStart = Math.floor((Date.now() - onboardingStart.getTime()) / (1000 * 60 * 60 * 24));
+
+                // If streak matches the full time since onboarding (approx), use original start date
+                // This preserves the exact time of day they started
+                if (Math.abs(result.currentStreak - daysSinceStart) <= 1) {
+                    effectiveStartDate = onboardingStart;
+                } else {
+                    // Otherwise, streak started more recently. Calculate backwards.
+                    effectiveStartDate.setDate(effectiveStartDate.getDate() - result.currentStreak);
+                }
+            } else {
+                // Streak is 0 (broken or not started). Timer should effectively show 0.
+                effectiveStartDate = new Date();
+            }
+
             // Convert to legacy StreakData format for backward compatibility
             const legacyStreakData: StreakData = {
                 currentStreak: result.currentStreak,
                 longestStreak: result.longestStreak,
                 lastCheckIn: result.lastValidDate ? new Date(result.lastValidDate) : null,
-                startDate: startDate,
+                startDate: effectiveStartDate,
                 totalDaysSugarFree: result.totalDaysUnderTarget,
             };
             setStreakData(legacyStreakData);

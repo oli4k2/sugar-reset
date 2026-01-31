@@ -95,8 +95,8 @@ export async function getDayStatus(
 ): Promise<DayStatus> {
     const items = await getScannedItemsForDate(dateString);
 
-    // Get the daily limit for this plan
-    const dailyTarget = getCurrentDayLimit(planType, planStartDate).dailyGrams;
+    // Get the daily limit for this plan (using the specific date)
+    const dailyTarget = getDailyTargetForDate(dateString, planType, planStartDate);
 
     // Sum up sugar from all food items
     const totalSugar = items.reduce((sum, item) => sum + (item.sugar || 0), 0);

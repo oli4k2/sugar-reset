@@ -20,9 +20,10 @@ import {
     Alert,
     RefreshControl,
     Image,
+    Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius, typography } from '../theme';
 import LooviBackground, { looviColors } from '../components/LooviBackground';
@@ -87,8 +88,30 @@ export default function SocialScreen() {
             if (isAuthenticated && user) {
                 loadData();
             }
-        }, [isAuthenticated, user])
+        }, [isAuthenticated, user?.id]) // Use user.id for exact dependency
     );
+
+    // Clear all data when user changes (logout/login to different account)
+    useEffect(() => {
+        // Reset all state when user ID changes
+        setFriends([]);
+        setFriendRequests([]);
+        setOutgoingRequests([]);
+        setLeaderboard([]);
+        setPosts([]);
+        setUserVotes(new Map());
+    }, [user?.id]);
+
+    // Handle openAddFriends navigation param (from InnerCircle SOS)
+    const route = useRoute<any>();
+    useEffect(() => {
+        if (route.params?.openAddFriends) {
+            setActiveTab('circle');
+            setShowSearchModal(true);
+            // Clear the param to prevent re-opening on focus
+            navigation.setParams({ openAddFriends: undefined });
+        }
+    }, [route.params?.openAddFriends]);
 
     const loadData = async () => {
         if (!user) return;
@@ -177,14 +200,20 @@ export default function SocialScreen() {
             const userIds = stats.map(s => s.userId);
             const usersMap = await friendService.getUsersByIds(userIds);
 
-            const entries: LeaderboardEntry[] = stats.map((stat, index) => {
+            // Filter out users without a valid displayName (deleted/anonymous accounts)
+            const validStats = stats.filter(stat => {
+                const userInfo = usersMap.get(stat.userId);
+                return userInfo && userInfo.displayName && userInfo.displayName.trim() !== '';
+            });
+
+            const entries: LeaderboardEntry[] = validStats.map((stat, index) => {
                 const userInfo = usersMap.get(stat.userId);
                 const badge = index === 0 ? '🏆' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
 
                 return {
                     rank: index + 1,
                     userId: stat.userId,
-                    name: userInfo?.displayName || 'Anonymous',
+                    name: userInfo?.displayName || 'User',
                     score: stat.healthScore,
                     streak: stat.currentStreak,
                     badge,
@@ -275,6 +304,56 @@ export default function SocialScreen() {
             console.error('Error cancelling request:', error);
             Alert.alert('Error', 'Failed to cancel friend request');
         }
+    };
+
+    const handleInviteFriends = async () => {
+        if (!user) return;
+
+        const userName = user.displayName || 'Someone';
+        const inviteLink = `https://craveless.info/invite/${user.id}`;
+
+        try {
+            await Share.share({
+                message: `Hey! I'm using Sugar Reset to track my sugar-free journey and would love for you to join my Inner Circle! 🍃\n\nDownload the app and add me as a friend:\n${inviteLink}`,
+                title: `${userName} invited you to Sugar Reset`,
+            });
+        } catch (error) {
+            console.error('Error sharing invite:', error);
+        }
+    };
+
+    const handleCongratulate = async (friend: FriendWithStats, message: string) => {
+        if (!user) return;
+
+        try {
+            const { notificationService } = await import('../services/notificationService');
+            const userName = user.displayName || 'A friend';
+
+            await notificationService.sendEncouragement(
+                user.id,
+                userName,
+                friend.uid,
+                message
+            );
+
+            Alert.alert('Sent! 🎉', `Your encouragement was sent to ${friend.displayName}!`);
+        } catch (error) {
+            console.error('Error sending congratulation:', error);
+            Alert.alert('Oops', 'Could not send encouragement right now.');
+        }
+    };
+
+    const showCongratulateOptions = (friend: FriendWithStats) => {
+        Alert.alert(
+            `Cheer on ${friend.displayName}! 🎉`,
+            'Send a quick encouragement:',
+            [
+                { text: '🔥 Way to go!', onPress: () => handleCongratulate(friend, 'Way to go! Keep crushing it! 🔥') },
+                { text: '💪 Keep pushing!', onPress: () => handleCongratulate(friend, 'Keep pushing! You\'ve got this! 💪') },
+                { text: '🌟 So proud!', onPress: () => handleCongratulate(friend, 'So proud of your progress! 🌟') },
+                { text: 'Cancel', style: 'cancel' },
+            ]
+        );
     };
 
     // Calculate user's rank in leaderboard
@@ -477,39 +556,51 @@ export default function SocialScreen() {
                 </GlassCard>
             ) : (
                 friends.map((friend) => (
-                    <TouchableOpacity
-                        key={friend.uid}
-                        onLongPress={() => handleRemoveFriend(friend.uid, friend.displayName)}
-                        activeOpacity={0.7}
-                    >
-                        <GlassCard variant="light" padding="md" style={styles.friendCard}>
-                            <View style={styles.friendRow}>
-                                <UserAvatar
-                                    size={44}
-                                    photoURL={friend.photoURL}
-                                    avatarType={friend.avatarType}
-                                    avatarValue={friend.avatarValue}
-                                    name={friend.displayName}
-                                    backgroundColor={looviColors.accent.secondary}
-                                />
-                                <View style={styles.friendInfo}>
-                                    <Text style={styles.friendName}>
-                                        {friend.displayName || 'Unknown'}
-                                    </Text>
-                                </View>
-                                <View style={styles.friendStats}>
-                                    <View style={styles.miniStat}>
-                                        <Text style={styles.miniStatValue}>{friend.streak || 0}</Text>
-                                        <Text style={styles.miniStatLabel}>Day streak</Text>
+                    <GlassCard key={friend.uid} variant="light" padding="md" style={styles.friendCard}>
+                        <View style={styles.friendRow}>
+                            <UserAvatar
+                                size={48}
+                                photoURL={friend.photoURL}
+                                avatarType={friend.avatarType}
+                                avatarValue={friend.avatarValue}
+                                name={friend.displayName}
+                            />
+                            <View style={styles.friendInfo}>
+                                <Text style={styles.friendName}>
+                                    {friend.displayName || 'Unknown'}
+                                </Text>
+                                <View style={styles.friendProgressRow}>
+                                    <View style={styles.friendMiniStat}>
+                                        <Ionicons name="flame" size={12} color={looviColors.accent.warning} />
+                                        <Text style={styles.friendMiniStatText}>{friend.streak || 0} days</Text>
                                     </View>
+                                    {friend.healthScore && (
+                                        <View style={styles.friendMiniStat}>
+                                            <Ionicons name="heart" size={12} color={looviColors.accent.primary} />
+                                            <Text style={styles.friendMiniStatText}>{friend.healthScore}</Text>
+                                        </View>
+                                    )}
                                 </View>
                             </View>
-                        </GlassCard>
-                    </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.celebrateButton}
+                                onPress={() => showCongratulateOptions(friend)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.celebrateEmoji}>🎉</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.removeFriendHint}
+                            onPress={() => handleRemoveFriend(friend.uid, friend.displayName)}
+                        >
+                            <Text style={styles.removeFriendText}>Hold to remove</Text>
+                        </TouchableOpacity>
+                    </GlassCard>
                 ))
             )}
 
-            {/* Add Friends CTA */}
+            {/* Add Friends CTA - moved above Grow Your Circle */}
             <TouchableOpacity
                 style={styles.outlineButton}
                 activeOpacity={0.8}
@@ -518,6 +609,29 @@ export default function SocialScreen() {
                 <Ionicons name="person-add-outline" size={20} color={looviColors.accent.primary} />
                 <Text style={styles.outlineButtonText}>Find Partners</Text>
             </TouchableOpacity>
+
+            {/* Invite CTA Card */}
+            <GlassCard variant="light" padding="lg" style={styles.inviteCtaCard}>
+                <View style={styles.inviteCtaContent}>
+                    <View style={styles.inviteCtaIconBg}>
+                        <Ionicons name="gift-outline" size={28} color={looviColors.accent.primary} />
+                    </View>
+                    <View style={styles.inviteCtaTextContainer}>
+                        <Text style={styles.inviteCtaTitle}>Grow Your Circle</Text>
+                        <Text style={styles.inviteCtaSubtitle}>
+                            Invite friends & stay accountable together
+                        </Text>
+                    </View>
+                </View>
+                <TouchableOpacity
+                    style={styles.inviteCtaButton}
+                    onPress={handleInviteFriends}
+                    activeOpacity={0.8}
+                >
+                    <Ionicons name="share-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.inviteCtaButtonText}>Share Invite Link</Text>
+                </TouchableOpacity>
+            </GlassCard>
         </View>
     );
 
@@ -805,10 +919,11 @@ const styles = StyleSheet.create({
     /* Content */
     content: {
         flex: 1,
+        overflow: 'hidden', // Creates carousel-like clipping effect
     },
     scrollContent: {
         padding: spacing.screen.horizontal,
-        paddingBottom: 100, // Space for FAB
+        paddingBottom: 140, // Space for FAB (increased from 100)
     },
     tabContent: {
         gap: spacing.md,
@@ -998,6 +1113,7 @@ const styles = StyleSheet.create({
     friendRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 12,
     },
     friendAvatar: {
         width: 44,
@@ -1149,5 +1265,104 @@ const styles = StyleSheet.create({
     leaderboardUserRow: {
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    inviteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: looviColors.accent.primary,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        gap: 4,
+    },
+    inviteButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    // Friend card enhancements
+    friendProgressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: 4,
+    },
+    friendMiniStat: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    friendMiniStatText: {
+        fontSize: 12,
+        color: looviColors.text.secondary,
+        fontWeight: '500',
+    },
+    celebrateButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    celebrateEmoji: {
+        fontSize: 20,
+    },
+    removeFriendHint: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0, 0, 0, 0.05)',
+        alignItems: 'center',
+    },
+    removeFriendText: {
+        fontSize: 11,
+        color: looviColors.text.tertiary,
+    },
+    // Invite CTA card
+    inviteCtaCard: {
+        marginTop: spacing.md,
+        marginBottom: spacing.sm,
+    },
+    inviteCtaContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    inviteCtaIconBg: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.md,
+    },
+    inviteCtaTextContainer: {
+        flex: 1,
+    },
+    inviteCtaTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+        marginBottom: 2,
+    },
+    inviteCtaSubtitle: {
+        fontSize: 13,
+        color: looviColors.text.secondary,
+    },
+    inviteCtaButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: looviColors.accent.primary,
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 8,
+    },
+    inviteCtaButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
     },
 });

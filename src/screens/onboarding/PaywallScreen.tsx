@@ -1,22 +1,27 @@
 /**
  * PaywallScreen
  * 
- * Subscription options with sky theme.
+ * Subscription options with RevenueCat integration.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
     ScrollView,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { PurchasesPackage } from 'react-native-purchases';
 import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
+import { useRevenueCat } from '../../hooks/useRevenueCat';
+import * as Haptics from 'expo-haptics';
 
 type PaywallScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Paywall'>;
@@ -57,19 +62,86 @@ const features = [
 ];
 
 export default function PaywallScreen({ navigation }: PaywallScreenProps) {
-    const [selectedPlan, setSelectedPlan] = useState('yearly');
+    const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium } = useRevenueCat();
+    const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
+    const [isPurchasing, setIsPurchasing] = useState(false);
+    const [isRestoring, setIsRestoring] = useState(false);
 
-    const handleSubscribe = () => {
-        // Navigate to signup to create account
-        // After signup, auth state change will navigate to Main
-        navigation.getParent()?.reset({
-            index: 0,
-            routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
-        });
+    // Set default selected package when offerings load
+    useEffect(() => {
+        if (currentOffering?.availablePackages && currentOffering.availablePackages.length > 0) {
+            // Prefer annual, then monthly
+            const annual = currentOffering.annual;
+            const monthly = currentOffering.monthly;
+            setSelectedPackage(annual || monthly || currentOffering.availablePackages[0]);
+        }
+    }, [currentOffering]);
+
+    // Navigate away if user is already premium
+    useEffect(() => {
+        if (isPremium) {
+            // User already has premium, navigate to main app
+            navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+            });
+        }
+    }, [isPremium, navigation]);
+
+    const handleSubscribe = async () => {
+        if (!selectedPackage) {
+            Alert.alert('Error', 'Please select a subscription plan');
+            return;
+        }
+
+        try {
+            setIsPurchasing(true);
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await purchasePackage(selectedPackage);
+            
+            // Success - navigation will happen automatically via isPremium effect
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (error: any) {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            
+            if (error.message === 'Purchase cancelled') {
+                // User cancelled - don't show error
+                return;
+            }
+            
+            Alert.alert(
+                'Purchase Failed',
+                error.message || 'Unable to complete purchase. Please try again.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setIsPurchasing(false);
+        }
     };
 
-    const handleRestore = () => {
-        // TODO: Implement restore purchases
+    const handleRestore = async () => {
+        try {
+            setIsRestoring(true);
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await restorePurchases();
+            
+            // Check if restore was successful
+            if (isPremium) {
+                Alert.alert('Success', 'Your purchases have been restored!');
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } else {
+                Alert.alert('No Purchases Found', 'We couldn\'t find any purchases to restore.');
+            }
+        } catch (error: any) {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert(
+                'Restore Failed',
+                error.message || 'Unable to restore purchases. Please try again.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setIsRestoring(false);
+        }
     };
 
     const handleSkip = () => {
@@ -78,6 +150,37 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             index: 0,
             routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
         });
+    };
+
+    // Get available packages from RevenueCat
+    const packages = currentOffering?.availablePackages || [];
+    
+    // Helper to get package display name
+    const getPackageName = (pkg: PurchasesPackage): string => {
+        if (pkg.packageType === 'ANNUAL') return 'Annual';
+        if (pkg.packageType === 'MONTHLY') return 'Monthly';
+        if (pkg.packageType === 'SIX_MONTH') return '6 Months';
+        if (pkg.packageType === 'THREE_MONTH') return '3 Months';
+        return pkg.identifier;
+    };
+
+    // Helper to check if package is popular (annual is usually best value)
+    const isPopular = (pkg: PurchasesPackage): boolean => {
+        return pkg.packageType === 'ANNUAL';
+    };
+
+    // Calculate savings for annual vs monthly
+    const getSavings = (pkg: PurchasesPackage): string | undefined => {
+        if (pkg.packageType === 'ANNUAL' && currentOffering?.monthly) {
+            const monthlyPrice = currentOffering.monthly.product.price;
+            const annualPrice = pkg.product.price;
+            const monthlyEquivalent = monthlyPrice * 12;
+            if (monthlyEquivalent > annualPrice) {
+                const savings = ((monthlyEquivalent - annualPrice) / monthlyEquivalent) * 100;
+                return `Save ${Math.round(savings)}%`;
+            }
+        }
+        return undefined;
     };
 
     return (
@@ -105,65 +208,118 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                     </GlassCard>
 
                     {/* Plans */}
-                    <View style={styles.plansContainer}>
-                        {plans.map((plan) => {
-                            const isSelected = selectedPlan === plan.id;
-                            return (
-                                <TouchableOpacity
-                                    key={plan.id}
-                                    onPress={() => setSelectedPlan(plan.id)}
-                                    activeOpacity={0.8}
-                                    style={styles.planWrapper}
-                                >
-                                    <GlassCard
-                                        variant="light"
-                                        padding="md"
-                                        style={isSelected ? {
-                                            ...styles.planCard,
-                                            ...styles.planCardSelected,
-                                        } : styles.planCard}
+                    {isLoading && packages.length === 0 ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={looviColors.accent.primary} />
+                            <Text style={styles.loadingText}>Loading subscription options...</Text>
+                        </View>
+                    ) : packages.length > 0 ? (
+                        <View style={styles.plansContainer}>
+                            {packages.map((pkg) => {
+                                const isSelected = selectedPackage?.identifier === pkg.identifier;
+                                const popular = isPopular(pkg);
+                                const savings = getSavings(pkg);
+                                
+                                return (
+                                    <TouchableOpacity
+                                        key={pkg.identifier}
+                                        onPress={() => setSelectedPackage(pkg)}
+                                        activeOpacity={0.8}
+                                        style={styles.planWrapper}
+                                        disabled={isPurchasing}
                                     >
-                                        {plan.popular && (
-                                            <View style={styles.popularBadge}>
-                                                <Text style={styles.popularText}>Best Value</Text>
+                                        <GlassCard
+                                            variant="light"
+                                            padding="md"
+                                            style={isSelected ? {
+                                                ...styles.planCard,
+                                                ...styles.planCardSelected,
+                                            } : styles.planCard}
+                                        >
+                                            {popular && (
+                                                <View style={styles.popularBadge}>
+                                                    <Text style={styles.popularText}>Best Value</Text>
+                                                </View>
+                                            )}
+                                            <Text style={styles.planName}>{getPackageName(pkg)}</Text>
+                                            <View style={styles.priceRow}>
+                                                <Text style={styles.planPrice}>{pkg.product.priceString}</Text>
+                                                {pkg.packageType === 'MONTHLY' && (
+                                                    <Text style={styles.planPeriod}>/month</Text>
+                                                )}
+                                                {pkg.packageType === 'ANNUAL' && (
+                                                    <Text style={styles.planPeriod}>/year</Text>
+                                                )}
                                             </View>
-                                        )}
-                                        <Text style={styles.planName}>{plan.name}</Text>
-                                        <View style={styles.priceRow}>
-                                            <Text style={styles.planPrice}>{plan.price}</Text>
-                                            <Text style={styles.planPeriod}>{plan.period}</Text>
-                                        </View>
-                                        {plan.savings && (
-                                            <Text style={styles.planSavings}>{plan.savings}</Text>
-                                        )}
-                                    </GlassCard>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
+                                            {savings && (
+                                                <Text style={styles.planSavings}>{savings}</Text>
+                                            )}
+                                        </GlassCard>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    ) : (
+                        <View style={styles.errorContainer}>
+                            <Text style={styles.errorText}>
+                                Unable to load subscription options. Please check your connection.
+                            </Text>
+                        </View>
+                    )}
 
                     {/* Trial info */}
-                    <Text style={styles.trialInfo}>
-                        Start with a 7-day free trial. Cancel anytime.
-                    </Text>
+                    {selectedPackage?.product.introPrice && (
+                        <Text style={styles.trialInfo}>
+                            {selectedPackage.product.introPrice.priceString === '$0.00' 
+                                ? 'Start with a free trial. Cancel anytime.'
+                                : `Special introductory price: ${selectedPackage.product.introPrice.priceString}`}
+                        </Text>
+                    )}
+                    {!selectedPackage?.product.introPrice && (
+                        <Text style={styles.trialInfo}>
+                            Cancel anytime. No commitment.
+                        </Text>
+                    )}
                 </ScrollView>
 
                 {/* Bottom */}
                 <View style={styles.bottomContainer}>
                     <TouchableOpacity
-                        style={styles.subscribeButton}
+                        style={[
+                            styles.subscribeButton,
+                            (isPurchasing || !selectedPackage) && styles.subscribeButtonDisabled
+                        ]}
                         onPress={handleSubscribe}
                         activeOpacity={0.8}
+                        disabled={isPurchasing || !selectedPackage || isLoading}
                     >
-                        <Text style={styles.subscribeButtonText}>Start Free Trial</Text>
+                        {isPurchasing ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                            <Text style={styles.subscribeButtonText}>
+                                {selectedPackage?.product.introPrice?.priceString === '$0.00'
+                                    ? 'Start Free Trial'
+                                    : 'Subscribe'}
+                            </Text>
+                        )}
                     </TouchableOpacity>
 
                     <View style={styles.linksRow}>
-                        <TouchableOpacity onPress={handleRestore}>
-                            <Text style={styles.linkText}>Restore Purchases</Text>
+                        <TouchableOpacity 
+                            onPress={handleRestore}
+                            disabled={isRestoring || isPurchasing}
+                        >
+                            {isRestoring ? (
+                                <ActivityIndicator size="small" color={looviColors.text.tertiary} />
+                            ) : (
+                                <Text style={styles.linkText}>Restore Purchases</Text>
+                            )}
                         </TouchableOpacity>
                         <Text style={styles.linkDivider}>•</Text>
-                        <TouchableOpacity onPress={handleSkip}>
+                        <TouchableOpacity 
+                            onPress={handleSkip}
+                            disabled={isPurchasing || isRestoring}
+                        >
                             <Text style={styles.linkText}>Skip for now</Text>
                         </TouchableOpacity>
                     </View>
@@ -318,5 +474,28 @@ const styles = StyleSheet.create({
     linkDivider: {
         marginHorizontal: spacing.md,
         color: looviColors.text.muted,
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.xl,
+        marginBottom: spacing.lg,
+    },
+    loadingText: {
+        fontSize: 14,
+        color: looviColors.text.secondary,
+        marginTop: spacing.md,
+    },
+    errorContainer: {
+        padding: spacing.lg,
+        marginBottom: spacing.lg,
+    },
+    errorText: {
+        fontSize: 14,
+        color: looviColors.accent.error,
+        textAlign: 'center',
+    },
+    subscribeButtonDisabled: {
+        opacity: 0.6,
     },
 });

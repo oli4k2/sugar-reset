@@ -238,23 +238,54 @@ export const friendService = {
 
     /**
      * Get user's Inner Circle (friends list) - one-time fetch
+     * Fetches LIVE user profiles to ensure names/avatars are current
      */
     async getInnerCircle(userId: string): Promise<Friend[]> {
         const friendsRef = collection(db, 'users', userId, 'friends');
         const snapshot = await getDocs(friendsRef);
 
-        return snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                uid: doc.id,
-                displayName: data.displayName,
-                email: data.email,
-                photoURL: data.photoURL,
-                avatarType: data.avatarType,
-                avatarValue: data.avatarValue,
-                addedAt: toDate(data.addedAt) as Date,
-            };
-        });
+        // Get friend UIDs
+        const friendDocs = snapshot.docs.map(doc => ({
+            uid: doc.id,
+            addedAt: toDate(doc.data().addedAt) as Date,
+        }));
+
+        // Fetch live profiles for all friends
+        const friends: Friend[] = await Promise.all(
+            friendDocs.map(async ({ uid, addedAt }) => {
+                try {
+                    // Get live profile data
+                    const profile = await userService.getUserProfile(uid);
+                    if (profile) {
+                        return {
+                            uid,
+                            displayName: profile.displayName || profile.email || 'Unknown',
+                            email: profile.email,
+                            photoURL: profile.photoURL,
+                            avatarType: profile.avatarType,
+                            avatarValue: profile.avatarValue,
+                            addedAt,
+                        };
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch live profile for friend:', uid);
+                }
+                // Fallback to stored data if live fetch fails
+                const storedDoc = snapshot.docs.find(d => d.id === uid);
+                const data = storedDoc?.data() || {};
+                return {
+                    uid,
+                    displayName: data.displayName || 'Unknown',
+                    email: data.email,
+                    photoURL: data.photoURL,
+                    avatarType: data.avatarType,
+                    avatarValue: data.avatarValue,
+                    addedAt,
+                };
+            })
+        );
+
+        return friends;
     },
 
     /**
@@ -392,27 +423,64 @@ export const friendService = {
 
     /**
      * Get leaderboard data (top users by health score)
+     * Only includes users who have been active in the past week
      */
     async getLeaderboard(limitCount: number = 10): Promise<UserStats[]> {
+        // Calculate date 7 days ago
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
         const statsRef = collection(db, 'userStats');
         const q = query(
             statsRef,
+            where('updatedAt', '>=', oneWeekAgo),
+            orderBy('updatedAt', 'desc'), // Need to order by filtered field first
             orderBy('healthScore', 'desc'),
-            limit(limitCount)
+            limit(limitCount * 2) // Fetch more to account for filtered-out users
         );
 
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                userId: doc.id,
-                currentStreak: data.currentStreak || 0,
-                healthScore: data.healthScore || 0,
-                goalAchieved: data.goalAchieved || false,
-                feeling: data.feeling || null,
-                updatedAt: toDate(data.updatedAt) as Date,
-            };
-        });
+        try {
+            const snapshot = await getDocs(q);
+            const stats = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    userId: doc.id,
+                    currentStreak: data.currentStreak || 0,
+                    healthScore: data.healthScore || 0,
+                    goalAchieved: data.goalAchieved || false,
+                    feeling: data.feeling || null,
+                    updatedAt: toDate(data.updatedAt) as Date,
+                };
+            });
+
+            // Sort by healthScore since Firestore compound ordering may not be exact
+            stats.sort((a, b) => b.healthScore - a.healthScore);
+
+            // Return only the requested limit
+            return stats.slice(0, limitCount);
+        } catch (error: any) {
+            // If query fails (e.g., missing index), fall back to simpler query
+            console.warn('Leaderboard query with filters failed, using fallback:', error?.code);
+
+            const fallbackQ = query(
+                statsRef,
+                orderBy('healthScore', 'desc'),
+                limit(limitCount)
+            );
+
+            const fallbackSnapshot = await getDocs(fallbackQ);
+            return fallbackSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    userId: doc.id,
+                    currentStreak: data.currentStreak || 0,
+                    healthScore: data.healthScore || 0,
+                    goalAchieved: data.goalAchieved || false,
+                    feeling: data.feeling || null,
+                    updatedAt: toDate(data.updatedAt) as Date,
+                };
+            });
+        }
     },
 
     /**

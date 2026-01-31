@@ -2,24 +2,9 @@
 
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 export default function Home() {
-  const [modalContent, setModalContent] = useState<{ title: string; content: string } | null>(null);
-
-  const openModal = (type: "privacy" | "terms") => {
-    if (type === "privacy") {
-      setModalContent({
-        title: "Privacy Policy",
-        content: "Welcome to Craveless ('we', 'our', or 'us'). We are committed to protecting your personal information and your right to privacy. \n\n1. Information we collect: We collect personal information that you voluntarily provide to us when you register on the Craveless app.\n\n2. How we use your information: We use your information to provide, improve, and administer our services.\n\n3. Contact us: If you have questions or comments about this policy, you may email us at contact@craveless.info.",
-      });
-    } else {
-      setModalContent({
-        title: "Terms of Service",
-        content: "Welcome to Craveless! These terms and conditions outline the rules and regulations for the use of the Craveless application.\n\n1. Acceptance of Terms: By accessing this app we assume you accept these terms and conditions.\n\n2. License: Craveless owns the intellectual property rights for all material on Craveless.\n\n3. User Comments: Certain parts of this app offer the opportunity for users to post and exchange opinions and information.",
-      });
-    }
-  };
-
   return (
     <main className="min-h-screen bg-loovi-background overflow-hidden relative selection:bg-loovi-coral-soft selection:text-loovi-text-primary">
       {/* Background Gradients & Blobs */}
@@ -134,42 +119,16 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        {/* Footer */}
         <footer className="py-12 border-t border-loovi-text-primary/5 text-center text-loovi-text-tertiary">
-          <div className="flex justify-center gap-8 mb-8 font-medium">
-            <button onClick={() => openModal('privacy')} className="hover:text-loovi-text-primary transition-colors">Privacy</button>
-            <button onClick={() => openModal('terms')} className="hover:text-loovi-text-primary transition-colors">Terms</button>
+          <div className="flex flex-wrap justify-center gap-6 mb-8 font-medium">
+            <Link href="/privacy-policy" className="hover:text-loovi-text-primary transition-colors">Privacy Policy</Link>
+            <Link href="/terms-of-service" className="hover:text-loovi-text-primary transition-colors">Terms of Service</Link>
+            <Link href="/refund-policy" className="hover:text-loovi-text-primary transition-colors">Refund Policy</Link>
             <a href="mailto:hello@scriptcollective.com" className="hover:text-loovi-text-primary transition-colors">Contact</a>
           </div>
           <p className="text-sm">© {new Date().getFullYear()} Craveless. All rights reserved.</p>
         </footer>
       </div>
-
-      {/* Modal */}
-      {modalContent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setModalContent(null)}>
-          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={() => setModalContent(null)}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
-            >
-              ✕
-            </button>
-            <h2 className="font-heading text-2xl font-bold text-loovi-text-primary mb-4">{modalContent.title}</h2>
-            <div className="prose prose-sm text-loovi-text-secondary whitespace-pre-line">
-              <p>{modalContent.content}</p>
-            </div>
-            <div className="mt-8 flex justify-end">
-              <button
-                onClick={() => setModalContent(null)}
-                className="px-6 py-2 bg-loovi-coral-orange text-white rounded-full font-bold text-sm hover:bg-loovi-coral-dark transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

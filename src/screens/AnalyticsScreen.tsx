@@ -123,6 +123,7 @@ const getScoreLabel = (score: number): string => {
 };
 
 // Generate personalized insights based on data
+// Generate personalized insights based on data
 const generateInsights = (
     wellnessLogs: WellnessLogData[],
     scannedItems: ScannedItem[],
@@ -136,7 +137,7 @@ const generateInsights = (
             icon: 'rocket-outline',
             iconColor: looviColors.accent.primary,
             title: 'Start Your Journey',
-            message: 'Log your first meal or check-in to unlock personalized insights about your health.',
+            message: 'Your health journey is waiting! Log your first meal or check-in to unlock personalized insights.',
             action: 'Log now',
             priority: 1,
         }];
@@ -153,108 +154,94 @@ const generateInsights = (
         ? wellnessLogs.reduce((sum, log) => sum + log.sleepHours, 0) / wellnessLogs.length
         : 0;
 
-    // Energy insight
+    // Energy insight - Action based
     if (avgEnergy > 0 && avgEnergy < 3) {
         insights.push({
             icon: 'flash',
             iconColor: '#F59E0B',
-            title: 'Low Energy Detected',
-            message: `Your average energy is ${avgEnergy.toFixed(1)}/5. Try eating protein-rich foods like eggs, chicken, or beans to maintain steady energy levels.`,
+            title: 'Need an Energy Boost?',
+            message: 'Feeling a bit drained? Boosting your protein intake can provide steady fuel. You\'ve got this!',
             action: 'Foods for energy',
             priority: 1,
         });
     }
 
-    // Sleep insight
+    // Sleep insight - Action based
     if (avgSleep > 0 && avgSleep < 7) {
         insights.push({
             icon: 'moon',
             iconColor: '#8B5CF6',
-            title: 'Sleep Could Be Better',
-            message: `You're averaging ${avgSleep.toFixed(1)} hours. Aim for 7-9 hours. Poor sleep increases sugar cravings by up to 45%.`,
+            title: 'Rest is Your Superpower',
+            message: 'A good night\'s sleep fights cravings better than willpower alone. Try winding down early tonight!',
             action: 'Sleep tips',
             priority: 2,
         });
     }
 
-    // Sugar insight
+    // Sugar insight - Supportive
     if (nutritionInsights && nutritionInsights.avgAddedSugar > 25) {
         insights.push({
-            icon: 'alert-circle',
-            iconColor: '#EF4444',
-            title: 'Sugar Intake High',
-            message: `You're averaging ${nutritionInsights.avgAddedSugar}g of sugar daily. WHO recommends under 25g for optimal health.`,
-            action: 'Low-sugar alternatives',
+            icon: 'water', // Suggest water/hydration
+            iconColor: '#3B82F6',
+            title: 'Hydrate & Reset',
+            message: 'Had some sugar? No worries! Hydrating and moving your body can help stabilize your levels quickly.',
+            action: 'Stabilize now',
             priority: 1,
         });
     } else if (nutritionInsights && nutritionInsights.avgAddedSugar > 0 && nutritionInsights.avgAddedSugar <= 25) {
         insights.push({
             icon: 'checkmark-circle',
             iconColor: '#22C55E',
-            title: 'Great Sugar Control!',
-            message: `Your sugar intake of ${nutritionInsights.avgAddedSugar}g is within healthy limits. Keep it up!`,
+            title: 'Crushing It!',
+            message: 'You\'re keeping sugar low and your body thanks you. Keep riding this wave of healthy choices!',
             priority: 3,
         });
     }
 
-    // Mood insight
+    // Mood insight - Empathetic
     if (avgMood > 0 && avgMood < 3) {
         insights.push({
-            icon: 'sad',
-            iconColor: '#F59E0B',
-            title: 'Mood Needs Attention',
-            message: 'Low mood can trigger sugar cravings. Try a 10-minute walk, call a friend, or write in your journal.',
+            icon: 'heart',
+            iconColor: '#EC4899',
+            title: 'Be Kind to Yourself',
+            message: 'It\'s okay to have tough days. Maybe a short walk, some music, or calling a friend could help lift your spirits?',
             action: 'Mood boosters',
             priority: 1,
         });
     }
 
-    // Protein insight
+    // Protein insight - Educational/Action
     if (nutritionInsights && nutritionInsights.avgProtein < 50) {
         insights.push({
             icon: 'fitness',
             iconColor: '#3B82F6',
-            title: 'Boost Your Protein',
-            message: `At ${nutritionInsights.avgProtein}g daily, adding more protein can help reduce cravings and stabilize energy.`,
-            action: 'High-protein foods',
+            title: 'Fuel Your Body',
+            message: 'Adding a bit more protein to your meals can be a game changer for cravings and fullness.',
+            action: 'High-protein ideas',
             priority: 2,
         });
     }
 
-    // Correlation insight - high sugar + low energy
+    // Correlation insight - Supportive observation
     if (nutritionInsights && nutritionInsights.avgAddedSugar > 30 && avgEnergy < 3) {
         insights.push({
             icon: 'git-compare',
             iconColor: '#EC4899',
-            title: 'Sugar-Energy Connection',
-            message: 'High sugar intake often causes energy crashes. Your data shows this pattern. Try reducing sugar for steadier energy.',
+            title: 'Energy Connection',
+            message: 'Notice how energy dips when sugar is high? Try swapping a sweet treat for fruit to see if your energy steadies!',
             priority: 1,
         });
     }
 
-    // Correlation insight - low sleep + low focus
-    if (avgSleep > 0 && avgSleep < 6.5 && wellnessLogs.length > 0) {
-        const avgFocus = wellnessLogs.reduce((sum, log) => sum + log.focus, 0) / wellnessLogs.length;
-        if (avgFocus < 3) {
-            insights.push({
-                icon: 'bulb',
-                iconColor: '#F59E0B',
-                title: 'Sleep Affects Focus',
-                message: 'Your focus tends to be lower when you sleep less. Even one extra hour can improve concentration by 20%.',
-                priority: 2,
-            });
-        }
-    }
-
-    // Positive streak insight
-    if (wellnessLogs.length >= 7) {
-        const recentMood = wellnessLogs.slice(-7).reduce((sum, log) => sum + log.mood, 0) / 7;
+    // Positive streak insight - Celebration
+    if (wellnessLogs.length >= 3) {
+        const recentMood = wellnessLogs.slice(-3).reduce((sum, log) => sum + log.mood, 0) / 3;
         if (recentMood >= 4) {
             insights.push({
-                icon: 'trophy',
-                iconColor: '#22C55E',
-                title: 'You\'re on a Roll!',
-                message: 'Your mood has been consistently high this week. Whatever you\'re doing, keep it up!',
+                icon: 'star',
+                iconColor: '#F59E0B',
+                title: 'You\'re Glowing!',
+                message: 'Your consistent efforts are clearly paying off with great mood levels. Whatever you\'re doing, it\'s working!',
                 priority: 3,
             });
         }
@@ -275,13 +262,18 @@ export default function AnalyticsScreen() {
     const [showInfoModal, setShowInfoModal] = useState<'overall' | 'nutrition' | 'wellness' | null>(null);
     const [showFoodScanner, setShowFoodScanner] = useState(false);
     const [showWellnessModal, setShowWellnessModal] = useState(false);
-    const { onboardingData, addJournalEntry } = useUserData();
+    const { onboardingData, addJournalEntry, refreshStreakFromFoodLogs } = useUserData();
 
     // Load wellness logs and food data
     useFocusEffect(
         React.useCallback(() => {
             const loadData = async () => {
                 try {
+                    // Trigger streak refresh to ensure up-to-date status
+                    if (refreshStreakFromFoodLogs) {
+                        refreshStreakFromFoodLogs();
+                    }
+
                     const [storedWellness, foodItems] = await Promise.all([
                         AsyncStorage.getItem('wellness_logs'),
                         getScannedItems(),
@@ -544,7 +536,7 @@ export default function AnalyticsScreen() {
                     >
                         {/* Header */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>Insights</Text>
+                            <Text style={styles.title}>Analytics</Text>
                             <Text style={styles.subtitle}>Your personalized health analysis</Text>
                         </View>
 
@@ -904,15 +896,16 @@ const styles = StyleSheet.create({
     },
     insightCard: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'rgba(255, 255, 255, 0.6)', // More transparent as requested
         borderRadius: borderRadius.xl,
         padding: spacing.md,
         marginBottom: spacing.md,
+        // Reduced shadow for lighter feel
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
     },
     insightCardPriority: {
         borderLeftWidth: 4,

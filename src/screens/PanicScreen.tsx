@@ -211,19 +211,19 @@ export default function PanicScreen() {
                             onPress={() => handlePress('DistractMe')}
                         >
                             <LinearGradient
-                                colors={['#4F46E5', '#312E81']} // Warm Indigo (Violin)
+                                colors={['rgba(99, 102, 241, 0.2)', 'rgba(67, 56, 202, 0.1)']}
                                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                                 style={StyleSheet.absoluteFillObject}
                             />
                             <View style={styles.cardContent}>
-                                <View style={[styles.iconContainer, { backgroundColor: 'rgba(251, 191, 36, 0.15)' }]}>
-                                    <Feather name="zap" size={24} color="#FBBF24" />
+                                <View style={[styles.iconContainer, { backgroundColor: 'rgba(129, 140, 248, 0.2)' }]}>
+                                    <Feather name="zap" size={24} color="#818CF8" />
                                 </View>
                                 <View style={styles.cardTextContainer}>
                                     <Text style={styles.cardLabel}>Distract Me</Text>
                                     <Text style={styles.cardTag}>Shift your focus</Text>
                                 </View>
-                                <Feather name="chevron-right" size={20} color="rgba(255,255,255,0.4)" />
+                                <Feather name="chevron-right" size={20} color="#818CF8" />
                             </View>
                         </TouchableOpacity>
 
@@ -234,7 +234,7 @@ export default function PanicScreen() {
                                 activeOpacity={0.9}
                                 onPress={() => handlePress('Reasons')}
                             >
-                                <LinearGradient colors={['#4F46E5', '#312E81']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                                <LinearGradient colors={['rgba(99, 102, 241, 0.2)', 'rgba(67, 56, 202, 0.1)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                                 <View style={styles.cardContentSquare}>
                                     <View style={[styles.iconContainerSmall, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
                                         <Feather name="anchor" size={22} color="#34D399" />
@@ -249,7 +249,7 @@ export default function PanicScreen() {
                                 activeOpacity={0.9}
                                 onPress={() => handlePress('InnerCircle')}
                             >
-                                <LinearGradient colors={['#4F46E5', '#312E81']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                                <LinearGradient colors={['rgba(99, 102, 241, 0.2)', 'rgba(67, 56, 202, 0.1)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                                 <View style={styles.cardContentSquare}>
                                     <View style={[styles.iconContainerSmall, { backgroundColor: 'rgba(248, 113, 113, 0.15)' }]}>
                                         <Feather name="users" size={22} color="#F87171" />
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: 'rgba(129, 140, 248, 0.3)',
     },
     cardLarge: {
         width: '100%',

@@ -20,6 +20,9 @@ import { BlurView } from 'expo-blur';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
 import { notificationService } from '../services/notificationService';
+import { friendService } from '../services/friendService';
+import { Friend } from '../types';
+import UserAvatar from '../components/UserAvatar';
 import { spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -43,12 +46,30 @@ const CONTEXT_CHIPS = [
 export default function InnerCircleScreen() {
     const navigation = useNavigation<any>();
     const { user } = useAuthContext();
-    const { onboardingData, innerCircle: friends } = useUserData();
+    const { onboardingData } = useUserData();
+    const [friends, setFriends] = useState<Friend[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
     const [selectedChip, setSelectedChip] = useState<string | null>(null);
 
     // Pulse animation for the connection lines
     const pulseAnim = useRef(new Animated.Value(0)).current;
+
+    // Fetch real friends from Firestore
+    useEffect(() => {
+        const loadFriends = async () => {
+            if (!user?.id) return;
+            try {
+                const circle = await friendService.getInnerCircle(user.id);
+                setFriends(circle);
+            } catch (error) {
+                console.error('Error loading Inner Circle:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadFriends();
+    }, [user?.id]);
 
     useEffect(() => {
         Animated.loop(
@@ -124,15 +145,32 @@ export default function InnerCircleScreen() {
                     {/* The Squad Visualization (Scalable Grid) */}
                     <View style={styles.gridContainer}>
                         <View style={styles.squadGrid}>
-                            {/* User Node (Always First) */}
-                            <View style={[styles.avatarNode, styles.userNode]}>
-                                <Feather name="user" size={24} color="#FFF" />
-                            </View>
+                            {/* User Node - Tap to Add Friends */}
+                            <TouchableOpacity
+                                style={[styles.avatarNode, styles.userNode]}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                    // Navigate to nested Social tab with openAddFriends param
+                                    navigation.navigate('Main', {
+                                        screen: 'Social',
+                                        params: { openAddFriends: true }
+                                    });
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <Feather name="user-plus" size={22} color="#FFF" />
+                            </TouchableOpacity>
 
                             {/* Friend Nodes */}
                             {friends.map((friend) => (
-                                <View key={friend.id} style={[styles.avatarNode, { backgroundColor: friend.color }]}>
-                                    <Text style={styles.initial}>{friend.name[0]}</Text>
+                                <View key={friend.uid} style={styles.avatarNode}>
+                                    <UserAvatar
+                                        size={52}
+                                        photoURL={friend.photoURL}
+                                        avatarType={friend.avatarType}
+                                        avatarValue={friend.avatarValue}
+                                        name={friend.displayName}
+                                    />
                                 </View>
                             ))}
                         </View>
@@ -173,6 +211,16 @@ export default function InnerCircleScreen() {
                                     </View>
                                 </TouchableOpacity>
                             ))}
+                        </View>
+
+                        {/* Message Preview */}
+                        <View style={styles.messagePreviewContainer}>
+                            <Text style={styles.messagePreviewLabel}>Message to send:</Text>
+                            <Text style={styles.messagePreviewText}>
+                                "{selectedChip
+                                    ? CONTEXT_CHIPS.find(c => c.id === selectedChip)?.message
+                                    : "Need a hand with a craving. Are you free?"}"
+                            </Text>
                         </View>
                     </View>
 
@@ -225,8 +273,8 @@ export default function InnerCircleScreen() {
                     </View>
 
                 </View>
-            </SafeAreaView>
-        </View>
+            </SafeAreaView >
+        </View >
     );
 }
 
@@ -410,5 +458,27 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: 'rgba(255,255,255,0.3)',
         textAlign: 'center',
+    },
+    messagePreviewContainer: {
+        marginTop: spacing.lg,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 16,
+        marginHorizontal: 20,
+    },
+    messagePreviewLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: THEME.textDim,
+        marginBottom: 6,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    messagePreviewText: {
+        fontSize: 14,
+        fontStyle: 'italic',
+        color: THEME.text,
+        lineHeight: 20,
     },
 });

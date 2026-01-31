@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { AuthProvider } from './src/context/AuthContext';
 import { UserDataProvider } from './src/context/UserDataContext';
+import { RevenueCatProvider } from './src/context/RevenueCatContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { colors } from './src/theme';
 
@@ -58,9 +59,11 @@ export default function App() {
           backgroundColor={colors.background.primary}
         />
         <AuthProvider>
-          <UserDataProvider>
-            <RootNavigator />
-          </UserDataProvider>
+          <RevenueCatProvider>
+            <UserDataProvider>
+              <RootNavigator />
+            </UserDataProvider>
+          </RevenueCatProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
