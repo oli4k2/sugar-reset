@@ -20,6 +20,13 @@ const fonts = {
         medium: 'Inter_500Medium',
         semibold: 'Inter_600SemiBold',
     },
+    rounded: {
+        regular: 'Outfit_400Regular',
+        medium: 'Outfit_500Medium',
+        semibold: 'Outfit_600SemiBold',
+        bold: 'Outfit_700Bold',
+        extrabold: 'Outfit_800ExtraBold',
+    },
 };
 
 export const typography = {

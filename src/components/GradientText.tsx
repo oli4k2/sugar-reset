@@ -2,11 +2,12 @@
  * GradientText Component
  * 
  * Creates text with a modern gradient effect using SVG.
+ * Supports multi-line text by splitting words based on estimated width.
  */
 
 import React from 'react';
 import { View, StyleSheet, TextStyle, Dimensions } from 'react-native';
-import Svg, { Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Text as SvgText, TSpan, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -17,6 +18,7 @@ interface GradientTextProps {
     fontWeight?: TextStyle['fontWeight'];
     fontStyle?: TextStyle['fontStyle'];
     style?: any;
+    maxWidth?: number;
 }
 
 export function GradientText({
@@ -26,13 +28,36 @@ export function GradientText({
     fontWeight = '800',
     fontStyle = 'normal',
     style,
+    maxWidth,
 }: GradientTextProps) {
-    // Use full width for centering, with some padding
-    const svgWidth = SCREEN_WIDTH - 60; // Account for screen padding
+    const availableWidth = maxWidth || SCREEN_WIDTH - 60;
+    const lineHeight = fontSize * 1.3;
+    
+    // More accurate chars per line estimate (depends on font weight and size)
+    // For Outfit/Inter bold, roughly 0.6 of fontSize per char average
+    const charsPerLine = Math.floor(availableWidth / (fontSize * 0.6));
+    
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+    
+    words.forEach(word => {
+        if ((currentLine + word).length > charsPerLine && currentLine.length > 0) {
+            lines.push(currentLine.trim());
+            currentLine = word + ' ';
+        } else {
+            currentLine += word + ' ';
+        }
+    });
+    if (currentLine.trim()) {
+        lines.push(currentLine.trim());
+    }
+
+    const svgHeight = lines.length * lineHeight + (fontSize * 0.2); // Add some buffer
 
     return (
-        <View style={[styles.container, style]}>
-            <Svg height={fontSize * 1.5} width={svgWidth}>
+        <View style={[styles.container, style, { width: availableWidth, height: svgHeight }]}>
+            <Svg height={svgHeight} width={availableWidth} viewBox={`0 0 ${availableWidth} ${svgHeight}`}>
                 <Defs>
                     <LinearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                         {colors.map((color, index) => (
@@ -49,11 +74,19 @@ export function GradientText({
                     fontSize={fontSize}
                     fontWeight={fontWeight as string}
                     fontStyle={fontStyle}
-                    x={svgWidth / 2}
+                    x={availableWidth / 2}
                     y={fontSize}
                     textAnchor="middle"
                 >
-                    {text}
+                    {lines.map((line, index) => (
+                        <TSpan
+                            key={index}
+                            x={availableWidth / 2}
+                            dy={index === 0 ? 0 : lineHeight}
+                        >
+                            {line}
+                        </TSpan>
+                    ))}
                 </SvgText>
             </Svg>
         </View>
@@ -63,6 +96,7 @@ export function GradientText({
 const styles = StyleSheet.create({
     container: {
         alignItems: 'center',
+        justifyContent: 'center',
     },
 });
 
