@@ -67,11 +67,6 @@ export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
                 >
                     {/* Centered Content Group */}
                     <View style={styles.centeredContent}>
-                        {/* Brand / Logo */}
-                        <View style={styles.brandContainer}>
-                            <Text style={styles.brandText}>sugarest.</Text>
-                        </View>
-
                         {/* Main Content */}
                         <View style={styles.mainContent}>
                             <Text style={styles.headline}>
@@ -124,18 +119,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    brandContainer: {
-        alignItems: 'center',
-        marginBottom: spacing.xl,
-    },
-    brandText: {
-        fontSize: 22,
-        fontFamily: typography.fonts.heading.semibold,
-        color: looviColors.text.primary,
-        opacity: 0.85,
-        letterSpacing: 2.5,
-        textTransform: 'lowercase',
     },
     mainContent: {
         alignItems: 'center',
