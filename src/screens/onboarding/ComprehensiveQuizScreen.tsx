@@ -16,6 +16,7 @@ import {
     Animated,
     Dimensions,
     Keyboard,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -56,6 +57,7 @@ interface Question {
     id: string;
     type: QuestionType;
     emoji: string;
+    image?: any; // Image source for Q1-Q4
     title: string;
     subtitle?: string;
     options?: QuestionOption[];
@@ -76,6 +78,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'gender',
             type: 'single',
             emoji: '👤',
+            image: require('../../../assets/images/onboarding/q1.png'),
             title: "What's your gender?",
             options: [
                 { id: 'male', emoji: '', label: 'Male' },
@@ -87,6 +90,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'ageGroup',
             type: 'single',
             emoji: '👤',
+            image: require('../../../assets/images/onboarding/q2.png'),
             title: 'What is your age group?',
             options: [
                 { id: '18-34', emoji: '', label: '18-34' },
@@ -100,6 +104,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'sugarFrequency',
             type: 'single',
             emoji: '📅',
+            image: require('../../../assets/images/onboarding/q3.png'),
             title: 'How often do you eat foods with added sugar?',
             options: [
                 { id: 'rarely', emoji: '', label: 'Rarely' },
@@ -112,6 +117,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'dailySweetTimes',
             type: 'single',
             emoji: '🍬',
+            image: require('../../../assets/images/onboarding/q4.png'),
             title: 'On a typical day, how many separate times do you eat or drink something sweet?',
             options: [
                 { id: '0-1', emoji: '', label: '0-1' },
@@ -1139,7 +1145,15 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                         >
                             {/* Question Header */}
                             <View style={styles.questionHeader}>
-                                <Text style={styles.questionEmoji}>{question.emoji}</Text>
+                                {question.image ? (
+                                    <Image 
+                                        source={question.image} 
+                                        style={styles.questionImage}
+                                        resizeMode="contain"
+                                    />
+                                ) : (
+                                    <Text style={styles.questionEmoji}>{question.emoji}</Text>
+                                )}
                                 <Text style={styles.questionTitle}>{question.title}</Text>
                                 {question.subtitle && (
                                     <Text style={styles.questionSubtitle}>{question.subtitle}</Text>
@@ -1241,6 +1255,11 @@ const styles = StyleSheet.create({
     },
     questionEmoji: {
         fontSize: 48,
+        marginBottom: spacing.md,
+    },
+    questionImage: {
+        width: 90,
+        height: 90,
         marginBottom: spacing.md,
     },
     questionTitle: {
