@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Craveless",
-    "slug": "craveless",
+    "slug": "sugar-reset",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,11 +15,11 @@
     "ios": {
       "icon": "./src/public/appstore.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.craveless.app",
+      "bundleIdentifier": "com.sugarreset.app",
       "appleTeamId": "LX5566JXPP",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSHealthUpdateUsageDescription": "SugarReset needs access to update your health data with your logged nutrition.",
+        "NSHealthUpdateUsageDescription": "Craveless needs access to update your health data with your logged nutrition.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

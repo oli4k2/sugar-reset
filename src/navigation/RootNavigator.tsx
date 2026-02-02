@@ -4,10 +4,10 @@
  * Calm, linear navigation flow with emphasis on habit science.
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, View, StyleSheet, Platform, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
@@ -18,6 +18,8 @@ import {
 } from '../types';
 import { colors } from '../theme';
 import { useAuthContext } from '../context/AuthContext';
+import { useUserData } from '../context/UserDataContext';
+import { useRevenueCat } from '../hooks/useRevenueCat';
 
 // Onboarding Screens
 import {
@@ -203,8 +205,100 @@ function LoadingScreen() {
 
 // Root Navigation - Shows appropriate flow based on auth state
 export default function RootNavigator() {
-    const { isLoading, isAuthenticated, isUnverified } = useAuthContext();
+    const { isLoading: authLoading, isAuthenticated, isUnverified } = useAuthContext();
+    const { hasCompletedOnboarding, isLoading: userDataLoading } = useUserData();
+    const { isPremium, isLoading: revenueCatLoading } = useRevenueCat();
+    
+    // IMPORTANT: All hooks must be called before any conditional returns
+    const navigationRef = useRef<NavigationContainerRef<any>>(null);
+    const lastNavigationState = useRef<{ hasCompletedOnboarding: boolean; isAuthenticated: boolean; isPremium: boolean } | null>(null);
 
+    const isLoading = authLoading || userDataLoading || revenueCatLoading;
+
+    // Determine initial route based on auth, onboarding completion, and premium status
+    let initialRouteName: 'Main' | 'Onboarding' | 'Auth' = 'Onboarding';
+    
+    if (!isLoading) {
+        // Debug: Log all navigation state
+        console.log('🧭 Navigation State:', {
+            isAuthenticated,
+            hasCompletedOnboarding,
+            isPremium,
+            authLoading,
+            userDataLoading,
+            revenueCatLoading,
+        });
+        
+        if (hasCompletedOnboarding && !isAuthenticated) {
+            // Onboarding complete but user needs to authenticate
+            initialRouteName = 'Auth';
+            console.log('ℹ️ Navigation: Onboarding complete but not authenticated → Auth');
+        } else if (isAuthenticated && hasCompletedOnboarding) {
+            // User is authenticated and completed onboarding - let them into the app
+            initialRouteName = 'Main';
+            console.log('✅ Navigation: User authenticated and onboarding complete → Main', {
+                isPremium,
+            });
+        } else {
+            console.log('ℹ️ Navigation: Showing onboarding flow', {
+                isAuthenticated,
+                hasCompletedOnboarding,
+                isPremium,
+            });
+        }
+    }
+
+    // Handle navigation when state changes (not just on initial mount)
+    // Only navigate if state actually changed and we're not already on the correct screen
+    // IMPORTANT: This useEffect must be called before any conditional returns
+    useEffect(() => {
+        // Don't navigate while loading or if unverified
+        if (isLoading || isUnverified) return;
+        if (!navigationRef.current) return;
+        
+        const currentState = { hasCompletedOnboarding, isAuthenticated, isPremium };
+        
+        // Skip if state hasn't changed
+        if (lastNavigationState.current &&
+            lastNavigationState.current.hasCompletedOnboarding === currentState.hasCompletedOnboarding &&
+            lastNavigationState.current.isAuthenticated === currentState.isAuthenticated &&
+            lastNavigationState.current.isPremium === currentState.isPremium) {
+            return;
+        }
+        
+        lastNavigationState.current = currentState;
+        
+        const currentRoute = navigationRef.current.getCurrentRoute();
+        const currentRouteName = currentRoute?.name;
+
+        // If authenticated and completed onboarding, go to Main (regardless of premium)
+        // Premium users get full access, non-premium can access paywall from Main
+        if (isAuthenticated && hasCompletedOnboarding) {
+            if (currentRouteName !== 'Main' && currentRouteName !== 'Paywall') {
+                console.log('🔄 Navigating to Main (authenticated and onboarding complete)', {
+                    isPremium,
+                });
+                navigationRef.current.reset({
+                    index: 0,
+                    routes: [{ name: 'Main' }],
+                });
+            }
+        }
+        // If onboarding complete but not authenticated, navigate to Auth
+        // But only if we're not already on Auth or Paywall (let Paywall handle its own navigation)
+        else if (hasCompletedOnboarding && !isAuthenticated) {
+            if (currentRouteName !== 'Auth' && currentRouteName !== 'Paywall') {
+                console.log('🔄 Navigating to Auth (onboarding complete, not authenticated)');
+                navigationRef.current.reset({
+                    index: 0,
+                    routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
+                });
+            }
+        }
+        // Otherwise, stay where we are - don't force navigation
+    }, [hasCompletedOnboarding, isAuthenticated, isPremium, isLoading, isUnverified]);
+
+    // Early returns AFTER all hooks
     if (isLoading) {
         return <LoadingScreen />;
     }
@@ -219,11 +313,8 @@ export default function RootNavigator() {
         );
     }
 
-    // If authenticated, skip onboarding and auth screens
-    const initialRouteName = isAuthenticated ? 'Main' : 'Onboarding';
-
     return (
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
             <RootStack.Navigator
                 screenOptions={{
                     headerShown: false,

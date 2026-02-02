@@ -76,7 +76,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             if (!isMounted) return;
 
-            console.log('👤 Auth state changed:', fbUser ? `User: ${fbUser.uid}` : 'No user');
+            console.log('👤 Auth state changed:', fbUser ? `User: ${fbUser.uid} (${fbUser.email || 'no email'})` : 'No user');
+            console.log('👤 Auth state details:', {
+                hasUser: !!fbUser,
+                uid: fbUser?.uid,
+                email: fbUser?.email,
+                emailVerified: fbUser?.emailVerified,
+                phoneNumber: fbUser?.phoneNumber,
+                providerId: fbUser?.providerData?.[0]?.providerId,
+                providers: fbUser?.providerData?.map(p => p?.providerId),
+            });
+            
+            // IMPORTANT: If user exists but has no valid identifier (email/phone), treat as not authenticated
+            // This handles cases where auth state might be stale
+            if (fbUser && !fbUser.email && !fbUser.phoneNumber) {
+                console.warn('⚠️ User exists but has no email or phone - treating as not authenticated');
+                setFirebaseUser(null);
+                setUser(null);
+                setIsLoading(false);
+                return;
+            }
+            
             setFirebaseUser(fbUser);
 
             if (fbUser) {
@@ -138,7 +158,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
     }, []);
 
-    const isUnverified = !!firebaseUser && !firebaseUser.emailVerified;
+    const isUnverified = !!firebaseUser && firebaseUser.email && !firebaseUser.emailVerified;
+
+    // Only consider authenticated if we have a valid Firebase user
+    // For email/password: must be verified
+    // For OAuth (Google/Apple): no verification needed
+    const isAuthenticated = !!firebaseUser && (
+        !firebaseUser.email || // OAuth providers might not have email
+        firebaseUser.emailVerified || // Email verified
+        firebaseUser.providerData.some(p => {
+            const providerId = p?.providerId || '';
+            return providerId.includes('google') || providerId.includes('apple');
+        }) // OAuth providers don't need email verification
+    );
 
     const refreshUser = async () => {
         if (auth.currentUser) {
@@ -165,7 +197,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         user,
         firebaseUser,
         isLoading,
-        isAuthenticated: !!firebaseUser && !isUnverified,
+        isAuthenticated,
         isUnverified,
         refreshUser,
     };

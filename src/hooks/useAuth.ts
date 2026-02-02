@@ -6,10 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import {
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
     signOut as firebaseSignOut,
-    sendPasswordResetEmail,
     updateProfile,
     GoogleAuthProvider,
     signInWithCredential,
@@ -26,10 +23,9 @@ interface AuthError {
 interface UseAuthReturn {
     isLoading: boolean;
     error: AuthError | null;
-    signIn: (email: string, password: string) => Promise<boolean>;
-    signUp: (email: string, password: string, displayName?: string) => Promise<boolean>;
+    signInWithPhoneNumber: (phoneNumber: string) => Promise<string>; // Returns verification ID
+    verifyOTP: (verificationId: string, code: string) => Promise<boolean>;
     signOut: () => Promise<void>;
-    resetPassword: (email: string) => Promise<boolean>;
     signInWithGoogle: (idToken: string) => Promise<boolean>;
     signInWithApple: (identityToken: string, nonce: string) => Promise<boolean>;
     sendVerificationEmail: () => Promise<boolean>;
@@ -70,57 +66,65 @@ export function useAuth(): UseAuthReturn {
     }, []);
 
     /**
-     * Sign in with email and password
+     * Sign in with phone number (sends OTP)
+     * Returns verification ID to be used with verifyOTP
+     * 
+     * NOTE: This requires Firebase Phone Auth to be enabled in Firebase Console
+     * and may require additional setup for React Native/Expo
      */
-    const signIn = useCallback(async (email: string, password: string): Promise<boolean> => {
+    const signInWithPhoneNumber = useCallback(async (phoneNumber: string): Promise<string> => {
         setIsLoading(true);
         setError(null);
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
-            return true;
+            // Format phone number (ensure it starts with +)
+            const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+            
+            // For React Native/Expo, we need to use a different approach
+            // Firebase Phone Auth in React Native requires react-native-firebase or expo-firebase
+            // For now, we'll use a placeholder that needs to be implemented with the correct library
+            
+            // TODO: Implement with react-native-firebase or expo-firebase
+            // Example:
+            // const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
+            // return confirmation.verificationId;
+            
+            throw new Error('Phone authentication not yet implemented. Please use Google or Apple sign-in.');
         } catch (err: any) {
-            setError({
-                code: err.code,
-                message: getErrorMessage(err.code),
-            });
-            return false;
-        } finally {
             setIsLoading(false);
+            setError({
+                code: err.code || 'phone-auth-not-implemented',
+                message: err.message || getErrorMessage(err.code),
+            });
+            throw err;
         }
     }, []);
 
     /**
-     * Sign up with email and password
+     * Verify OTP code
      */
-    const signUp = useCallback(async (
-        email: string,
-        password: string,
+    const verifyOTP = useCallback(async (
+        verificationId: string,
+        code: string,
         displayName?: string
     ): Promise<boolean> => {
         setIsLoading(true);
         setError(null);
 
         try {
-            const { user } = await createUserWithEmailAndPassword(auth, email, password);
-
-            // Update display name if provided
-            if (displayName) {
-                await updateProfile(user, { displayName });
-            }
-
-            // Create user profile in Firestore
-            await userService.createUserProfile(user.uid, email, displayName);
-
-            return true;
+            // TODO: Implement with react-native-firebase or expo-firebase
+            // Example:
+            // const credential = auth.PhoneAuthProvider.credential(verificationId, code);
+            // const { user } = await auth().signInWithCredential(credential);
+            
+            throw new Error('OTP verification not yet implemented.');
         } catch (err: any) {
+            setIsLoading(false);
             setError({
-                code: err.code,
-                message: getErrorMessage(err.code),
+                code: err.code || 'otp-verification-not-implemented',
+                message: err.message || getErrorMessage(err.code),
             });
             return false;
-        } finally {
-            setIsLoading(false);
         }
     }, []);
 
@@ -142,27 +146,6 @@ export function useAuth(): UseAuthReturn {
     }, []);
 
     /**
-     * Send password reset email
-     */
-    const resetPassword = useCallback(async (email: string): Promise<boolean> => {
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            await sendPasswordResetEmail(auth, email);
-            return true;
-        } catch (err: any) {
-            setError({
-                code: err.code,
-                message: getErrorMessage(err.code),
-            });
-            return false;
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    /**
      * Sign in with Google (using ID token from Google Sign-In)
      */
     const signInWithGoogle = useCallback(async (idToken: string): Promise<boolean> => {
@@ -176,11 +159,19 @@ export function useAuth(): UseAuthReturn {
             // Check if user profile exists, create if not
             const existingProfile = await userService.getUserProfile(user.uid);
             if (!existingProfile) {
-                await userService.createUserProfile(
+                console.log('📝 Creating Firestore profile for Google user:', user.uid);
+                const newProfile = await userService.createUserProfile(
                     user.uid,
                     user.email || '',
                     user.displayName || undefined
                 );
+                if (newProfile) {
+                    console.log('✅ Firestore profile created for Google user');
+                } else {
+                    console.warn('⚠️ Failed to create Firestore profile for Google user');
+                }
+            } else {
+                console.log('✅ Firestore profile already exists for Google user');
             }
 
             return true;
@@ -216,11 +207,19 @@ export function useAuth(): UseAuthReturn {
             // Check if user profile exists, create if not
             const existingProfile = await userService.getUserProfile(user.uid);
             if (!existingProfile) {
-                await userService.createUserProfile(
+                console.log('📝 Creating Firestore profile for Apple user:', user.uid);
+                const newProfile = await userService.createUserProfile(
                     user.uid,
                     user.email || '',
                     user.displayName || undefined
                 );
+                if (newProfile) {
+                    console.log('✅ Firestore profile created for Apple user');
+                } else {
+                    console.warn('⚠️ Failed to create Firestore profile for Apple user');
+                }
+            } else {
+                console.log('✅ Firestore profile already exists for Apple user');
             }
 
             return true;
@@ -292,10 +291,9 @@ export function useAuth(): UseAuthReturn {
     return {
         isLoading,
         error,
-        signIn,
-        signUp,
+        signInWithPhoneNumber,
+        verifyOTP,
         signOut,
-        resetPassword,
         signInWithGoogle,
         signInWithApple,
         clearError,

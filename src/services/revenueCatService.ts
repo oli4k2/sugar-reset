@@ -280,10 +280,62 @@ class RevenueCatServiceImpl implements RevenueCatService {
 
     try {
       const customerInfo = await this.getCustomerInfo();
-      return customerInfo.entitlements.active['premium'] !== undefined;
+      
+      // Check if premium entitlement exists and is active
+      const premiumEntitlement = customerInfo.entitlements.active['premium'];
+      const hasPremium = premiumEntitlement !== undefined;
+      
+      // IMPORTANT: Don't trust anonymous purchases during onboarding
+      // Only trust premium if user is identified (not anonymous)
+      const isAnonymous = customerInfo.originalAppUserId?.startsWith('$RCAnonymousID:') ?? false;
+      
+      // Debug logging
+      if (__DEV__) {
+        console.log('🔍 Premium check:', {
+          hasPremium,
+          isAnonymous,
+          originalAppUserId: customerInfo.originalAppUserId,
+          premiumEntitlement: premiumEntitlement ? {
+            identifier: premiumEntitlement.identifier,
+            isActive: premiumEntitlement.isActive,
+            willRenew: premiumEntitlement.willRenew,
+            periodType: premiumEntitlement.periodType,
+          } : null,
+          activeEntitlements: Object.keys(customerInfo.entitlements.active),
+          allEntitlements: Object.keys(customerInfo.entitlements.all || {}),
+        });
+      }
+      
+      // If user is anonymous, don't trust premium status (likely from previous test)
+      if (isAnonymous && hasPremium) {
+        console.log('⚠️ Premium detected but user is anonymous - ignoring for onboarding flow');
+        return false;
+      }
+      
+      // Double-check: entitlement must exist AND be active
+      if (hasPremium && premiumEntitlement) {
+        return premiumEntitlement.isActive === true;
+      }
+      
+      return false;
     } catch (error) {
       console.error('❌ Failed to check premium status:', error);
+      // On error, default to false (not premium)
       return false;
+    }
+  }
+
+  async logOut(): Promise<void> {
+    if (USE_MOCK_DATA) {
+      return;
+    }
+
+    try {
+      await Purchases.logOut();
+      console.log('✅ RevenueCat: Logged out (cleared anonymous ID)');
+    } catch (error) {
+      console.error('❌ Failed to log out from RevenueCat:', error);
+      throw error;
     }
   }
 

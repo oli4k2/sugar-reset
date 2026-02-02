@@ -45,3 +45,8 @@ yarn-error.*
 # Firebase
 GoogleService-Info.plist
 google-services.json
+
+# Google Play Service Account (RevenueCat)
+*-service-account.json
+*service-account*.json
+google-play-service-account.json
