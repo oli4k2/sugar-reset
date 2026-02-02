@@ -84,9 +84,16 @@ export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScr
                         ]}
                     >
                         <Animated.Image
-                            source={require('../../public/cravelesslogo.png')}
-                            style={styles.logo}
+                            source={require('../../public/craveless_icon.png')}
+                            style={styles.logoIcon}
                             resizeMode="contain"
+                        />
+                        <GradientText
+                            text="craveless"
+                            colors={['#FF6B35', '#E8A87C', '#D4896A']}
+                            fontSize={getResponsiveFontSize(24)}
+                            fontWeight="700"
+                            style={styles.logoText}
                         />
                     </Animated.View>
 
@@ -152,9 +159,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: spacing['2xl'],
     },
-    logo: {
-        width: SCREEN_WIDTH * 0.4,
-        height: SCREEN_WIDTH * 0.25,
+    logoIcon: {
+        width: SCREEN_WIDTH * 0.15,
+        height: SCREEN_WIDTH * 0.15,
+        marginBottom: spacing.xs,
+    },
+    logoText: {
+        marginTop: spacing.xs,
     },
     welcomeSection: {
         alignItems: 'center',

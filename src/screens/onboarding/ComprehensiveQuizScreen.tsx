@@ -18,6 +18,7 @@ import {
     Keyboard,
     Image,
 } from 'react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Slider from '@react-native-community/slider';
@@ -118,7 +119,7 @@ const getQuestions = (gender: string | null): Question[] => {
             type: 'single',
             emoji: '🍬',
             image: require('../../../assets/images/onboarding/q4.png'),
-            title: 'On a typical day, how many separate times do you eat or drink something sweet?',
+            title: 'On a typical day, how many separate times do you eat or drink something sugary?',
             options: [
                 { id: '0-1', emoji: '', label: '0-1' },
                 { id: '2-3', emoji: '', label: '2-3' },
@@ -130,6 +131,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'unconsciousSugar',
             type: 'scale',
             emoji: '🤔',
+            image: require('../../../assets/images/onboarding/q5.png'),
             title: 'How often do you eat sugar without consciously deciding to?',
             options: [
                 { id: '1', emoji: '', label: 'Never' },
@@ -142,6 +144,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'sugarChoiceFeeling',
             type: 'single',
             emoji: '💭',
+            image: require('../../../assets/images/onboarding/q6.png'),
             title: 'Which feels closer to the truth?',
             options: [
                 { id: 'choose', emoji: '', label: 'I choose to eat sugar' },
@@ -153,6 +156,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'sugarSituations',
             type: 'triggers',
             emoji: '🎯',
+            image: require('../../../assets/images/onboarding/q7.png'),
             title: 'In which situations do you most often eat sugary foods?',
             options: [
                 { id: 'stress', emoji: '', label: 'When stressed' },
@@ -167,6 +171,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'reduceSugarAttempt',
             type: 'single',
             emoji: '🔄',
+            image: require('../../../assets/images/onboarding/q8.png'),
             title: 'When you try to reduce sugar, what usually happens?',
             options: [
                 { id: 'succeed', emoji: '', label: 'I succeed' },
@@ -179,6 +184,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'craveWhenNotHungry',
             type: 'scale',
             emoji: '🍰',
+            image: require('../../../assets/images/onboarding/q9.png'),
             title: "How often do you crave sugary snacks and drinks when you're not hungry?",
             options: [
                 { id: '1', emoji: '', label: 'Never' },
@@ -191,6 +197,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'craveIntensity',
             type: 'scale',
             emoji: '⚡',
+            image: require('../../../assets/images/onboarding/q10.png'),
             title: 'When you crave sugar, how intense is the urge?',
             options: [
                 { id: '1', emoji: '', label: 'Easy to ignore' },
@@ -203,6 +210,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'avoidSugarDifficulty',
             type: 'scale',
             emoji: '💪',
+            image: require('../../../assets/images/onboarding/q11.png'),
             title: 'How hard is it to avoid sugar in your normal routine?',
             options: [
                 { id: '1', emoji: '', label: 'Easy' },
@@ -215,6 +223,7 @@ const getQuestions = (gender: string | null): Question[] => {
             id: 'sugarVisibility',
             type: 'scale',
             emoji: '👀',
+            image: require('../../../assets/images/onboarding/q12.png'),
             title: 'How often are sugary foods or drinks visible around you?',
             options: [
                 { id: '1', emoji: '', label: 'Rarely' },
@@ -257,6 +266,9 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const slideAnim = useRef(new Animated.Value(0)).current;
     const resultFade = useRef(new Animated.Value(0)).current;
     const resultScale = useRef(new Animated.Value(0.8)).current;
+    
+    // Swipe gesture tracking
+    const isAnimating = useRef(false);
 
     // Handle skip from params - skip quiz and results, go directly to userInfo
     useEffect(() => {
@@ -270,17 +282,25 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const question = QUESTIONS[currentQuestion];
     const progress = (currentQuestion + 1) / QUESTIONS.length;
 
-    const animateTransition = (callback: () => void) => {
+    const animateTransition = (callback: () => void, direction: 'forward' | 'backward' = 'forward') => {
+        if (isAnimating.current) return;
+        isAnimating.current = true;
+        
+        const slideOutValue = direction === 'forward' ? -30 : 30;
+        const slideInValue = direction === 'forward' ? 30 : -30;
+        
         Animated.parallel([
             Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-            Animated.timing(slideAnim, { toValue: -30, duration: 150, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: slideOutValue, duration: 150, useNativeDriver: true }),
         ]).start(() => {
             callback();
-            slideAnim.setValue(30);
+            slideAnim.setValue(slideInValue);
             Animated.parallel([
                 Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
                 Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-            ]).start();
+            ]).start(() => {
+                isAnimating.current = false;
+            });
         });
     };
 
@@ -333,7 +353,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         Keyboard.dismiss();
         
         if (currentQuestion < QUESTIONS.length - 1) {
-            animateTransition(() => setCurrentQuestion(prev => prev + 1));
+            animateTransition(() => setCurrentQuestion(prev => prev + 1), 'forward');
         } else {
             console.log('Final question reached, checking canProceed...');
             if (canProceed()) {
@@ -343,6 +363,13 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             } else {
                 console.log('canProceed returned false');
             }
+        }
+    };
+
+    const goPrevious = () => {
+        if (currentQuestion > 0 && !isAnimating.current) {
+            Keyboard.dismiss();
+            animateTransition(() => setCurrentQuestion(prev => prev - 1), 'backward');
         }
     };
 
@@ -720,6 +747,33 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         }
         return question.options;
     };
+
+    // Gesture handler for swipe gestures
+    const swipeGesture = Gesture.Pan()
+        .minDistance(10) // Minimum distance before activation
+        .activeOffsetX([-20, 20]) // Only activate if horizontal movement exceeds 20px
+        .failOffsetY([-15, 15]) // Fail if vertical movement exceeds 15px (allows scrolling)
+        .onEnd((event) => {
+            const { translationX, velocityX } = event;
+            const swipeThreshold = 50; // Minimum swipe distance
+            const velocityThreshold = 400; // Minimum swipe velocity
+            
+            console.log('Swipe detected:', { translationX, velocityX, currentQuestion, isAnimating: isAnimating.current });
+            
+            // Swipe right (backward) - only if not on first question
+            if ((translationX > swipeThreshold || velocityX > velocityThreshold) && currentQuestion > 0 && !isAnimating.current) {
+                console.log('Going previous');
+                goPrevious();
+            }
+            // Swipe left (forward) - only if not on last question and not animating
+            else if ((translationX < -swipeThreshold || velocityX < -velocityThreshold) && currentQuestion < QUESTIONS.length - 1 && !isAnimating.current) {
+                // Only auto-advance if question is already answered
+                if (canProceed() && question.type !== 'multi' && question.type !== 'slider' && question.type !== 'text' && question.type !== 'triggers') {
+                    console.log('Going next via swipe');
+                    goNext();
+                }
+            }
+        });
 
     const renderQuestion = () => {
         const filteredOptions = getFilteredOptions();
@@ -1119,36 +1173,45 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         <LooviBackground variant="coralTop">
             {!isCalculating && (
                 <SafeAreaView style={styles.container}>
+                    {/* Invisible overlay for swipe gestures */}
+                    <GestureDetector gesture={swipeGesture}>
+                        <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
+                    </GestureDetector>
+                    
                     {/* Progress Bar */}
                     <View style={styles.progressContainer}>
-                        <View style={styles.progressTrack}>
-                            <Animated.View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                            <View style={styles.progressTrack}>
+                                <Animated.View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+                            </View>
+                            <Text style={styles.progressText}>
+                                Question {currentQuestion + 1} of {QUESTIONS.length}
+                            </Text>
                         </View>
-                        <Text style={styles.progressText}>
-                            Question {currentQuestion + 1} of {QUESTIONS.length}
-                        </Text>
-                    </View>
 
-                    <ScrollView
-                        style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        <Animated.View
-                            style={[
-                                styles.questionContainer,
-                                {
-                                    opacity: fadeAnim,
-                                    transform: [{ translateY: slideAnim }],
-                                },
-                            ]}
-                        >
+                        <View style={styles.swipeWrapper}>
+                            <ScrollView
+                                style={styles.scrollView}
+                                contentContainerStyle={styles.scrollContent}
+                                showsVerticalScrollIndicator={false}
+                            >
+                            <Animated.View
+                                style={[
+                                    styles.questionContainer,
+                                    {
+                                        opacity: fadeAnim,
+                                        transform: [{ translateY: slideAnim }],
+                                    },
+                                ]}
+                            >
                             {/* Question Header */}
                             <View style={styles.questionHeader}>
                                 {question.image ? (
                                     <Image 
                                         source={question.image} 
-                                        style={styles.questionImage}
+                                        style={[
+                                            styles.questionImage,
+                                            question.id === 'dailySweetTimes' && styles.questionImageLarge
+                                        ]}
                                         resizeMode="contain"
                                     />
                                 ) : (
@@ -1163,41 +1226,42 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             {/* Question Content */}
                             {renderQuestion()}
                         </Animated.View>
-                    </ScrollView>
-
-                    {/* Continue Button (for multi-select, slider, text, triggers) */}
-                    {(question.type === 'multi' || question.type === 'slider' || question.type === 'text' || question.type === 'triggers') && (
-                        <View style={styles.footer}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.continueButton,
-                                    !canProceed() && styles.continueButtonDisabled,
-                                ]}
-                                onPress={goNext}
-                                disabled={!canProceed()}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={styles.continueButtonText}>
-                                    {currentQuestion < QUESTIONS.length - 1 ? 'Continue' : 'See Results'}
-                                </Text>
-                            </TouchableOpacity>
+                            </ScrollView>
                         </View>
-                    )}
 
-                    {/* CTA Button for question 12 (last question) */}
-                    {currentQuestion === QUESTIONS.length - 1 && question.type !== 'multi' && question.type !== 'slider' && question.type !== 'text' && question.type !== 'triggers' && answers[question.id] !== null && (
-                        <View style={styles.footer}>
-                            <TouchableOpacity
-                                style={styles.continueButton}
-                                onPress={handleContinueToAnalysis}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={styles.continueButtonText}>
-                                    Continue to analysis
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    )}
+                        {/* Continue Button (for multi-select, slider, text, triggers) */}
+                        {(question.type === 'multi' || question.type === 'slider' || question.type === 'text' || question.type === 'triggers') && (
+                            <View style={styles.footer}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.continueButton,
+                                        !canProceed() && styles.continueButtonDisabled,
+                                    ]}
+                                    onPress={goNext}
+                                    disabled={!canProceed()}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.continueButtonText}>
+                                        {currentQuestion < QUESTIONS.length - 1 ? 'Continue' : 'See Results'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* CTA Button for question 12 (last question) */}
+                        {currentQuestion === QUESTIONS.length - 1 && question.type !== 'multi' && question.type !== 'slider' && question.type !== 'text' && question.type !== 'triggers' && answers[question.id] !== null && (
+                            <View style={styles.footer}>
+                                <TouchableOpacity
+                                    style={styles.continueButton}
+                                    onPress={handleContinueToAnalysis}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={styles.continueButtonText}>
+                                        Continue to analysis
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                 </SafeAreaView>
             )}
             
@@ -1239,6 +1303,9 @@ const styles = StyleSheet.create({
         marginTop: spacing.sm,
         textAlign: 'center',
     },
+    swipeWrapper: {
+        flex: 1,
+    },
     scrollView: {
         flex: 1,
     },
@@ -1261,6 +1328,10 @@ const styles = StyleSheet.create({
         width: 90,
         height: 90,
         marginBottom: spacing.md,
+    },
+    questionImageLarge: {
+        width: 98,
+        height: 98,
     },
     questionTitle: {
         fontSize: 24,
