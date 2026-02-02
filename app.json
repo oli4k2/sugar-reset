@@ -17,7 +17,6 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.sugarreset.app",
       "appleTeamId": "LX5566JXPP",
-      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSHealthUpdateUsageDescription": "Craveless needs access to update your health data with your logged nutrition.",
         "ITSAppUsesNonExemptEncryption": false

@@ -25,16 +25,17 @@ import { useRevenueCat } from '../hooks/useRevenueCat';
 import {
     WelcomeScreen,
     QuizIntroScreen,
-    SugarDefinitionScreen,
     ComprehensiveQuizScreen,
     SugarScienceScreen,
     SugarestWelcomeScreen,
     SuccessStoriesScreen,
+    SugarResetGraphScreen,
     FeatureShowcaseScreen,
     GoalsScreen,
     PlanSelectionScreen,
     PromiseScreen,
     PaywallScreen,
+    SymptomsScreen,
 } from '../screens/onboarding';
 
 // Auth Screens
@@ -333,14 +334,15 @@ export default function RootNavigator() {
                             {/* Phase 1: Quiz */}
                             <OnboardingStack.Screen name="Welcome" component={WelcomeScreen} />
                             <OnboardingStack.Screen name="QuizIntro" component={QuizIntroScreen} />
-                            <OnboardingStack.Screen name="SugarDefinition" component={SugarDefinitionScreen} />
                             <OnboardingStack.Screen name="ComprehensiveQuiz" component={ComprehensiveQuizScreen} />
+                            <OnboardingStack.Screen name="Symptoms" component={SymptomsScreen} />
 
                             {/* Phase 2: Education & Social Proof */}
                             <OnboardingStack.Screen name="SugarDangers" component={SugarScienceScreen} />
                             <OnboardingStack.Screen name="SugarestWelcome" component={SugarestWelcomeScreen} />
                             <OnboardingStack.Screen name="FeatureShowcase" component={FeatureShowcaseScreen} />
                             <OnboardingStack.Screen name="SuccessStories" component={SuccessStoriesScreen} />
+                            <OnboardingStack.Screen name="SugarResetGraph" component={SugarResetGraphScreen} />
 
                             {/* Phase 3: Commitment */}
                             <OnboardingStack.Screen name="Goals" component={GoalsScreen} />

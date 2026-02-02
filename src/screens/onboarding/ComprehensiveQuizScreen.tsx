@@ -28,7 +28,8 @@ import { GlassCard } from '../../components/GlassCard';
 import { useUserData } from '../../context/UserDataContext';
 import { PlanBuildingAnimation } from '../../components/PlanBuildingAnimation';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isSmallScreen = SCREEN_HEIGHT < 700; // iPhone SE, smaller Android devices
 
 type ComprehensiveQuizScreenProps = {
     navigation: NativeStackNavigationProp<any, 'ComprehensiveQuiz'>;
@@ -76,111 +77,145 @@ const getQuestions = (gender: string | null): Question[] => {
             type: 'single',
             emoji: '👤',
             title: "What's your gender?",
-            subtitle: 'This helps us personalize recommendations',
             options: [
-                { id: 'male', emoji: '👨', label: 'Male' },
-                { id: 'female', emoji: '👩', label: 'Female' },
-                { id: 'other', emoji: '🙂', label: 'Prefer not to say' },
+                { id: 'male', emoji: '', label: 'Male' },
+                { id: 'female', emoji: '', label: 'Female' },
+                { id: 'other', emoji: '', label: 'Prefer not to say' },
             ],
         },
         {
-            id: 'frequency',
+            id: 'ageGroup',
+            type: 'single',
+            emoji: '👤',
+            title: 'What is your age group?',
+            options: [
+                { id: '18-34', emoji: '', label: '18-34' },
+                { id: '35-44', emoji: '', label: '35-44' },
+                { id: '45-54', emoji: '', label: '45-54' },
+                { id: '55-64', emoji: '', label: '55-64' },
+                { id: '65+', emoji: '', label: '65+' },
+            ],
+        },
+        {
+            id: 'sugarFrequency',
             type: 'single',
             emoji: '📅',
-            title: 'How often do you consume added sugar?',
-            subtitle: 'Including sweets, soda, sweetened coffee, desserts...',
+            title: 'How often do you eat foods with added sugar?',
             options: [
-                { id: 'rarely', emoji: '🌱', label: 'Rarely', description: 'Few times a month' },
-                { id: 'weekly', emoji: '📆', label: 'Few times a week', description: 'Not every day' },
-                { id: 'daily', emoji: '🔄', label: 'Daily', description: 'Once or twice a day' },
-                { id: 'multiple', emoji: '🌊', label: 'Multiple times daily', description: 'Throughout the day' },
+                { id: 'rarely', emoji: '', label: 'Rarely' },
+                { id: 'few-times-week', emoji: '', label: 'A few times per week' },
+                { id: 'daily', emoji: '', label: 'Daily' },
+                { id: 'multiple-daily', emoji: '', label: 'Multiple times per day' },
             ],
         },
         {
-            id: 'consumptionShift',
+            id: 'dailySweetTimes',
             type: 'single',
-            emoji: '📈',
-            title: 'Has your sugar consumption grown over time?',
+            emoji: '🍬',
+            title: 'On a typical day, how many separate times do you eat or drink something sweet?',
             options: [
-                { id: 'yes', emoji: '📈', label: 'Yes' },
-                { id: 'fluctuates', emoji: '📊', label: 'It varies' },
-                { id: 'no', emoji: '📉', label: 'No' },
+                { id: '0-1', emoji: '', label: '0-1' },
+                { id: '2-3', emoji: '', label: '2-3' },
+                { id: '4-5', emoji: '', label: '4-5' },
+                { id: '6+', emoji: '', label: '6+' },
             ],
         },
         {
-            id: 'hardToGoWithout',
+            id: 'unconsciousSugar',
             type: 'scale',
-            emoji: '💪',
-            title: 'Do you find it hard to go a day without sugar?',
+            emoji: '🤔',
+            title: 'How often do you eat sugar without consciously deciding to?',
             options: [
-                { id: '1', emoji: '🟢', label: 'Never', description: 'No problem at all' },
-                { id: '2', emoji: '🟡', label: 'Sometimes', description: 'Depends on the day' },
-                { id: '3', emoji: '🟠', label: 'Often', description: 'Most days are hard' },
-                { id: '4', emoji: '🔴', label: 'Always', description: 'Can\'t imagine it' },
+                { id: '1', emoji: '', label: 'Never' },
+                { id: '2', emoji: '', label: 'Sometimes' },
+                { id: '3', emoji: '', label: 'Often' },
+                { id: '4', emoji: '', label: 'Almost always' },
             ],
         },
         {
-            id: 'triggers',
+            id: 'sugarChoiceFeeling',
+            type: 'single',
+            emoji: '💭',
+            title: 'Which feels closer to the truth?',
+            options: [
+                { id: 'choose', emoji: '', label: 'I choose to eat sugar' },
+                { id: 'give-in', emoji: '', label: 'I give in to cravings' },
+                { id: 'already-eating', emoji: '', label: 'I find myself already eating it' },
+            ],
+        },
+        {
+            id: 'sugarSituations',
             type: 'triggers',
             emoji: '🎯',
-            title: 'What triggers your sugar cravings?',
-            subtitle: 'Select all that apply',
+            title: 'In which situations do you most often eat sugary foods?',
             options: [
-                { id: 'stress', emoji: '😰', label: 'Stress or anxiety' },
-                { id: 'boredom', emoji: '😐', label: 'Boredom' },
-                { id: 'tired', emoji: '😴', label: 'Feeling tired' },
-                { id: 'emotional', emoji: '😢', label: 'Emotional moments' },
-                { id: 'social', emoji: '👥', label: 'Social situations' },
-                { id: 'reward', emoji: '🏆', label: 'Rewarding myself' },
-                { id: 'habit', emoji: '🔄', label: 'Just a habit' },
-                { id: 'menstrual', emoji: '🌙', label: 'Menstrual cycle', femaleOnly: true },
+                { id: 'stress', emoji: '', label: 'When stressed' },
+                { id: 'boredom', emoji: '', label: 'When bored' },
+                { id: 'after-meals', emoji: '', label: 'After meals' },
+                { id: 'late-night', emoji: '', label: 'Late at night' },
+                { id: 'social', emoji: '', label: 'Social situations' },
+                { id: 'no-pattern', emoji: '', label: "I don't notice patterns" },
             ],
         },
         {
-            id: 'moodDifference',
+            id: 'reduceSugarAttempt',
             type: 'single',
-            emoji: '🎭',
-            title: "How does your mood change when you don't eat sugar?",
+            emoji: '🔄',
+            title: 'When you try to reduce sugar, what usually happens?',
             options: [
-                { id: 'worse', emoji: '😞', label: 'It becomes worse' },
-                { id: 'same', emoji: '😐', label: 'It stays the same' },
-                { id: 'better', emoji: '😊', label: 'It becomes better' },
+                { id: 'succeed', emoji: '', label: 'I succeed' },
+                { id: 'few-days', emoji: '', label: 'I last a few days' },
+                { id: 'old-habits', emoji: '', label: 'I return to old habits' },
+                { id: 'never-tried', emoji: '', label: "I've never tried" },
             ],
         },
         {
-            id: 'monthlySpending',
-            type: 'single',
-            emoji: '💵',
-            title: 'How much do you spend on sugary products each month?',
+            id: 'craveWhenNotHungry',
+            type: 'scale',
+            emoji: '🍰',
+            title: "How often do you crave sugary snacks and drinks when you're not hungry?",
             options: [
-                { id: '0-10', emoji: '💚', label: '$0 - $10 per month' },
-                { id: '10-50', emoji: '💛', label: '$10 - $50 per month' },
-                { id: '50-100', emoji: '🧡', label: '$50 - $100 per month' },
-                { id: '100+', emoji: '❤️', label: '$100+ per month' },
+                { id: '1', emoji: '', label: 'Never' },
+                { id: '2', emoji: '', label: 'Sometimes' },
+                { id: '3', emoji: '', label: 'Often' },
+                { id: '4', emoji: '', label: 'Almost always' },
             ],
         },
         {
-            id: 'reasons',
-            type: 'triggers', // Using triggers type for multi-select
-            emoji: '🎯',
-            title: 'Why are you reducing your sugar intake?',
-            subtitle: 'Select all that apply',
+            id: 'craveIntensity',
+            type: 'scale',
+            emoji: '⚡',
+            title: 'When you crave sugar, how intense is the urge?',
             options: [
-                { id: 'dependence', emoji: '⛓️', label: 'Reducing sugar dependence' },
-                { id: 'weight', emoji: '⚖️', label: 'Supporting weight loss' },
-                { id: 'health', emoji: '🏥', label: 'Improving overall health' },
-                { id: 'balance', emoji: '🧠', label: 'Mental and emotional balance' },
-                { id: 'beauty', emoji: '✨', label: 'Healthier skin and hair' },
-                { id: 'energy', emoji: '⚡', label: 'Sustained daily energy' },
-                { id: 'other', emoji: '📝', label: 'Other: specify', isOther: true },
+                { id: '1', emoji: '', label: 'Easy to ignore' },
+                { id: '2', emoji: '', label: 'Noticeable' },
+                { id: '3', emoji: '', label: 'Hard to resist' },
+                { id: '4', emoji: '', label: 'Feels automatic' },
             ],
         },
         {
-            id: 'userInfo',
-            type: 'userInfo',
-            emoji: '👤',
-            title: 'A little more about you',
-            subtitle: 'This helps us calculate your plan accurately',
+            id: 'avoidSugarDifficulty',
+            type: 'scale',
+            emoji: '💪',
+            title: 'How hard is it to avoid sugar in your normal routine?',
+            options: [
+                { id: '1', emoji: '', label: 'Easy' },
+                { id: '2', emoji: '', label: 'Somewhat hard' },
+                { id: '3', emoji: '', label: 'Hard' },
+                { id: '4', emoji: '', label: 'Almost impossible' },
+            ],
+        },
+        {
+            id: 'sugarVisibility',
+            type: 'scale',
+            emoji: '👀',
+            title: 'How often are sugary foods or drinks visible around you?',
+            options: [
+                { id: '1', emoji: '', label: 'Rarely' },
+                { id: '2', emoji: '', label: 'Sometimes' },
+                { id: '3', emoji: '', label: 'Often' },
+                { id: '4', emoji: '', label: 'Everywhere' },
+            ],
         },
     ];
 
@@ -191,20 +226,23 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const { updateOnboardingData } = useUserData();
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [showResult, setShowResult] = useState(false);
+    const [showUserInfo, setShowUserInfo] = useState(false);
     const [isCalculating, setIsCalculating] = useState(false);
 
     // Answers state
     const [answers, setAnswers] = useState<Record<string, any>>({
         gender: null,
-        frequency: null,
-        consumptionShift: null,
-        hardToGoWithout: null,
-        triggers: [],
-        intake: 50,
-        moodDifference: null,
-        monthlySpending: null,
-        reasons: [],
-        otherReason: '',
+        ageGroup: null,
+        sugarFrequency: null,
+        dailySweetTimes: null,
+        unconsciousSugar: null,
+        sugarChoiceFeeling: null,
+        sugarSituations: [],
+        reduceSugarAttempt: null,
+        craveWhenNotHungry: null,
+        craveIntensity: null,
+        avoidSugarDifficulty: null,
+        sugarVisibility: null,
         nickname: '',
         age: '',
     });
@@ -214,15 +252,11 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const resultFade = useRef(new Animated.Value(0)).current;
     const resultScale = useRef(new Animated.Value(0.8)).current;
 
-    // Handle skip from params
+    // Handle skip from params - skip quiz and results, go directly to userInfo
     useEffect(() => {
         if (route.params?.skip) {
-            // Find the index of Question 9 (userInfo)
-            const QUESTIONS = getQuestions(answers.gender);
-            const userInfoIndex = QUESTIONS.findIndex(q => q.id === 'userInfo');
-            if (userInfoIndex !== -1) {
-                setCurrentQuestion(userInfoIndex);
-            }
+            // Skip all quiz questions and results, go directly to userInfo screen
+            setShowUserInfo(true);
         }
     }, [route.params?.skip]);
 
@@ -246,7 +280,10 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
 
     const handleSingleSelect = (optionId: string) => {
         setAnswers(prev => ({ ...prev, [question.id]: optionId }));
-        setTimeout(() => goNext(), 300);
+        // For question 12 (last question), don't auto-advance - show CTA button instead
+        if (currentQuestion < QUESTIONS.length - 1) {
+            setTimeout(() => goNext(), 300);
+        }
     };
 
     const handleMultiSelect = (optionId: string, fieldId: string) => {
@@ -273,9 +310,6 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
 
     const canProceed = () => {
         const answer = answers[question.id];
-        if (question.type === 'userInfo') {
-            return answers.nickname.trim().length > 0 && answers.age.trim().length > 0;
-        }
         if (question.type === 'text') return answer && answer.trim().length > 0;
         if (question.type === 'multi' || question.type === 'triggers') {
             const hasSelection = answer && answer.length > 0;
@@ -312,41 +346,87 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     };
 
     const saveAnswers = async () => {
-        // Calculate sugar dependency score
-        const frequencyMap: Record<string, number> = { rarely: 1, weekly: 2, daily: 3, multiple: 4 };
-        const frequencyScore = frequencyMap[answers.frequency as string] || 0;
-        
-        const hardScore = parseInt(answers.hardToGoWithout) || 0;
-        
-        const shiftScore = answers.consumptionShift === 'yes' ? 2 : answers.consumptionShift === 'fluctuates' ? 1 : 0;
-        
-        const moodScore = answers.moodDifference === 'worse' ? 2 : answers.moodDifference === 'same' ? 1 : 0;
-        
-        const spendingMap: Record<string, number> = { 
-            '0-10': 0, 
-            '10-50': 1, 
-            '50-100': 2, 
-            '100+': 3 
+        // Calculate sugar dependency score from all questions
+        // Q3: sugarFrequency (1-4 points)
+        const frequencyMap: Record<string, number> = { 
+            'rarely': 1, 
+            'few-times-week': 2, 
+            'daily': 3, 
+            'multiple-daily': 4 
         };
-        const spendingScore = spendingMap[answers.monthlySpending as string] || 0;
+        const frequencyScore = frequencyMap[answers.sugarFrequency as string] || 0;
+        
+        // Q4: dailySweetTimes (1-4 points)
+        const dailySweetTimesMap: Record<string, number> = {
+            '0-1': 1,
+            '2-3': 2,
+            '4-5': 3,
+            '6+': 4
+        };
+        const dailySweetTimesScore = dailySweetTimesMap[answers.dailySweetTimes as string] || 0;
+        
+        // Q5: unconsciousSugar (1-4 points)
+        const unconsciousSugarScore = parseInt(answers.unconsciousSugar) || 0;
+        
+        // Q6: sugarChoiceFeeling (1-3 points)
+        const choiceFeelingMap: Record<string, number> = {
+            'choose': 1,
+            'give-in': 2,
+            'already-eating': 3
+        };
+        const choiceFeelingScore = choiceFeelingMap[answers.sugarChoiceFeeling as string] || 0;
+        
+        // Q7: sugarSituations (0-2 points, based on number selected, max 2)
+        const situationsCount = (answers.sugarSituations || []).length;
+        const situationsScore = situationsCount === 0 ? 0 : situationsCount <= 2 ? 1 : 2;
+        
+        // Q8: reduceSugarAttempt (1-4 points)
+        const reduceAttemptMap: Record<string, number> = {
+            'succeed': 1,
+            'few-days': 2,
+            'old-habits': 3,
+            'never-tried': 4
+        };
+        const reduceAttemptScore = reduceAttemptMap[answers.reduceSugarAttempt as string] || 0;
+        
+        // Q9: craveWhenNotHungry (1-4 points)
+        const craveWhenNotHungryScore = parseInt(answers.craveWhenNotHungry) || 0;
+        
+        // Q10: craveIntensity (1-4 points)
+        const craveIntensityScore = parseInt(answers.craveIntensity) || 0;
+        
+        // Q11: avoidSugarDifficulty (1-4 points)
+        const avoidDifficultyScore = parseInt(answers.avoidSugarDifficulty) || 0;
+        
+        // Q12: sugarVisibility (1-4 points)
+        const visibilityScore = parseInt(answers.sugarVisibility) || 0;
 
-        const sugarDependencyScore = frequencyScore + hardScore + shiftScore + moodScore + spendingScore;
+        const sugarDependencyScore = frequencyScore + dailySweetTimesScore + unconsciousSugarScore + 
+            choiceFeelingScore + situationsScore + reduceAttemptScore + craveWhenNotHungryScore + 
+            craveIntensityScore + avoidDifficultyScore + visibilityScore;
 
-        await updateOnboardingData({
+        const dataToSave: any = {
             gender: answers.gender,
-            sugarFrequency: answers.frequency,
-            consumptionShift: answers.consumptionShift,
-            dailySugarGrams: answers.intake,
-            hardToGoWithout: parseInt(answers.hardToGoWithout) || 0,
-            triggers: answers.triggers,
-            moodDifference: answers.moodDifference,
-            monthlySpending: answers.monthlySpending,
-            reasons: answers.reasons,
-            otherReason: answers.otherReason,
-            nickname: answers.nickname,
-            age: answers.age,
+            ageGroup: answers.ageGroup,
+            sugarFrequency: answers.sugarFrequency,
+            dailySweetTimes: answers.dailySweetTimes,
+            unconsciousSugar: answers.unconsciousSugar,
+            sugarChoiceFeeling: answers.sugarChoiceFeeling,
+            triggers: answers.sugarSituations,
+            reduceSugarAttempt: answers.reduceSugarAttempt,
+            craveWhenNotHungry: answers.craveWhenNotHungry,
+            craveIntensity: answers.craveIntensity,
+            avoidSugarDifficulty: answers.avoidSugarDifficulty,
+            sugarVisibility: answers.sugarVisibility,
             sugarDependencyScore,
-        });
+        };
+
+        // Only save userInfo if it's been filled (after results screen)
+        if (answers.nickname.trim()) {
+            dataToSave.nickname = answers.nickname;
+        }
+
+        await updateOnboardingData(dataToSave);
     };
 
     const showResultScreen = () => {
@@ -358,42 +438,41 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     };
 
     const handleContinue = () => {
-        navigation.navigate('SugarDangers');
+        // Show userInfo screen after results
+        setShowResult(false);
+        setShowUserInfo(true);
+    };
+
+    const handleUserInfoContinue = async () => {
+        // Save userInfo and navigate to next screen
+        await updateOnboardingData({
+            nickname: answers.nickname,
+        });
+        navigation.navigate('Symptoms');
+    };
+
+    const handleContinueToAnalysis = async () => {
+        // Save answers and show loading animation (same as normal flow)
+        Keyboard.dismiss();
+        await saveAnswers();
+        setIsCalculating(true);
     };
 
     // Extract primary motivation/trigger for emotional bridge
     const getPrimaryMotivation = (): string => {
-        // Priority 1: Check reasons (more specific motivations)
-        const reasons = answers.reasons || [];
-        if (reasons.length > 0) {
-            const reasonMap: Record<string, string> = {
-                'energy': 'energy crashes',
-                'weight': 'weight struggles',
-                'health': 'health concerns',
-                'balance': 'mood swings',
-                'beauty': 'skin issues',
-                'dependence': 'sugar cravings',
-            };
-            // Return the first reason found, or a default
-            for (const reason of reasons) {
-                if (reasonMap[reason]) {
-                    return reasonMap[reason];
-                }
-            }
-        }
-
-        // Priority 2: Check triggers
-        const triggers = answers.triggers || [];
-        if (triggers.length > 0) {
-            const triggerMap: Record<string, string> = {
+        // Check sugar situations (triggers)
+        const situations = answers.sugarSituations || [];
+        if (situations.length > 0) {
+            const situationMap: Record<string, string> = {
                 'stress': 'stress eating',
-                'tired': 'energy crashes',
-                'emotional': 'emotional eating',
                 'boredom': 'boredom snacking',
+                'after-meals': 'after-meal cravings',
+                'late-night': 'late-night cravings',
+                'social': 'social situations',
             };
-            for (const trigger of triggers) {
-                if (triggerMap[trigger]) {
-                    return triggerMap[trigger];
+            for (const situation of situations) {
+                if (situationMap[situation]) {
+                    return situationMap[situation];
                 }
             }
         }
@@ -402,25 +481,204 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         return 'sugar cravings';
     };
 
-    // Calculate result
-    const getResultMessage = () => {
-        const frequencyMap2: Record<string, number> = { rarely: 1, weekly: 2, daily: 3, multiple: 4 };
-        const frequencyScore = frequencyMap2[answers.frequency as string] || 0;
-        const hardScore = parseInt(answers.hardToGoWithout) || 0;
-        
-        const shiftScore = answers.consumptionShift === 'yes' ? 2 : answers.consumptionShift === 'fluctuates' ? 1 : 0;
-        const moodScore = answers.moodDifference === 'worse' ? 2 : answers.moodDifference === 'same' ? 1 : 0;
-        
-        const spendingMap: Record<string, number> = { 
-            '0-10': 0, 
-            '10-50': 1, 
-            '50-100': 2, 
-            '100+': 3 
-        };
-        const spendingScore = spendingMap[answers.monthlySpending as string] || 0;
+    // Calculate category scores for the 5-bar display
+    // Returns number of filled segments (1-5) for each category
+    // 1 = perfect (all healthiest), 3-5 = distributed based on severity (avoiding 2)
+    const getCategoryScores = () => {
+        // Exposure: sugarVisibility (single question, scale 1-4)
+        // 1 = '1' (Rarely), 3 = '2' (Sometimes), 4 = '3' (Often), 5 = '4' (Everywhere)
+        const visibilityValue = parseInt(answers.sugarVisibility) || 4;
+        const exposureSegments = visibilityValue === 1 ? 1 : visibilityValue === 2 ? 3 : visibilityValue === 3 ? 4 : 5;
 
-        const totalScore = frequencyScore + hardScore + shiftScore + moodScore + spendingScore;
-        const maxScore = 15;
+        // Autopilot: unconsciousSugar (1-4) + sugarChoiceFeeling (choose=1, give-in=2, already-eating=3)
+        const unconsciousValue = parseInt(answers.unconsciousSugar) || 4;
+        const choiceFeelingMap: Record<string, number> = {
+            'choose': 1,
+            'give-in': 2,
+            'already-eating': 3
+        };
+        const choiceFeelingValue = choiceFeelingMap[answers.sugarChoiceFeeling as string] || 3;
+        
+        // Perfect: both are 1
+        // Good (3): one is 1, other is 2
+        // High (4): both are 2, or one is 1 and other is 3, or one is 2 and other is 3
+        // Very High (5): both are 3 or 4, or one is 4
+        let autopilotSegments = 5;
+        if (unconsciousValue === 1 && choiceFeelingValue === 1) {
+            autopilotSegments = 1; // Perfect
+        } else if ((unconsciousValue === 1 && choiceFeelingValue === 2) || 
+                   (unconsciousValue === 2 && choiceFeelingValue === 1)) {
+            autopilotSegments = 3; // Good
+        } else if ((unconsciousValue === 2 && choiceFeelingValue === 2) ||
+                   (unconsciousValue === 1 && choiceFeelingValue === 3) ||
+                   (unconsciousValue === 3 && choiceFeelingValue === 1) ||
+                   (unconsciousValue === 2 && choiceFeelingValue === 3) ||
+                   (unconsciousValue === 3 && choiceFeelingValue === 2)) {
+            autopilotSegments = 4; // High
+        } else {
+            autopilotSegments = 5; // Very High
+        }
+
+        // Control: reduceSugarAttempt (succeed=1, few-days=2, old-habits=3, never-tried=4) + avoidSugarDifficulty (1-4)
+        const reduceAttemptMap: Record<string, number> = {
+            'succeed': 1,
+            'few-days': 2,
+            'old-habits': 3,
+            'never-tried': 4
+        };
+        const reduceAttemptValue = reduceAttemptMap[answers.reduceSugarAttempt as string] || 4;
+        const avoidDifficultyValue = parseInt(answers.avoidSugarDifficulty) || 4;
+        
+        // Perfect: both are 1
+        // Good (3): one is 1, other is 2
+        // High (4): both are 2, or one is 1 and other is 3, or one is 2 and other is 3
+        // Very High (5): both are 3 or 4, or one is 4
+        let controlSegments = 5;
+        if (reduceAttemptValue === 1 && avoidDifficultyValue === 1) {
+            controlSegments = 1; // Perfect
+        } else if ((reduceAttemptValue === 1 && avoidDifficultyValue === 2) || 
+                   (reduceAttemptValue === 2 && avoidDifficultyValue === 1)) {
+            controlSegments = 3; // Good
+        } else if ((reduceAttemptValue === 2 && avoidDifficultyValue === 2) ||
+                   (reduceAttemptValue === 1 && avoidDifficultyValue === 3) ||
+                   (reduceAttemptValue === 3 && avoidDifficultyValue === 1) ||
+                   (reduceAttemptValue === 2 && avoidDifficultyValue === 3) ||
+                   (reduceAttemptValue === 3 && avoidDifficultyValue === 2)) {
+            controlSegments = 4; // High
+        } else {
+            controlSegments = 5; // Very High
+        }
+
+        // MentalPull: craveWhenNotHungry (1-4) + craveIntensity (1-4)
+        const craveWhenNotHungryValue = parseInt(answers.craveWhenNotHungry) || 4;
+        const craveIntensityValue = parseInt(answers.craveIntensity) || 4;
+        
+        // Perfect: both are 1
+        // Good (3): one is 1, other is 2
+        // High (4): both are 2, or one is 1 and other is 3, or one is 2 and other is 3
+        // Very High (5): both are 3 or 4, or one is 4
+        let mentalPullSegments = 5;
+        if (craveWhenNotHungryValue === 1 && craveIntensityValue === 1) {
+            mentalPullSegments = 1; // Perfect
+        } else if ((craveWhenNotHungryValue === 1 && craveIntensityValue === 2) || 
+                   (craveWhenNotHungryValue === 2 && craveIntensityValue === 1)) {
+            mentalPullSegments = 3; // Good
+        } else if ((craveWhenNotHungryValue === 2 && craveIntensityValue === 2) ||
+                   (craveWhenNotHungryValue === 1 && craveIntensityValue === 3) ||
+                   (craveWhenNotHungryValue === 3 && craveIntensityValue === 1) ||
+                   (craveWhenNotHungryValue === 2 && craveIntensityValue === 3) ||
+                   (craveWhenNotHungryValue === 3 && craveIntensityValue === 2)) {
+            mentalPullSegments = 4; // High
+        } else {
+            mentalPullSegments = 5; // Very High
+        }
+
+        // Environment: sugarFrequency (rarely=1, few-times-week=2, daily=3, multiple-daily=4) + 
+        //              dailySweetTimes (0-1=1, 2-3=2, 4-5=3, 6+=4) + sugarSituations (count/pattern)
+        const frequencyMap: Record<string, number> = {
+            'rarely': 1,
+            'few-times-week': 2,
+            'daily': 3,
+            'multiple-daily': 4
+        };
+        const frequencyValue = frequencyMap[answers.sugarFrequency as string] || 4;
+        const dailySweetTimesMap: Record<string, number> = {
+            '0-1': 1,
+            '2-3': 2,
+            '4-5': 3,
+            '6+': 4
+        };
+        const dailySweetTimesValue = dailySweetTimesMap[answers.dailySweetTimes as string] || 4;
+        const situations = answers.sugarSituations || [];
+        const hasNoPattern = situations.length === 0 || (situations.length === 1 && situations[0] === 'no-pattern');
+        const situationsValue = hasNoPattern ? 1 : situations.length >= 3 ? 4 : situations.length === 2 ? 3 : 2;
+        
+        // Average the three values, then map to segments
+        // Perfect (1): all are 1
+        // Good (3): average is around 1.5-2
+        // High (4): average is around 2.5-3
+        // Very High (5): average is 3.5+
+        const avgEnvironment = (frequencyValue + dailySweetTimesValue + situationsValue) / 3;
+        let environmentSegments = 5;
+        if (frequencyValue === 1 && dailySweetTimesValue === 1 && situationsValue === 1) {
+            environmentSegments = 1; // Perfect
+        } else if (avgEnvironment <= 2) {
+            environmentSegments = 3; // Good
+        } else if (avgEnvironment <= 3) {
+            environmentSegments = 4; // High
+        } else {
+            environmentSegments = 5; // Very High
+        }
+
+        return {
+            exposure: exposureSegments,
+            autopilot: autopilotSegments,
+            control: controlSegments,
+            mentalPull: mentalPullSegments,
+            environment: environmentSegments,
+        };
+    };
+
+    // Calculate result (kept for backward compatibility with sugarDependencyScore)
+    const getResultMessage = () => {
+        // Q3: sugarFrequency (1-4 points)
+        const frequencyMap: Record<string, number> = { 
+            'rarely': 1, 
+            'few-times-week': 2, 
+            'daily': 3, 
+            'multiple-daily': 4 
+        };
+        const frequencyScore = frequencyMap[answers.sugarFrequency as string] || 0;
+        
+        // Q4: dailySweetTimes (1-4 points)
+        const dailySweetTimesMap: Record<string, number> = {
+            '0-1': 1,
+            '2-3': 2,
+            '4-5': 3,
+            '6+': 4
+        };
+        const dailySweetTimesScore = dailySweetTimesMap[answers.dailySweetTimes as string] || 0;
+        
+        // Q5: unconsciousSugar (1-4 points)
+        const unconsciousSugarScore = parseInt(answers.unconsciousSugar) || 0;
+        
+        // Q6: sugarChoiceFeeling (1-3 points)
+        const choiceFeelingMap: Record<string, number> = {
+            'choose': 1,
+            'give-in': 2,
+            'already-eating': 3
+        };
+        const choiceFeelingScore = choiceFeelingMap[answers.sugarChoiceFeeling as string] || 0;
+        
+        // Q7: sugarSituations (0-2 points, based on number selected, max 2)
+        const situationsCount = (answers.sugarSituations || []).length;
+        const situationsScore = situationsCount === 0 ? 0 : situationsCount <= 2 ? 1 : 2;
+        
+        // Q8: reduceSugarAttempt (1-4 points)
+        const reduceAttemptMap: Record<string, number> = {
+            'succeed': 1,
+            'few-days': 2,
+            'old-habits': 3,
+            'never-tried': 4
+        };
+        const reduceAttemptScore = reduceAttemptMap[answers.reduceSugarAttempt as string] || 0;
+        
+        // Q9: craveWhenNotHungry (1-4 points)
+        const craveWhenNotHungryScore = parseInt(answers.craveWhenNotHungry) || 0;
+        
+        // Q10: craveIntensity (1-4 points)
+        const craveIntensityScore = parseInt(answers.craveIntensity) || 0;
+        
+        // Q11: avoidSugarDifficulty (1-4 points)
+        const avoidDifficultyScore = parseInt(answers.avoidSugarDifficulty) || 0;
+        
+        // Q12: sugarVisibility (1-4 points)
+        const visibilityScore = parseInt(answers.sugarVisibility) || 0;
+
+        const totalScore = frequencyScore + dailySweetTimesScore + unconsciousSugarScore + 
+            choiceFeelingScore + situationsScore + reduceAttemptScore + craveWhenNotHungryScore + 
+            craveIntensityScore + avoidDifficultyScore + visibilityScore;
+        const maxScore = 37; // Updated max score: 4+4+4+3+2+4+4+4+4+4 = 37
         const rawPercentage = Math.round((totalScore / maxScore) * 100);
 
         // Determine dependency level
@@ -451,7 +709,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     // Filter options for triggers question based on gender
     const getFilteredOptions = () => {
         if (!question.options) return [];
-        if (question.id === 'triggers' && answers.gender !== 'female') {
+        if (question.id === 'sugarSituations' && answers.gender !== 'female') {
             return question.options.filter(opt => !opt.femaleOnly);
         }
         return question.options;
@@ -475,7 +733,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 onPress={() => handleSingleSelect(option.id)}
                                 activeOpacity={0.7}
                             >
-                                <Text style={styles.optionEmoji}>{option.emoji}</Text>
+                                {option.emoji && <Text style={styles.optionEmoji}>{option.emoji}</Text>}
                                 <View style={styles.optionTextContainer}>
                                     <Text style={[
                                         styles.optionLabel,
@@ -510,7 +768,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                     onPress={() => handleMultiSelect(option.id, question.id)}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={styles.singleRowEmoji}>{option.emoji}</Text>
+                                    {option.emoji && <Text style={styles.singleRowEmoji}>{option.emoji}</Text>}
                                     <Text style={[
                                         styles.singleRowLabel,
                                         isSelected && styles.singleRowLabelSelected,
@@ -543,7 +801,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                         onPress={() => handleMultiSelect(option.id, question.id)}
                                         activeOpacity={0.7}
                                     >
-                                        <Text style={styles.singleRowEmoji}>{option.emoji}</Text>
+                                        {option.emoji && <Text style={styles.singleRowEmoji}>{option.emoji}</Text>}
                                         <Text style={[
                                             styles.singleRowLabel,
                                             isSelected && styles.singleRowLabelSelected,
@@ -633,53 +891,141 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                     </View>
                 );
 
-            case 'userInfo':
-                return (
-                    <View style={styles.userInfoContainer}>
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>What should we call you?</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                placeholder="Your name"
-                                placeholderTextColor={looviColors.text.muted}
-                                value={answers.nickname}
-                                onChangeText={(text) => handleUserInfoChange('nickname', text)}
-                                autoCapitalize="words"
-                                maxLength={20}
-                            />
-                        </View>
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>How old are you?</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                placeholder="Your age"
-                                placeholderTextColor={looviColors.text.muted}
-                                value={answers.age}
-                                onChangeText={(text) => handleUserInfoChange('age', text.replace(/[^0-9]/g, ''))}
-                                keyboardType="number-pad"
-                                maxLength={3}
-                            />
-                        </View>
-                    </View>
-                );
-
             default:
                 return null;
         }
     };
 
+    if (showUserInfo) {
+        // UserInfo screen after results
+        return (
+            <LooviBackground variant="coralTop">
+                <SafeAreaView style={styles.container}>
+                    <ScrollView
+                        style={styles.scrollView}
+                        contentContainerStyle={styles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.questionContainer,
+                                {
+                                    opacity: fadeAnim,
+                                    transform: [{ translateY: slideAnim }],
+                                },
+                            ]}
+                        >
+                            {/* Question Header */}
+                            <View style={styles.questionHeader}>
+                                <Text style={styles.questionEmoji}>👤</Text>
+                                <Text style={styles.questionTitle}>A little more about you</Text>
+                            </View>
+
+                            {/* UserInfo Content */}
+                            <View style={styles.userInfoContainer}>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>What should we call you?</Text>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Your name"
+                                        placeholderTextColor={looviColors.text.muted}
+                                        value={answers.nickname}
+                                        onChangeText={(text) => handleUserInfoChange('nickname', text)}
+                                        autoCapitalize="words"
+                                        maxLength={20}
+                                    />
+                                </View>
+                            </View>
+                        </Animated.View>
+                    </ScrollView>
+
+                    {/* Continue Button */}
+                    <View style={styles.footer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.continueButton,
+                                !answers.nickname.trim() && styles.continueButtonDisabled,
+                            ]}
+                            onPress={handleUserInfoContinue}
+                            disabled={!answers.nickname.trim()}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.continueButtonText}>
+                                Continue
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </LooviBackground>
+        );
+    }
+
     if (showResult) {
-        const result = getResultMessage();
-        const average = 34;
-        const userScore = Math.max(result.score, 20); // Ensure minimum visibility
-        const userPosition = Math.min(userScore, 95); // Cap at 95% to keep marker visible
+        const categoryScores = getCategoryScores();
+
+        // Adaptive spacing for smaller screens
+        const adaptiveSpacing = {
+            titleBottom: isSmallScreen ? spacing.sm : spacing.md,
+            sublineBottom: isSmallScreen ? spacing.xl : spacing['2xl'],
+            barStackTop: isSmallScreen ? spacing.xl : spacing['2xl'],
+            barStackBottom: isSmallScreen ? spacing.md : spacing.lg,
+            barGap: isSmallScreen ? spacing.md : spacing.lg,
+            disclaimerTop: isSmallScreen ? spacing.md : spacing.lg,
+            disclaimerBottom: isSmallScreen ? spacing.xl : spacing['2xl'],
+            buttonTop: isSmallScreen ? spacing.lg : spacing.xl,
+            scrollPadding: isSmallScreen ? spacing.xl : spacing['2xl'],
+        };
+
+        // Get color based on score (1 = best, 5 = worst)
+        const getScoreColor = (filledSegments: number): string => {
+            switch (filledSegments) {
+                case 1:
+                    return '#F5E6D3'; // Whitish-yellow-orange (soft, best)
+                case 3:
+                    return '#F0B88A'; // Medium orange
+                case 4:
+                    return '#E8A87C'; // Orange-coral (current accent)
+                case 5:
+                    return '#D77B5A'; // Red-orange (imposing, worst)
+                default:
+                    return '#E8A87C'; // Default to accent color
+            }
+        };
+
+        // Helper component for a single bar with segments
+        const CategoryBar = ({ label, filledSegments }: { label: string; filledSegments: number }) => {
+            const segments = Array.from({ length: 5 }, (_, i) => i < filledSegments);
+            const segmentColor = getScoreColor(filledSegments);
+            return (
+                <View style={styles.categoryBarContainer}>
+                    <Text style={[styles.categoryBarLabel, isSmallScreen && { fontSize: 13 }]}>{label}</Text>
+                    <View style={styles.categoryBarSegments}>
+                        {segments.map((filled, index) => (
+                            <View
+                                key={index}
+                                style={[
+                                    styles.categoryBarSegment,
+                                    isSmallScreen && { height: 28 },
+                                    filled && {
+                                        backgroundColor: segmentColor,
+                                    },
+                                ]}
+                            />
+                        ))}
+                    </View>
+                </View>
+            );
+        };
 
         return (
             <LooviBackground variant="mixed">
                 <SafeAreaView style={styles.container}>
                     <ScrollView
                         style={styles.scrollView}
-                        contentContainerStyle={styles.resultScrollContent}
+                        contentContainerStyle={[
+                            styles.resultScrollContent,
+                            { paddingVertical: isSmallScreen ? spacing.xl : spacing['2xl'] }
+                        ]}
                         showsVerticalScrollIndicator={false}
                     >
                         <Animated.View
@@ -691,78 +1037,69 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 },
                             ]}
                         >
-                            {/* Headline */}
-                            <Text style={styles.resultHeadline}>The results are in.</Text>
+                            {/* Title */}
+                            <Text style={[
+                                styles.resultTitle,
+                                isSmallScreen && { fontSize: 28, marginBottom: adaptiveSpacing.titleBottom }
+                            ]}>
+                                Pattern detected
+                            </Text>
 
-                            {/* Verdict */}
-                            <View style={styles.resultVerdictContainer}>
-                                <Text style={styles.resultVerdict}>
-                                    Your profile indicates
-                                </Text>
-                                <Text style={styles.resultVerdictBold}>
-                                    {result.dependencyLevel} Sugar Dependency
-                                </Text>
+                            {/* Subline */}
+                            <Text style={[
+                                styles.resultSubline,
+                                isSmallScreen && { 
+                                    fontSize: 15, 
+                                    marginBottom: adaptiveSpacing.sublineBottom 
+                                }
+                            ]}>
+                                Your responses form a sugar habit loop.
+                            </Text>
+
+                            {/* 5-Bar Stack */}
+                            <View style={[
+                                styles.barStackContainer,
+                                {
+                                    marginTop: adaptiveSpacing.barStackTop,
+                                    marginBottom: adaptiveSpacing.barStackBottom,
+                                    gap: adaptiveSpacing.barGap,
+                                }
+                            ]}>
+                                <CategoryBar label="Exposure" filledSegments={categoryScores.exposure} />
+                                <CategoryBar label="Autopilot" filledSegments={categoryScores.autopilot} />
+                                <CategoryBar label="Control" filledSegments={categoryScores.control} />
+                                <CategoryBar label="Mental Pull" filledSegments={categoryScores.mentalPull} />
+                                <CategoryBar label="Environment" filledSegments={categoryScores.environment} />
                             </View>
 
-                            {/* Habit Spectrum Card */}
-                            <GlassCard variant="light" padding="lg" style={styles.spectrumCard}>
-                                <Text style={styles.spectrumTitle}>Habit Spectrum</Text>
-                                
-                                {/* Spectrum Container */}
-                                <View style={styles.spectrumContainer}>
-                                    {/* The Spectrum Track */}
-                                    <View style={styles.spectrumTrackContainer}>
-                                        <LinearGradient
-                                            colors={[looviColors.skyBlue, looviColors.coralOrange]}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 0 }}
-                                            style={styles.spectrumTrack}
-                                        />
-                                        
-                                        {/* Average Marker - line extends from bar to label */}
-                                        <View style={[styles.markerWithLine, { left: `${average}%` }]}>
-                                            <View style={styles.markerLineExtended} />
-                                            <Text style={styles.smallMarkerLabel}>Average</Text>
-                                            <Text style={styles.smallMarkerScore}>{average}%</Text>
-                                        </View>
-
-                                        {/* User Marker - emoji on bar with line and label below */}
-                                        <View style={[styles.userMarkerWithLine, { left: `${userPosition}%` }]}>
-                                            <View style={styles.userMarkerCircle}>
-                                                <Text style={styles.userMarkerEmoji}>
-                                                    {answers.gender === 'male' ? '👨' : answers.gender === 'female' ? '👩' : '👤'}
-                                                </Text>
-                                            </View>
-                                            <Text style={styles.userMarkerLabel}>You</Text>
-                                            <Text style={styles.userMarkerScore}>{result.score}%</Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Score Comparison */}
-                                    <View style={styles.scoreComparison}>
-                                        <Text style={styles.scoreComparisonText}>
-                                            You scored <Text style={styles.scoreComparisonBold}>{result.score}%</Text>, 
-                                            {' '}significantly higher than the average of <Text style={styles.scoreComparisonBold}>{average}%</Text>.
-                                        </Text>
-                                    </View>
-                                </View>
-                            </GlassCard>
-
-                            {/* Emotional Bridge */}
-                            <View style={styles.emotionalBridge}>
-                                <Text style={styles.emotionalBridgeText}>
-                                    This dependency strains your body and worsens mental health issues.
-                                </Text>
-                            </View>
+                            {/* Asterisk disclaimer */}
+                            <Text style={[
+                                styles.resultDisclaimer,
+                                {
+                                    marginTop: adaptiveSpacing.disclaimerTop,
+                                    marginBottom: adaptiveSpacing.disclaimerBottom,
+                                }
+                            ]}>
+                                * This result is an indication only, not a medical diagnosis
+                            </Text>
 
                             {/* CTA Button */}
                             <TouchableOpacity
-                                style={styles.checkSymptomsButton}
+                                style={[
+                                    styles.checkSymptomsButton,
+                                    {
+                                        marginTop: adaptiveSpacing.buttonTop,
+                                    },
+                                    isSmallScreen && { paddingVertical: 16 }
+                                ]}
                                 onPress={handleContinue}
                                 activeOpacity={0.8}
                             >
-                                <Text style={styles.checkSymptomsButtonText}>
-                                    Discover how this affects you →
+                                <Text style={[
+                                    styles.checkSymptomsButtonText,
+                                    isSmallScreen && { fontSize: 16 }
+                                ]}>
+                                    Check symptoms
                                 </Text>
                             </TouchableOpacity>
                         </Animated.View>
@@ -814,8 +1151,8 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                         </Animated.View>
                     </ScrollView>
 
-                    {/* Continue Button (for multi-select, slider, text, triggers, userInfo) */}
-                    {(question.type === 'multi' || question.type === 'slider' || question.type === 'text' || question.type === 'triggers' || question.type === 'userInfo') && (
+                    {/* Continue Button (for multi-select, slider, text, triggers) */}
+                    {(question.type === 'multi' || question.type === 'slider' || question.type === 'text' || question.type === 'triggers') && (
                         <View style={styles.footer}>
                             <TouchableOpacity
                                 style={[
@@ -828,6 +1165,21 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             >
                                 <Text style={styles.continueButtonText}>
                                     {currentQuestion < QUESTIONS.length - 1 ? 'Continue' : 'See Results'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* CTA Button for question 12 (last question) */}
+                    {currentQuestion === QUESTIONS.length - 1 && question.type !== 'multi' && question.type !== 'slider' && question.type !== 'text' && question.type !== 'triggers' && answers[question.id] !== null && (
+                        <View style={styles.footer}>
+                            <TouchableOpacity
+                                style={styles.continueButton}
+                                onPress={handleContinueToAnalysis}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.continueButtonText}>
+                                    Continue to analysis
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -1100,151 +1452,63 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         justifyContent: 'center',
         paddingVertical: spacing['2xl'],
+        minHeight: SCREEN_HEIGHT * 0.8, // Ensure minimum height for proper centering
     },
     resultContainer: {
         paddingHorizontal: spacing.screen.horizontal,
     },
-    resultHeadline: {
-        fontSize: 28,
+    resultTitle: {
+        fontSize: 32,
         fontWeight: '700',
         color: looviColors.text.primary,
         textAlign: 'center',
-        marginBottom: spacing.xl,
+        marginBottom: spacing.md,
     },
-    resultVerdictContainer: {
-        alignItems: 'center',
-        marginBottom: spacing['2xl'],
-    },
-    resultVerdict: {
+    resultSubline: {
         fontSize: 16,
         fontWeight: '400',
-        color: looviColors.text.primary,
+        color: looviColors.text.secondary,
         textAlign: 'center',
-        lineHeight: 24,
-    },
-    resultVerdictBold: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: looviColors.accent.primary,
-        textAlign: 'center',
-    },
-    spectrumCard: {
         marginBottom: spacing['2xl'],
-        paddingHorizontal: spacing.md,
     },
-    spectrumTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: looviColors.text.primary,
+    resultHelperText: {
+        fontSize: 12,
+        fontWeight: '400',
+        color: looviColors.text.tertiary,
         textAlign: 'center',
+        marginBottom: spacing['2xl'],
+    },
+    barStackContainer: {
+        gap: spacing.lg,
+        marginTop: spacing['2xl'],
         marginBottom: spacing.lg,
     },
-    spectrumContainer: {
-        width: '100%',
+    categoryBarContainer: {
+        gap: spacing.sm,
     },
-    spectrumTrackContainer: {
-        width: '100%',
+    categoryBarLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: looviColors.text.primary,
         marginBottom: spacing.xs,
-        position: 'relative',
-        paddingHorizontal: spacing.xs,
-        paddingBottom: 60, // Space for labels below bar
     },
-    spectrumTrack: {
-        width: '100%',
-        height: 28,
-        borderRadius: borderRadius.lg,
-        position: 'relative',
-        zIndex: 1,
+    categoryBarSegments: {
+        flexDirection: 'row',
+        gap: spacing.xs,
     },
-    markerWithLine: {
-        position: 'absolute',
-        top: 10, // Start at middle of bar (bar is 28px, so 14 is middle, 10 gives slight overlap)
-        alignItems: 'center',
-        transform: [{ translateX: -20 }],
-        zIndex: 5,
+    categoryBarSegment: {
+        flex: 1,
+        height: 32,
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+        borderRadius: borderRadius.md,
     },
-    markerLineExtended: {
-        width: 2,
-        height: 24, // Extends from middle of bar down past it
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: 1,
-        marginBottom: 4,
-    },
-    smallMarkerLabel: {
-        fontSize: 9,
-        fontWeight: '600',
-        color: looviColors.text.secondary,
-    },
-    smallMarkerScore: {
-        fontSize: 9,
-        fontWeight: '600',
-        color: looviColors.text.secondary,
-    },
-    userMarkerWithLine: {
-        position: 'absolute',
-        top: -6, // Position emoji above the bar
-        alignItems: 'center',
-        transform: [{ translateX: -20 }],
-        zIndex: 10,
-    },
-    userMarkerCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: looviColors.accent.primary,
-        borderWidth: 4,
-        borderColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: looviColors.accent.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 8,
-        marginBottom: 4,
-    },
-    userMarkerEmoji: {
-        fontSize: 20,
-    },
-    userMarkerLabel: {
-        fontSize: 11,
-        fontWeight: '700',
-        color: looviColors.accent.primary,
-    },
-    userMarkerScore: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: looviColors.accent.primary,
-    },
-    scoreComparison: {
-        marginTop: spacing.xs,
-        paddingHorizontal: spacing.md,
-    },
-    scoreComparisonText: {
-        fontSize: 16,
+    resultDisclaimer: {
+        fontSize: 10,
         fontWeight: '400',
-        color: looviColors.text.secondary,
+        color: looviColors.text.tertiary,
         textAlign: 'center',
-        lineHeight: 24,
-    },
-    scoreComparisonBold: {
-        fontWeight: '700',
-        color: looviColors.text.primary,
-    },
-    emotionalBridge: {
+        marginTop: spacing.lg,
         marginBottom: spacing['2xl'],
-        paddingHorizontal: spacing.md,
-    },
-    emotionalBridgeText: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: looviColors.text.primary,
-        fontStyle: 'italic',
-        textAlign: 'center',
-        lineHeight: 18,
-        textShadowColor: looviColors.accent.primary,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 8,
     },
     checkSymptomsButton: {
         backgroundColor: looviColors.accent.primary,
@@ -1257,7 +1521,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 12,
         elevation: 5,
-        marginTop: spacing.md,
+        marginTop: spacing.xl,
     },
     checkSymptomsButtonText: {
         color: '#FFFFFF',

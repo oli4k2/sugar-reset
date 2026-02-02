@@ -99,7 +99,7 @@ export default function SuccessStoriesScreen({ navigation }: SuccessStoriesScree
     }, []);
 
     const handleContinue = () => {
-        navigation.navigate('Goals');
+        navigation.navigate('SugarResetGraph');
     };
 
     return (
