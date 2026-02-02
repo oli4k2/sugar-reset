@@ -29,6 +29,7 @@ import LooviBackground, { looviColors } from '../components/LooviBackground';
 import { GlassCard } from '../components/GlassCard';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
+import { useUserProfile } from '../context/UserProfileContext';
 import postService, { Comment } from '../services/postService';
 import { Post } from '../types';
 import { UserAvatar } from '../components/UserAvatar';
@@ -48,6 +49,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const { post: paramsPost } = route.params;
     const { user } = useAuthContext();
     const { onboardingData } = useUserData();
+    const { showUserProfile } = useUserProfile();
 
     // Helper to hydrate post from params (handles string dates from serialization)
     const initialPost: Post = {
@@ -196,7 +198,17 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const renderPost = () => (
         <GlassCard padding="lg" style={styles.postCard}>
             {/* Author */}
-            <View style={styles.postHeader}>
+            <TouchableOpacity
+                style={styles.postHeader}
+                onPress={() => showUserProfile({
+                    userId: post.authorId,
+                    displayName: post.authorName,
+                    photoURL: post.photoURL,
+                    avatarType: post.avatarType,
+                    avatarValue: post.avatarValue,
+                })}
+                activeOpacity={0.7}
+            >
                 <View style={styles.avatarPlaceholder}>
                     <UserAvatar
                         size={40}
@@ -212,7 +224,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                         {postService.getTimeAgo(post.createdAt)}
                     </Text>
                 </View>
-            </View>
+            </TouchableOpacity>
 
             {/* Content */}
             <Text style={styles.postTitle}>{post.title}</Text>
@@ -239,19 +251,31 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const renderComment = ({ item }: { item: Comment }) => (
         <GlassCard variant="light" padding="md" style={styles.commentCard}>
             <View style={styles.commentHeader}>
-                <View style={styles.commentAvatarContainer}>
-                    <UserAvatar
-                        size={32}
-                        photoURL={item.photoURL}
-                        avatarType={item.avatarType}
-                        avatarValue={item.avatarValue}
-                        name={item.authorName}
-                    />
-                </View>
-                <View style={styles.commentHeaderInfo}>
-                    <Text style={styles.commentAuthor}>{item.authorName}</Text>
-                    <Text style={styles.commentTime}>{postService.getTimeAgo(item.createdAt)}</Text>
-                </View>
+                <TouchableOpacity
+                    style={styles.commentAuthorRow}
+                    onPress={() => showUserProfile({
+                        userId: item.authorId,
+                        displayName: item.authorName,
+                        photoURL: item.photoURL,
+                        avatarType: item.avatarType,
+                        avatarValue: item.avatarValue,
+                    })}
+                    activeOpacity={0.7}
+                >
+                    <View style={styles.commentAvatarContainer}>
+                        <UserAvatar
+                            size={32}
+                            photoURL={item.photoURL}
+                            avatarType={item.avatarType}
+                            avatarValue={item.avatarValue}
+                            name={item.authorName}
+                        />
+                    </View>
+                    <View style={styles.commentHeaderInfo}>
+                        <Text style={styles.commentAuthor}>{item.authorName}</Text>
+                        <Text style={styles.commentTime}>{postService.getTimeAgo(item.createdAt)}</Text>
+                    </View>
+                </TouchableOpacity>
                 {user?.id === item.authorId && (
                     <TouchableOpacity
                         onPress={() => handleDeleteComment(item)}
@@ -438,6 +462,11 @@ const styles = StyleSheet.create({
     },
     commentAvatarContainer: {
         marginRight: spacing.sm,
+    },
+    commentAuthorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
     },
     commentHeaderInfo: {
         flex: 1,

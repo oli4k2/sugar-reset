@@ -23,6 +23,7 @@ import { notificationService } from '../services/notificationService';
 import { friendService } from '../services/friendService';
 import { Friend } from '../types';
 import UserAvatar from '../components/UserAvatar';
+import { UserProfilePopup } from '../components/UserProfilePopup';
 import { spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -51,6 +52,15 @@ export default function InnerCircleScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
     const [selectedChip, setSelectedChip] = useState<string | null>(null);
+
+    // Local popup state for InnerCircle (since this is a fullScreenModal, global context popup has z-index issues)
+    const [selectedUser, setSelectedUser] = useState<{
+        userId: string;
+        displayName: string;
+        photoURL?: string | null;
+        avatarType?: 'photo' | 'emoji' | 'initial' | null;
+        avatarValue?: string | null;
+    } | null>(null);
 
     // Pulse animation for the connection lines
     const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -163,7 +173,21 @@ export default function InnerCircleScreen() {
 
                             {/* Friend Nodes */}
                             {friends.map((friend) => (
-                                <View key={friend.uid} style={styles.avatarNode}>
+                                <TouchableOpacity
+                                    key={friend.uid}
+                                    style={styles.avatarNode}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setSelectedUser({
+                                            userId: friend.uid,
+                                            displayName: friend.displayName,
+                                            photoURL: friend.photoURL,
+                                            avatarType: friend.avatarType,
+                                            avatarValue: friend.avatarValue,
+                                        });
+                                    }}
+                                    activeOpacity={0.7}
+                                >
                                     <UserAvatar
                                         size={52}
                                         photoURL={friend.photoURL}
@@ -171,7 +195,7 @@ export default function InnerCircleScreen() {
                                         avatarValue={friend.avatarValue}
                                         name={friend.displayName}
                                     />
-                                </View>
+                                </TouchableOpacity>
                             ))}
                         </View>
 
@@ -274,6 +298,19 @@ export default function InnerCircleScreen() {
 
                 </View>
             </SafeAreaView >
+
+            {/* User Profile Popup - rendered locally to avoid z-index issues with fullScreenModal */}
+            {selectedUser && (
+                <UserProfilePopup
+                    visible={!!selectedUser}
+                    onClose={() => setSelectedUser(null)}
+                    userId={selectedUser.userId}
+                    displayName={selectedUser.displayName}
+                    photoURL={selectedUser.photoURL}
+                    avatarType={selectedUser.avatarType}
+                    avatarValue={selectedUser.avatarValue}
+                />
+            )}
         </View >
     );
 }

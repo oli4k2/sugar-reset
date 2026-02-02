@@ -37,6 +37,7 @@ import { friendService } from '../services/friendService';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
+import { useUserProfile } from '../context/UserProfileContext';
 import { UserAvatar } from '../components/UserAvatar';
 import { Friend, FriendRequest, UserStats, User, Post } from '../types';
 
@@ -65,6 +66,7 @@ export default function SocialScreen() {
     const navigation = useNavigation<any>();
     const { user, isAuthenticated } = useAuthContext();
     const { streakData, latestHealthScore } = useUserData();
+    const { showUserProfile } = useUserProfile();
 
     const [activeTab, setActiveTab] = useState<Tab>('community');
     const [sortFilter, setSortFilter] = useState<'new' | 'hot' | 'top'>('hot');
@@ -427,7 +429,20 @@ export default function SocialScreen() {
                             <GlassCard variant="light" padding="lg" style={styles.postCard}>
                                 {/* Post Header */}
                                 <View style={styles.postHeader}>
-                                    <View style={styles.authorInfo}>
+                                    <TouchableOpacity
+                                        style={styles.authorInfo}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            showUserProfile({
+                                                userId: post.authorId,
+                                                displayName: post.authorName,
+                                                photoURL: post.photoURL,
+                                                avatarType: post.avatarType,
+                                                avatarValue: post.avatarValue,
+                                            });
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
                                         <View style={styles.postAvatarContainer}>
                                             <UserAvatar
                                                 size={32}
@@ -440,7 +455,7 @@ export default function SocialScreen() {
                                         <View>
                                             <Text style={styles.authorName}>{post.authorName}</Text>
                                         </View>
-                                    </View>
+                                    </TouchableOpacity>
                                     <Text style={styles.postTime}>{postService.getTimeAgo(post.createdAt)}</Text>
                                 </View>
 
@@ -558,14 +573,35 @@ export default function SocialScreen() {
                 friends.map((friend) => (
                     <GlassCard key={friend.uid} variant="light" padding="md" style={styles.friendCard}>
                         <View style={styles.friendRow}>
-                            <UserAvatar
-                                size={48}
-                                photoURL={friend.photoURL}
-                                avatarType={friend.avatarType}
-                                avatarValue={friend.avatarValue}
-                                name={friend.displayName}
-                            />
-                            <View style={styles.friendInfo}>
+                            <TouchableOpacity
+                                onPress={() => showUserProfile({
+                                    userId: friend.uid,
+                                    displayName: friend.displayName,
+                                    photoURL: friend.photoURL,
+                                    avatarType: friend.avatarType,
+                                    avatarValue: friend.avatarValue,
+                                })}
+                                activeOpacity={0.7}
+                            >
+                                <UserAvatar
+                                    size={48}
+                                    photoURL={friend.photoURL}
+                                    avatarType={friend.avatarType}
+                                    avatarValue={friend.avatarValue}
+                                    name={friend.displayName}
+                                />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.friendInfo}
+                                onPress={() => showUserProfile({
+                                    userId: friend.uid,
+                                    displayName: friend.displayName,
+                                    photoURL: friend.photoURL,
+                                    avatarType: friend.avatarType,
+                                    avatarValue: friend.avatarValue,
+                                })}
+                                activeOpacity={0.7}
+                            >
                                 <Text style={styles.friendName}>
                                     {friend.displayName || 'Unknown'}
                                 </Text>
@@ -581,7 +617,7 @@ export default function SocialScreen() {
                                         </View>
                                     )}
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.celebrateButton}
                                 onPress={() => showCongratulateOptions(friend)}
@@ -656,38 +692,50 @@ export default function SocialScreen() {
                 <>
                     {/* Leaderboard List */}
                     {leaderboard.map((entry) => (
-                        <GlassCard key={entry.userId} variant="light" padding="md" style={styles.leaderboardCard}>
-                            <View style={styles.leaderboardRow}>
-                                <View style={styles.rankBadge}>
-                                    {entry.rank <= 3 ? (
-                                        <Text style={styles.rankEmoji}>
-                                            {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
-                                        </Text>
-                                    ) : (
-                                        <Text style={styles.rankNumber}>{entry.rank}</Text>
-                                    )}
-                                </View>
-                                <View style={styles.leaderboardInfo}>
-                                    <View style={styles.leaderboardUserRow}>
-                                        <UserAvatar
-                                            size={32}
-                                            photoURL={entry.photoURL}
-                                            avatarType={entry.avatarType}
-                                            avatarValue={entry.avatarValue}
-                                            name={entry.name}
-                                        />
-                                        <View style={{ marginLeft: spacing.sm }}>
-                                            <Text style={styles.leaderboardName}>{entry.name}</Text>
-                                            <Text style={styles.leaderboardScore}>{entry.score} pts</Text>
+                        <TouchableOpacity
+                            key={entry.userId}
+                            activeOpacity={0.8}
+                            onPress={() => showUserProfile({
+                                userId: entry.userId,
+                                displayName: entry.name,
+                                photoURL: entry.photoURL,
+                                avatarType: entry.avatarType,
+                                avatarValue: entry.avatarValue,
+                            })}
+                        >
+                            <GlassCard variant="light" padding="md" style={styles.leaderboardCard}>
+                                <View style={styles.leaderboardRow}>
+                                    <View style={styles.rankBadge}>
+                                        {entry.rank <= 3 ? (
+                                            <Text style={styles.rankEmoji}>
+                                                {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
+                                            </Text>
+                                        ) : (
+                                            <Text style={styles.rankNumber}>{entry.rank}</Text>
+                                        )}
+                                    </View>
+                                    <View style={styles.leaderboardInfo}>
+                                        <View style={styles.leaderboardUserRow}>
+                                            <UserAvatar
+                                                size={32}
+                                                photoURL={entry.photoURL}
+                                                avatarType={entry.avatarType}
+                                                avatarValue={entry.avatarValue}
+                                                name={entry.name}
+                                            />
+                                            <View style={{ marginLeft: spacing.sm }}>
+                                                <Text style={styles.leaderboardName}>{entry.name}</Text>
+                                                <Text style={styles.leaderboardScore}>{entry.score} pts</Text>
+                                            </View>
                                         </View>
                                     </View>
+                                    <View style={styles.streakBadge}>
+                                        <Ionicons name="flame" size={14} color="#FFFFFF" />
+                                        <Text style={styles.streakBadgeText}>{entry.streak}</Text>
+                                    </View>
                                 </View>
-                                <View style={styles.streakBadge}>
-                                    <Ionicons name="flame" size={14} color="#FFFFFF" />
-                                    <Text style={styles.streakBadgeText}>{entry.streak}</Text>
-                                </View>
-                            </View>
-                        </GlassCard>
+                            </GlassCard>
+                        </TouchableOpacity>
                     ))}
                 </>
             )

@@ -514,7 +514,7 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 currentStreak: streakData.currentStreak,
                 healthScore: latestHealthScore,
                 goalAchieved: streakData.currentStreak > 0, // Simplified for now
-                feeling: todayCheckIn?.mood === 5 ? 'great' : todayCheckIn?.mood === 4 ? 'good' : todayCheckIn?.mood === 3 ? 'okay' : todayCheckIn?.mood ? 'struggling' : null,
+                pledgedToday: !!todayCheckIn, // True if user has checked in today
                 updatedAt: new Date(),
             }).then(() => {
                 // Trigger community stats update in the background

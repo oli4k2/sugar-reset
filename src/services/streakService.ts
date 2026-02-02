@@ -80,9 +80,25 @@ export function getDailyTargetForDate(
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const weekNumber = Math.floor(diffDays / 7) + 1;
 
-    // Get the limit for that week using planUtils
-    const weekLimit = getCurrentDayLimit(planType, planStartDate);
-    return weekLimit.dailyGrams;
+    // Get the plan details to find the limit for the calculated week
+    const plan = planType === 'cold_turkey'
+        ? { weeklyLimits: [{ dailyGrams: 0 }] }  // Cold turkey is always 0g
+        : {
+            weeklyLimits: [
+                { dailyGrams: 50 },  // Week 1
+                { dailyGrams: 45 },  // Week 2
+                { dailyGrams: 40 },  // Week 3
+                { dailyGrams: 35 },  // Week 4
+                { dailyGrams: 30 },  // Week 5
+                { dailyGrams: 25 },  // Week 6
+                { dailyGrams: 20 },  // Week 7
+                { dailyGrams: 0 },   // Week 8+
+            ]
+        };
+
+    // Get the limit for the specific week (cap at last defined week)
+    const weekIndex = Math.min(weekNumber - 1, plan.weeklyLimits.length - 1);
+    return plan.weeklyLimits[Math.max(0, weekIndex)].dailyGrams;
 }
 
 /**

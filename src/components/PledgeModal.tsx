@@ -38,10 +38,11 @@ const BUTTON_SIZE = 80;
 const DURATION = 1700;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const VIBRANT = {
-    cyan: '#00FFFF',
-    magenta: '#FF00FF',
-    yellow: '#FFFF00',
+// Using app-matching colors from looviColors theme
+const PLEDGE_COLORS = {
+    coral: looviColors.coralOrange,      // Primary coral accent (#E8A87C)
+    sage: looviColors.accent.success,    // Sage green (#7FB069)
+    cream: looviColors.warmBeige,        // Warm beige (#F2E4D8)
     white: '#FFFFFF',
 };
 
@@ -90,9 +91,9 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
     const startTimeRef = useRef<number>(0);
 
     // Geometry
-    const blobCyan = generateBlob(100, 5, 20);
-    const blobMagenta = generateBlob(105, 3, 25);
-    const blobYellow = generateBlob(110, 4, 15);
+    const blobCoral = generateBlob(100, 5, 20);
+    const blobSage = generateBlob(105, 3, 25);
+    const blobCream = generateBlob(110, 4, 15);
 
     useEffect(() => {
         if (visible) {
@@ -323,30 +324,30 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
                                         ]}>
                                             <Svg width="400" height="400" viewBox="-200 -200 400 400">
                                                 <Defs>
-                                                    <RadialGradient id="gradCyan" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={VIBRANT.cyan} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={VIBRANT.cyan} stopOpacity="0" />
+                                                    <RadialGradient id="gradCoral" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
+                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.coral} stopOpacity="0.8" />
+                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.coral} stopOpacity="0" />
                                                     </RadialGradient>
-                                                    <RadialGradient id="gradMagenta" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={VIBRANT.magenta} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={VIBRANT.magenta} stopOpacity="0" />
+                                                    <RadialGradient id="gradSage" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
+                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.sage} stopOpacity="0.8" />
+                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.sage} stopOpacity="0" />
                                                     </RadialGradient>
-                                                    <RadialGradient id="gradYellow" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={VIBRANT.yellow} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={VIBRANT.yellow} stopOpacity="0" />
+                                                    <RadialGradient id="gradCream" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
+                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.cream} stopOpacity="0.8" />
+                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.cream} stopOpacity="0" />
                                                     </RadialGradient>
                                                 </Defs>
                                                 {/* @ts-ignore */}
                                                 <AnimatedG style={{ transform: [{ rotate: spin1.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-                                                    <Path d={blobCyan} fill="url(#gradCyan)" />
+                                                    <Path d={blobCoral} fill="url(#gradCoral)" />
                                                 </AnimatedG>
                                                 {/* @ts-ignore */}
                                                 <AnimatedG style={{ transform: [{ rotate: spin2.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] }) }] }}>
-                                                    <Path d={blobMagenta} fill="url(#gradMagenta)" opacity={0.9} />
+                                                    <Path d={blobSage} fill="url(#gradSage)" opacity={0.9} />
                                                 </AnimatedG>
                                                 {/* @ts-ignore */}
                                                 <AnimatedG style={{ transform: [{ rotate: spin3.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
-                                                    <Path d={blobYellow} fill="url(#gradYellow)" opacity={0.8} />
+                                                    <Path d={blobCream} fill="url(#gradCream)" opacity={0.8} />
                                                 </AnimatedG>
                                             </Svg>
                                         </Animated.View>
@@ -435,30 +436,30 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
                                         ]}>
                                             <Svg width="400" height="400" viewBox="-200 -200 400 400">
                                                 <Defs>
-                                                    <RadialGradient id="gradCyan" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={VIBRANT.cyan} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={VIBRANT.cyan} stopOpacity="0" />
+                                                    <RadialGradient id="gradCoralSuccess" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
+                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.coral} stopOpacity="0.8" />
+                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.coral} stopOpacity="0" />
                                                     </RadialGradient>
-                                                    <RadialGradient id="gradMagenta" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={VIBRANT.magenta} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={VIBRANT.magenta} stopOpacity="0" />
+                                                    <RadialGradient id="gradSageSuccess" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
+                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.sage} stopOpacity="0.8" />
+                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.sage} stopOpacity="0" />
                                                     </RadialGradient>
-                                                    <RadialGradient id="gradYellow" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={VIBRANT.yellow} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={VIBRANT.yellow} stopOpacity="0" />
+                                                    <RadialGradient id="gradCreamSuccess" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
+                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.cream} stopOpacity="0.8" />
+                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.cream} stopOpacity="0" />
                                                     </RadialGradient>
                                                 </Defs>
                                                 {/* @ts-ignore */}
                                                 <AnimatedG style={{ transform: [{ rotate: spin1.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-                                                    <Path d={blobCyan} fill="url(#gradCyan)" />
+                                                    <Path d={blobCoral} fill="url(#gradCoralSuccess)" />
                                                 </AnimatedG>
                                                 {/* @ts-ignore */}
                                                 <AnimatedG style={{ transform: [{ rotate: spin2.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] }) }] }}>
-                                                    <Path d={blobMagenta} fill="url(#gradMagenta)" opacity={0.9} />
+                                                    <Path d={blobSage} fill="url(#gradSageSuccess)" opacity={0.9} />
                                                 </AnimatedG>
                                                 {/* @ts-ignore */}
                                                 <AnimatedG style={{ transform: [{ rotate: spin3.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
-                                                    <Path d={blobYellow} fill="url(#gradYellow)" opacity={0.8} />
+                                                    <Path d={blobCream} fill="url(#gradCreamSuccess)" opacity={0.8} />
                                                 </AnimatedG>
                                             </Svg>
                                         </Animated.View>

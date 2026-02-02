@@ -22,7 +22,7 @@ export interface UserStats {
     currentStreak: number;
     healthScore: number;
     goalAchieved: boolean; // Daily goal met?
-    feeling: 'great' | 'good' | 'okay' | 'struggling' | null;
+    pledgedToday: boolean; // Has the user made their morning pledge?
     updatedAt: Date;
 }
 

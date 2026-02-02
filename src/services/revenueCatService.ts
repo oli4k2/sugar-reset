@@ -17,7 +17,7 @@ import Purchases, {
 import { Platform } from 'react-native';
 
 // Development mode flag - set to true to use mocked data
-const USE_MOCK_DATA = __DEV__ && false; // Change to true to enable mock mode
+const USE_MOCK_DATA = __DEV__ && true; // ← ENABLED for development - bypasses real payments
 
 // Mock data for development
 const createMockOffering = (): PurchasesOffering => {

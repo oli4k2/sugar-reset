@@ -58,6 +58,8 @@ import {
 } from '../services/healthScoringService';
 
 import { PledgeModal } from '../components/PledgeModal';
+import { useAuthContext } from '../context/AuthContext';
+import { userService } from '../services/userService';
 
 function formatDuration(ms: number) {
     const seconds = Math.floor((ms / 1000) % 60);
@@ -134,6 +136,9 @@ export default function HomeScreen() {
         hasLoggedFoodToday: hasLoggedFoodTodayFromContext,
         canRecoverStreak,
     } = useUserData();
+
+    // Auth context for syncing pledge status
+    const { user, isAuthenticated } = useAuthContext();
 
     // Get user data from context (with fallbacks)
     // Use streakData.startDate for timer accuracy (updates when streak resets)
@@ -644,7 +649,7 @@ export default function HomeScreen() {
                                     } else if (item.type === 'journal') {
                                         isCompleted = isJournaled;
                                         label = "Journal";
-                                        subLabel = isJournaled ? "Completed" : "Evening";
+                                        subLabel = "Evening";
                                         iconEmoji = isJournaled ? "✅" : "📓";
                                         // When done: Green background
                                         bg = isJournaled ? looviColors.accent.success : 'rgba(235, 110, 95, 0.9)'; // Orange/Red for Evening/Incomplete
@@ -982,10 +987,22 @@ export default function HomeScreen() {
                     <PledgeModal
                         visible={showPledgeModal}
                         onClose={() => setShowPledgeModal(false)}
-                        onPledgeComplete={() => {
+                        onPledgeComplete={async () => {
                             setHasPledgedToday(true);
                             // Trigger layout animation for the button change
                             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+                            // Sync pledgedToday to Firebase for UserProfilePopup
+                            if (isAuthenticated && user?.id) {
+                                try {
+                                    await userService.syncUserStats(user.id, {
+                                        pledgedToday: true,
+                                        updatedAt: new Date(),
+                                    });
+                                } catch (e) {
+                                    console.warn('Failed to sync pledge status:', e);
+                                }
+                            }
                         }}
                     />
 

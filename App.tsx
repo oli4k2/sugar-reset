@@ -12,6 +12,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { AuthProvider } from './src/context/AuthContext';
 import { UserDataProvider } from './src/context/UserDataContext';
 import { RevenueCatProvider } from './src/context/RevenueCatContext';
+import { UserProfileProvider } from './src/context/UserProfileContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { colors } from './src/theme';
 
@@ -73,7 +74,9 @@ export default function App() {
         <AuthProvider>
           <RevenueCatProvider>
             <UserDataProvider>
-              <RootNavigator />
+              <UserProfileProvider>
+                <RootNavigator />
+              </UserProfileProvider>
             </UserDataProvider>
           </RevenueCatProvider>
         </AuthProvider>

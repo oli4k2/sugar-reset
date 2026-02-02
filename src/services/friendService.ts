@@ -416,7 +416,7 @@ export const friendService = {
             currentStreak: data.currentStreak || 0,
             healthScore: data.healthScore || 0,
             goalAchieved: data.goalAchieved || false,
-            feeling: data.feeling || null,
+            pledgedToday: data.pledgedToday || false,
             updatedAt: toDate(data.updatedAt) as Date,
         };
     },
@@ -448,7 +448,7 @@ export const friendService = {
                     currentStreak: data.currentStreak || 0,
                     healthScore: data.healthScore || 0,
                     goalAchieved: data.goalAchieved || false,
-                    feeling: data.feeling || null,
+                    pledgedToday: data.pledgedToday || false,
                     updatedAt: toDate(data.updatedAt) as Date,
                 };
             });
@@ -476,7 +476,7 @@ export const friendService = {
                     currentStreak: data.currentStreak || 0,
                     healthScore: data.healthScore || 0,
                     goalAchieved: data.goalAchieved || false,
-                    feeling: data.feeling || null,
+                    pledgedToday: data.pledgedToday || false,
                     updatedAt: toDate(data.updatedAt) as Date,
                 };
             });

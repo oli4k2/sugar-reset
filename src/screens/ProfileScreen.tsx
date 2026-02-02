@@ -18,6 +18,7 @@ import {
     TextInput,
     Linking,
     ActivityIndicator,
+    Switch,
 } from 'react-native';
 import * as StoreReview from 'expo-store-review';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,6 +33,7 @@ import { AVATAR_EMOJIS } from '../constants/avatarConfig';
 
 import { useUserData } from '../context/UserDataContext';
 import { userService } from '../services/userService';
+import { dataCleanupService } from '../services/dataCleanupService';
 import { useAuthContext } from '../context/AuthContext';
 import { useAuth } from '../hooks/useAuth';
 import { useRevenueCat } from '../hooks/useRevenueCat';
@@ -40,28 +42,31 @@ import { storageService } from '../services/storageService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppIcon } from '../components/OnboardingIcon';
 import * as Haptics from 'expo-haptics';
+import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
 
 interface MenuItem {
     id: string;
     emoji: string;
     label: string;
     action?: () => void;
+    hasToggle?: boolean;
 }
 
-const menuSections = [
+const menuSections: { title: string; items: MenuItem[] }[] = [
     {
         title: 'Account',
         items: [
             { id: 'profile', emoji: '👤', label: 'Edit Profile' },
             { id: 'plan', emoji: '📋', label: 'My Plan' },
+            { id: 'subscription', emoji: '👑', label: 'Subscription' },
             { id: 'restore', emoji: '🔄', label: 'Restore Purchases' },
+            { id: 'deleteAccount', emoji: '⚠️', label: 'Delete Account' },
         ],
     },
     {
         title: 'Preferences',
         items: [
             { id: 'notifications', emoji: '🔔', label: 'Notifications' },
-            { id: 'reminders', emoji: '⏰', label: 'Daily Reminders' },
         ],
     },
     {
@@ -76,6 +81,7 @@ const menuSections = [
         title: 'Developer',
         items: [
             { id: 'clearData', emoji: '🗑️', label: 'Clear All Data' },
+            { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
         ],
     }] : []),
     {
@@ -88,7 +94,7 @@ const menuSections = [
 ];
 
 export default function ProfileScreen() {
-    const { onboardingData, streakData, updateOnboardingData } = useUserData();
+    const { onboardingData, streakData, updateOnboardingData, latestHealthScore, todayCheckIn } = useUserData();
     const { user, isAuthenticated, firebaseUser, refreshUser } = useAuthContext();
     const { signOut } = useAuth();
     const { restorePurchases, isPremium } = useRevenueCat();
@@ -101,6 +107,23 @@ export default function ProfileScreen() {
     const [selectedAvatarType, setSelectedAvatarType] = useState<'photo' | 'emoji' | 'initial'>('initial');
     const [selectedAvatarValue, setSelectedAvatarValue] = useState<string>('');
     const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+    const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+    const [hasPledgedToday, setHasPledgedToday] = useState(false);
+
+    // Load pledge status
+    useEffect(() => {
+        const loadPledgeStatus = async () => {
+            try {
+                const lastPledge = await AsyncStorage.getItem('last_pledge_date');
+                const today = new Date().toISOString().split('T')[0];
+                setHasPledgedToday(lastPledge === today);
+            } catch (e) {
+                console.warn('Failed to load pledge status:', e);
+            }
+        };
+        loadPledgeStatus();
+    }, []);
 
     // Determine auth provider type
     const authProvider = useMemo((): 'google' | 'apple' | 'email' | 'unknown' => {
@@ -133,7 +156,10 @@ export default function ProfileScreen() {
     const email = firebaseUser?.email || user?.email || 'Not signed in';
     const daysSugarFree = streakData?.currentStreak || 0;
     const currentPlan = onboardingData.plan === 'cold_turkey' ? 'Cold Turkey' : 'Gradual Reduction';
-    const plan = isAuthenticated ? 'Premium' : 'Free';
+    const subscriptionType = isPremium ? 'Premium' : 'Free';
+
+    // Health score display
+    const healthScoreDisplay = latestHealthScore > 0 ? latestHealthScore : '--';
 
     const handleViewPlanDetails = () => {
         setShowPlanDetails(true);
@@ -166,7 +192,7 @@ export default function ProfileScreen() {
             setIsRestoring(true);
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await restorePurchases();
-            
+
             // Check if restore was successful
             if (isPremium) {
                 Alert.alert('Success', 'Your purchases have been restored!');
@@ -200,7 +226,7 @@ export default function ProfileScreen() {
                             // Clear all AsyncStorage
                             await AsyncStorage.clear();
                             console.log('✅ Cleared all AsyncStorage');
-                            
+
                             // Log out from RevenueCat (clears anonymous ID)
                             try {
                                 await revenueCatService.logOut();
@@ -208,11 +234,11 @@ export default function ProfileScreen() {
                             } catch (rcError) {
                                 console.warn('⚠️ Failed to clear RevenueCat:', rcError);
                             }
-                            
+
                             // Sign out from Firebase (this clears the persisted auth state)
                             await signOut();
                             console.log('✅ Signed out from Firebase');
-                            
+
                             // Also clear Firebase auth persistence explicitly
                             try {
                                 const { signOut: firebaseSignOut } = require('firebase/auth');
@@ -222,7 +248,7 @@ export default function ProfileScreen() {
                             } catch (e) {
                                 console.warn('⚠️ Error clearing Firebase auth:', e);
                             }
-                            
+
                             Alert.alert(
                                 'Data Cleared',
                                 'All app data has been cleared. The app will restart.',
@@ -242,6 +268,48 @@ export default function ProfileScreen() {
                         } catch (error: any) {
                             console.error('Error clearing data:', error);
                             Alert.alert('Error', 'Failed to clear all data: ' + error.message);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleCleanupCommunityData = async () => {
+        Alert.alert(
+            'Clean Community Data',
+            'This will:\n• Remove posts from deleted users\n• Remove comments from deleted users\n• Update author names to current profiles\n\nThis may take a moment.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Preview',
+                    onPress: async () => {
+                        try {
+                            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            const preview = await dataCleanupService.previewCleanup();
+                            Alert.alert(
+                                'Cleanup Preview',
+                                `Found:\n• ${preview.orphanedPosts.length} orphaned posts\n• ${preview.orphanedComments.length} orphaned comments\n• ${preview.outdatedNames.length} outdated names\n\nRun cleanup to fix these issues.`
+                            );
+                        } catch (error: any) {
+                            Alert.alert('Error', 'Failed to preview: ' + error.message);
+                        }
+                    },
+                },
+                {
+                    text: 'Clean Now',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                            const result = await dataCleanupService.performFullCleanup();
+                            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            Alert.alert(
+                                'Cleanup Complete',
+                                `Results:\n• Posts removed: ${result.postsRemoved}\n• Posts updated: ${result.postsUpdated}\n• Comments removed: ${result.commentsRemoved}\n• Comments updated: ${result.commentsUpdated}${result.errors.length > 0 ? `\n\nErrors: ${result.errors.length}` : ''}`
+                            );
+                        } catch (error: any) {
+                            Alert.alert('Error', 'Cleanup failed: ' + error.message);
                         }
                     },
                 },
@@ -269,6 +337,111 @@ export default function ProfileScreen() {
                             console.error('Error signing out:', error);
                         }
                     }
+                },
+            ]
+        );
+    };
+
+    const handleDeleteAccount = () => {
+        if (!isAuthenticated || !firebaseUser) {
+            Alert.alert('Not Signed In', 'You need to be signed in to delete your account.');
+            return;
+        }
+
+        Alert.alert(
+            'Delete Account',
+            'Are you sure you want to permanently delete your account? This action cannot be undone. All your data, progress, and streak history will be lost forever.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete Account',
+                    style: 'destructive',
+                    onPress: () => {
+                        // Second confirmation
+                        Alert.alert(
+                            'Final Confirmation',
+                            'This will permanently delete your account and all associated data. Type DELETE to confirm.',
+                            [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                    text: 'I Understand, Delete',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                        setIsDeletingAccount(true);
+                                        try {
+                                            // Delete user data from Firestore
+                                            const { doc, deleteDoc, collection, getDocs, writeBatch } = await import('firebase/firestore');
+                                            const { db } = await import('../config/firebase');
+                                            const { deleteUser } = await import('firebase/auth');
+
+                                            const userId = firebaseUser.uid;
+                                            const batch = writeBatch(db);
+
+                                            // Delete user document
+                                            batch.delete(doc(db, 'users', userId));
+
+                                            // Delete user stats
+                                            batch.delete(doc(db, 'userStats', userId));
+
+                                            // Delete user's friends subcollection
+                                            try {
+                                                const friendsSnap = await getDocs(collection(db, 'users', userId, 'friends'));
+                                                friendsSnap.forEach((friendDoc) => {
+                                                    batch.delete(friendDoc.ref);
+                                                });
+                                            } catch (e) { }
+
+                                            // Delete user's posts
+                                            try {
+                                                const { query, where } = await import('firebase/firestore');
+                                                const postsRef = collection(db, 'posts');
+                                                const postsQuery = query(postsRef, where('authorId', '==', userId));
+                                                const postsSnap = await getDocs(postsQuery);
+                                                postsSnap.forEach((postDoc) => {
+                                                    batch.delete(postDoc.ref);
+                                                });
+                                            } catch (e) { }
+
+                                            // Commit batch delete
+                                            await batch.commit();
+
+                                            // Clear local data
+                                            await AsyncStorage.clear();
+
+                                            // Delete Firebase Auth account
+                                            await deleteUser(firebaseUser);
+
+                                            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+                                            // Navigate to onboarding
+                                            navigation.reset({
+                                                index: 0,
+                                                routes: [{ name: 'Onboarding' }],
+                                            });
+
+                                            Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
+                                        } catch (error: any) {
+                                            console.error('Error deleting account:', error);
+                                            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
+                                            // Handle re-authentication requirement
+                                            if (error.code === 'auth/requires-recent-login') {
+                                                Alert.alert(
+                                                    'Re-authentication Required',
+                                                    'For security reasons, please sign out and sign back in, then try deleting your account again.',
+                                                    [{ text: 'OK' }]
+                                                );
+                                            } else {
+                                                Alert.alert('Error', 'Failed to delete account: ' + (error.message || 'Unknown error'));
+                                            }
+                                        } finally {
+                                            setIsDeletingAccount(false);
+                                        }
+                                    },
+                                },
+                            ]
+                        );
+                    },
                 },
             ]
         );
@@ -336,31 +509,56 @@ export default function ProfileScreen() {
                             <Text style={styles.title}>Profile</Text>
                         </View>
 
-                        {/* User Card */}
-                        <GlassCard variant="light" padding="lg" style={styles.userCard}>
-                            <View style={styles.avatarContainer}>
-                                <UserAvatar
-                                    size={64}
-                                    photoURL={user?.photoURL}
-                                    avatarType={user?.avatarType}
-                                    avatarValue={user?.avatarValue}
-                                    name={name}
-                                />
+                        {/* User Profile Section - Floating Design */}
+                        <View style={styles.userProfileSection}>
+                            {/* Avatar with shadow */}
+                            <View style={styles.avatarWrapper}>
+                                <View style={styles.avatarShadow}>
+                                    <UserAvatar
+                                        size={80}
+                                        photoURL={user?.photoURL}
+                                        avatarType={user?.avatarType}
+                                        avatarValue={user?.avatarValue}
+                                        name={name}
+                                    />
+                                </View>
                             </View>
+
+                            {/* Name and Email */}
                             <Text style={styles.userName}>{name}</Text>
                             <Text style={styles.userEmail}>{email}</Text>
-                            <View style={styles.statsRow}>
-                                <View style={styles.statItem}>
-                                    <Text style={styles.statValue}>{daysSugarFree}</Text>
-                                    <Text style={styles.statLabel}>Days Free</Text>
+
+                            {/* Subscription Badge */}
+                            <View style={styles.subscriptionBadge}>
+                                <Text style={styles.subscriptionText}>
+                                    {subscriptionType === 'Premium' ? '👑 Premium' : '✨ Free'}
+                                </Text>
+                            </View>
+
+                            {/* Stats Cards - Streak, Health, Pledge */}
+                            <View style={styles.floatingStatsRow}>
+                                {/* Streak */}
+                                <View style={styles.floatingStatCard}>
+                                    <Text style={styles.floatingStatEmoji}>🔥</Text>
+                                    <Text style={styles.floatingStatValue}>{daysSugarFree}</Text>
+                                    <Text style={styles.floatingStatLabel}>Streak</Text>
                                 </View>
-                                <View style={styles.statDivider} />
-                                <View style={styles.statItem}>
-                                    <AppIcon emoji="🌟" size={24} />
-                                    <Text style={styles.statLabel}>{plan}</Text>
+
+                                {/* Health */}
+                                <View style={styles.floatingStatCard}>
+                                    <Text style={styles.floatingStatEmoji}>❤️</Text>
+                                    <Text style={styles.floatingStatValue}>{healthScoreDisplay}</Text>
+                                    <Text style={styles.floatingStatLabel}>Health</Text>
+                                </View>
+
+                                {/* Pledge */}
+                                <View style={styles.floatingStatCard}>
+                                    <Text style={styles.floatingStatEmoji}>{hasPledgedToday ? '✅' : '🖐️'}</Text>
+                                    <Text style={styles.floatingStatValue}>{hasPledgedToday ? 'Yes' : 'No'}</Text>
+                                    <Text style={styles.floatingStatLabel}>Pledge</Text>
                                 </View>
                             </View>
-                        </GlassCard>
+                        </View>
 
                         {/* Reasons Section */}
 
@@ -376,6 +574,7 @@ export default function ProfileScreen() {
                                             style={[
                                                 styles.menuItem,
                                                 itemIndex < section.items.length - 1 && styles.menuItemBorder,
+                                                item.id === 'deleteAccount' && styles.deleteMenuItem,
                                             ]}
                                             activeOpacity={0.6}
                                             onPress={
@@ -383,43 +582,62 @@ export default function ProfileScreen() {
                                                     ? handleViewPlanDetails
                                                     : item.id === 'profile'
                                                         ? handleEditProfile
-                                                        : item.id === 'restore'
-                                                            ? handleRestorePurchases
-                                                            : item.id === 'journal'
-                                                                ? () => navigation.navigate('Journal')
-                                                                : item.id === 'help'
-                                                                    ? () => navigation.navigate('Help')
-                                                                    : item.id === 'rate'
-                                                                        ? async () => {
-                                                                            if (await StoreReview.hasAction()) {
-                                                                                StoreReview.requestReview();
-                                                                            } else {
-                                                                                Alert.alert('Rate App', 'You can rate us on the App Store!');
-                                                                            }
-                                                                        }
-                                                                        : item.id === 'feedback'
-                                                                            ? () => Linking.openURL('mailto:hello@scriptcollective.com')
-                                                                            : item.id === 'privacy'
-                                                                                ? () => navigation.navigate('PrivacyPolicy')
-                                                                                : item.id === 'terms'
-                                                                                    ? () => navigation.navigate('TermsOfService')
-                                                                                    : item.id === 'clearData'
-                                                                                        ? handleClearAllData
-                                                                                        : undefined
+                                                        : item.id === 'subscription'
+                                                            ? () => navigation.navigate('Paywall')
+                                                            : item.id === 'restore'
+                                                                ? handleRestorePurchases
+                                                                : item.id === 'deleteAccount'
+                                                                    ? handleDeleteAccount
+                                                                    : item.id === 'notifications'
+                                                                        ? () => setShowNotificationSettings(true)
+                                                                        : item.id === 'journal'
+                                                                            ? () => navigation.navigate('Journal')
+                                                                            : item.id === 'help'
+                                                                                ? () => navigation.navigate('Help')
+                                                                                : item.id === 'rate'
+                                                                                    ? async () => {
+                                                                                        if (await StoreReview.hasAction()) {
+                                                                                            StoreReview.requestReview();
+                                                                                        } else {
+                                                                                            Alert.alert('Rate App', 'You can rate us on the App Store!');
+                                                                                        }
+                                                                                    }
+                                                                                    : item.id === 'feedback'
+                                                                                        ? () => Linking.openURL('mailto:hello@scriptcollective.com')
+                                                                                        : item.id === 'privacy'
+                                                                                            ? () => navigation.navigate('PrivacyPolicy')
+                                                                                            : item.id === 'terms'
+                                                                                                ? () => navigation.navigate('TermsOfService')
+                                                                                                : item.id === 'clearData'
+                                                                                                    ? handleClearAllData
+                                                                                                    : item.id === 'cleanupCommunity'
+                                                                                                        ? handleCleanupCommunityData
+                                                                                                        : undefined
                                             }
-                                            disabled={item.id === 'restore' && isRestoring}
+                                            disabled={(item.id === 'restore' && isRestoring) || (item.id === 'deleteAccount' && isDeletingAccount)}
                                         >
                                             <AppIcon emoji={item.emoji} size={20} />
                                             <View style={styles.menuLabelContainer}>
-                                                <Text style={styles.menuLabel}>{item.label}</Text>
+                                                <Text style={[
+                                                    styles.menuLabel,
+                                                    item.id === 'deleteAccount' && styles.deleteMenuLabel
+                                                ]}>{item.label}</Text>
                                                 {item.id === 'plan' && (
                                                     <Text style={styles.menuValue}>{currentPlan}</Text>
+                                                )}
+                                                {item.id === 'subscription' && (
+                                                    <Text style={styles.menuValue}>{subscriptionType}</Text>
                                                 )}
                                             </View>
                                             {item.id === 'restore' && isRestoring ? (
                                                 <ActivityIndicator size="small" color={looviColors.accent.primary} />
+                                            ) : item.id === 'deleteAccount' && isDeletingAccount ? (
+                                                <ActivityIndicator size="small" color="#FF3B30" />
                                             ) : (
-                                                <Text style={styles.menuArrow}>›</Text>
+                                                <Text style={[
+                                                    styles.menuArrow,
+                                                    item.id === 'deleteAccount' && styles.deleteMenuArrow
+                                                ]}>›</Text>
                                             )}
                                         </TouchableOpacity>
                                     ))}
@@ -582,6 +800,12 @@ export default function ProfileScreen() {
                         onClose={() => setShowPlanDetails(false)}
                         onSwitchPlan={handleChangePlan}
                     />
+
+                    {/* Notification Settings Modal */}
+                    <NotificationSettingsModal
+                        visible={showNotificationSettings}
+                        onClose={() => setShowNotificationSettings(false)}
+                    />
                 </SafeAreaView>
             </LooviBackground>
         </>
@@ -609,6 +833,86 @@ const styles = StyleSheet.create({
         color: looviColors.text.primary,
         letterSpacing: -0.5,
     },
+    // Floating User Profile Styles
+    userProfileSection: {
+        alignItems: 'center',
+        marginBottom: spacing.xl,
+        paddingVertical: spacing.lg,
+    },
+    avatarWrapper: {
+        marginBottom: spacing.md,
+    },
+    avatarShadow: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+        elevation: 10,
+        borderRadius: 40,
+    },
+    userName: {
+        fontSize: 26,
+        fontWeight: '800',
+        color: looviColors.text.primary,
+        marginBottom: spacing.xs,
+        letterSpacing: -0.5,
+    },
+    userEmail: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
+        marginBottom: spacing.md,
+    },
+    subscriptionBadge: {
+        backgroundColor: 'rgba(217, 123, 102, 0.15)',
+        paddingVertical: spacing.xs,
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.full,
+        marginBottom: spacing.lg,
+    },
+    subscriptionText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: looviColors.coralOrange,
+    },
+    floatingStatsRow: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    floatingStatCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.65)',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
+        borderRadius: borderRadius.xl,
+        alignItems: 'center',
+        minWidth: 90,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.5)',
+    },
+    floatingStatValue: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: looviColors.text.primary,
+        letterSpacing: -0.3,
+    },
+    floatingStatEmoji: {
+        fontSize: 22,
+        marginBottom: 2,
+    },
+    floatingStatLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: looviColors.text.secondary,
+        marginTop: spacing.xs,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    // Legacy styles (kept for compatibility)
     userCard: {
         alignItems: 'center',
         marginBottom: spacing.xl,
@@ -624,18 +928,6 @@ const styles = StyleSheet.create({
     },
     avatarEmoji: {
         fontSize: 40,
-    },
-    userName: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: looviColors.text.primary,
-        marginBottom: spacing.xs,
-    },
-    userEmail: {
-        fontSize: 14,
-        fontWeight: '400',
-        color: looviColors.text.tertiary,
-        marginBottom: spacing.lg,
     },
     statsRow: {
         flexDirection: 'row',
@@ -858,30 +1150,36 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     menuSection: {
-        marginBottom: spacing.lg,
+        marginBottom: spacing.xl,
     },
     sectionTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: looviColors.text.tertiary,
+        fontSize: 14,
+        fontWeight: '700',
+        color: looviColors.text.secondary,
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        marginBottom: spacing.sm,
+        letterSpacing: 1,
+        marginBottom: spacing.md,
         marginLeft: spacing.sm,
     },
-    menuCard: {},
+    menuCard: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+    },
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: spacing.md,
+        paddingVertical: spacing.md + 2,
         paddingHorizontal: spacing.md,
     },
     menuItemBorder: {
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+        borderBottomColor: 'rgba(0, 0, 0, 0.04)',
     },
     menuEmoji: {
-        fontSize: 20,
+        fontSize: 22,
         marginRight: spacing.md,
     },
     menuLabelContainer: {
@@ -889,24 +1187,25 @@ const styles = StyleSheet.create({
         marginLeft: spacing.md,
     },
     menuLabel: {
-        fontSize: 15,
-        fontWeight: '400',
+        fontSize: 16,
+        fontWeight: '600',
         color: looviColors.text.primary,
     },
     menuValue: {
         fontSize: 13,
-        fontWeight: '400',
-        color: looviColors.text.tertiary,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
         marginTop: 2,
     },
     menuSubtext: {
         fontSize: 12,
-        fontWeight: '400',
-        color: looviColors.text.tertiary,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
         marginTop: 2,
     },
     menuArrow: {
-        fontSize: 20,
+        fontSize: 22,
+        fontWeight: '300',
         color: looviColors.text.muted,
     },
     logoutButton: {
@@ -993,5 +1292,14 @@ const styles = StyleSheet.create({
     },
     emojiText: {
         fontSize: 24,
+    },
+    deleteMenuItem: {
+        // Optional: could add a subtle red tint background
+    },
+    deleteMenuLabel: {
+        color: '#FF3B30',
+    },
+    deleteMenuArrow: {
+        color: '#FF3B30',
     },
 });
