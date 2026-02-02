@@ -59,8 +59,25 @@ async function clearAll(): Promise<void> {
     try {
         const keys = Object.values(STORAGE_KEYS);
         await AsyncStorage.multiRemove(keys);
+        console.log('✅ Cleared all app storage keys');
     } catch (error) {
         console.error('Error clearing storage:', error);
+        throw error;
+    }
+}
+
+/**
+ * Clear ALL AsyncStorage data (nuclear option - clears everything)
+ * Use with caution - this will clear ALL AsyncStorage data, not just app data
+ */
+async function clearEverything(): Promise<void> {
+    try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        await AsyncStorage.multiRemove(allKeys);
+        console.log('✅ Cleared ALL AsyncStorage data');
+    } catch (error) {
+        console.error('Error clearing all storage:', error);
+        throw error;
     }
 }
 
@@ -70,6 +87,7 @@ export const storageService = {
     load,
     remove,
     clearAll,
+    clearEverything,
     KEYS: STORAGE_KEYS,
 };
 

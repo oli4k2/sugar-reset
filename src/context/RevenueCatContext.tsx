@@ -97,10 +97,17 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     }
   }, [isInitialized, loadData]);
 
-  // Sync user ID when authenticated
+  // Sync user ID when authenticated and restore purchases
   useEffect(() => {
     if (isInitialized && isAuthenticated && user?.id) {
-      revenueCatService.setUserId(user.id).then(() => {
+      revenueCatService.setUserId(user.id).then(async () => {
+        // Restore purchases to link any anonymous purchases to this user
+        try {
+          await revenueCatService.restorePurchases();
+          console.log('✅ Purchases restored after login');
+        } catch (error) {
+          console.log('ℹ️ No purchases to restore or restore failed:', error);
+        }
         // Refresh data after setting user ID
         loadData();
       });

@@ -17,6 +17,7 @@ import {
     Modal,
     TextInput,
     Linking,
+    ActivityIndicator,
 } from 'react-native';
 import * as StoreReview from 'expo-store-review';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,7 +34,12 @@ import { useUserData } from '../context/UserDataContext';
 import { userService } from '../services/userService';
 import { useAuthContext } from '../context/AuthContext';
 import { useAuth } from '../hooks/useAuth';
+import { useRevenueCat } from '../hooks/useRevenueCat';
+import { revenueCatService } from '../services/revenueCatService';
+import { storageService } from '../services/storageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppIcon } from '../components/OnboardingIcon';
+import * as Haptics from 'expo-haptics';
 
 interface MenuItem {
     id: string;
@@ -48,6 +54,7 @@ const menuSections = [
         items: [
             { id: 'profile', emoji: '👤', label: 'Edit Profile' },
             { id: 'plan', emoji: '📋', label: 'My Plan' },
+            { id: 'restore', emoji: '🔄', label: 'Restore Purchases' },
         ],
     },
     {
@@ -65,6 +72,12 @@ const menuSections = [
             { id: 'rate', emoji: '⭐', label: 'Rate the App' },
         ],
     },
+    ...(__DEV__ ? [{
+        title: 'Developer',
+        items: [
+            { id: 'clearData', emoji: '🗑️', label: 'Clear All Data' },
+        ],
+    }] : []),
     {
         title: 'Legal',
         items: [
@@ -78,11 +91,13 @@ export default function ProfileScreen() {
     const { onboardingData, streakData, updateOnboardingData } = useUserData();
     const { user, isAuthenticated, firebaseUser, refreshUser } = useAuthContext();
     const { signOut } = useAuth();
+    const { restorePurchases, isPremium } = useRevenueCat();
     const navigation = useNavigation<any>();
     const [showPlanDetails, setShowPlanDetails] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [isRestoring, setIsRestoring] = useState(false);
     const [selectedAvatarType, setSelectedAvatarType] = useState<'photo' | 'emoji' | 'initial'>('initial');
     const [selectedAvatarValue, setSelectedAvatarValue] = useState<string>('');
     const [showAvatarPicker, setShowAvatarPicker] = useState(false);
@@ -141,6 +156,94 @@ export default function ProfileScreen() {
                         await updateOnboardingData({ plan: newPlan });
                         Alert.alert('Plan Updated', `You're now on the ${newPlanName} plan.`);
                     }
+                },
+            ]
+        );
+    };
+
+    const handleRestorePurchases = async () => {
+        try {
+            setIsRestoring(true);
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await restorePurchases();
+            
+            // Check if restore was successful
+            if (isPremium) {
+                Alert.alert('Success', 'Your purchases have been restored!');
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } else {
+                Alert.alert('No Purchases Found', 'We couldn\'t find any purchases to restore.');
+            }
+        } catch (error: any) {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert(
+                'Restore Failed',
+                error.message || 'Unable to restore purchases. Please try again.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setIsRestoring(false);
+        }
+    };
+
+    const handleClearAllData = () => {
+        Alert.alert(
+            'Clear All Data',
+            'This will clear all local app data, log you out, and reset the app to its initial state. This cannot be undone.\n\nAre you sure?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Clear All',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            // Clear all AsyncStorage
+                            await AsyncStorage.clear();
+                            console.log('✅ Cleared all AsyncStorage');
+                            
+                            // Log out from RevenueCat (clears anonymous ID)
+                            try {
+                                await revenueCatService.logOut();
+                                console.log('✅ Cleared RevenueCat anonymous ID');
+                            } catch (rcError) {
+                                console.warn('⚠️ Failed to clear RevenueCat:', rcError);
+                            }
+                            
+                            // Sign out from Firebase (this clears the persisted auth state)
+                            await signOut();
+                            console.log('✅ Signed out from Firebase');
+                            
+                            // Also clear Firebase auth persistence explicitly
+                            try {
+                                const { signOut: firebaseSignOut } = require('firebase/auth');
+                                const { auth } = require('../config/firebase');
+                                await firebaseSignOut(auth);
+                                console.log('✅ Firebase auth state cleared');
+                            } catch (e) {
+                                console.warn('⚠️ Error clearing Firebase auth:', e);
+                            }
+                            
+                            Alert.alert(
+                                'Data Cleared',
+                                'All app data has been cleared. The app will restart.',
+                                [
+                                    {
+                                        text: 'OK',
+                                        onPress: () => {
+                                            // Force app restart by navigating to onboarding
+                                            navigation.getParent()?.reset({
+                                                index: 0,
+                                                routes: [{ name: 'Onboarding' }],
+                                            });
+                                        },
+                                    },
+                                ]
+                            );
+                        } catch (error: any) {
+                            console.error('Error clearing data:', error);
+                            Alert.alert('Error', 'Failed to clear all data: ' + error.message);
+                        }
+                    },
                 },
             ]
         );
@@ -280,26 +383,31 @@ export default function ProfileScreen() {
                                                     ? handleViewPlanDetails
                                                     : item.id === 'profile'
                                                         ? handleEditProfile
-                                                        : item.id === 'journal'
-                                                            ? () => navigation.navigate('Journal')
-                                                            : item.id === 'help'
-                                                                ? () => navigation.navigate('Help')
-                                                                : item.id === 'rate'
-                                                                    ? async () => {
-                                                                        if (await StoreReview.hasAction()) {
-                                                                            StoreReview.requestReview();
-                                                                        } else {
-                                                                            Alert.alert('Rate App', 'You can rate us on the App Store!');
+                                                        : item.id === 'restore'
+                                                            ? handleRestorePurchases
+                                                            : item.id === 'journal'
+                                                                ? () => navigation.navigate('Journal')
+                                                                : item.id === 'help'
+                                                                    ? () => navigation.navigate('Help')
+                                                                    : item.id === 'rate'
+                                                                        ? async () => {
+                                                                            if (await StoreReview.hasAction()) {
+                                                                                StoreReview.requestReview();
+                                                                            } else {
+                                                                                Alert.alert('Rate App', 'You can rate us on the App Store!');
+                                                                            }
                                                                         }
-                                                                    }
-                                                                    : item.id === 'feedback'
-                                                                        ? () => Linking.openURL('mailto:hello@scriptcollective.com')
-                                                                        : item.id === 'privacy'
-                                                                            ? () => navigation.navigate('PrivacyPolicy')
-                                                                            : item.id === 'terms'
-                                                                                ? () => navigation.navigate('TermsOfService')
-                                                                                : undefined
+                                                                        : item.id === 'feedback'
+                                                                            ? () => Linking.openURL('mailto:hello@scriptcollective.com')
+                                                                            : item.id === 'privacy'
+                                                                                ? () => navigation.navigate('PrivacyPolicy')
+                                                                                : item.id === 'terms'
+                                                                                    ? () => navigation.navigate('TermsOfService')
+                                                                                    : item.id === 'clearData'
+                                                                                        ? handleClearAllData
+                                                                                        : undefined
                                             }
+                                            disabled={item.id === 'restore' && isRestoring}
                                         >
                                             <AppIcon emoji={item.emoji} size={20} />
                                             <View style={styles.menuLabelContainer}>
@@ -308,7 +416,11 @@ export default function ProfileScreen() {
                                                     <Text style={styles.menuValue}>{currentPlan}</Text>
                                                 )}
                                             </View>
-                                            <Text style={styles.menuArrow}>›</Text>
+                                            {item.id === 'restore' && isRestoring ? (
+                                                <ActivityIndicator size="small" color={looviColors.accent.primary} />
+                                            ) : (
+                                                <Text style={styles.menuArrow}>›</Text>
+                                            )}
                                         </TouchableOpacity>
                                     ))}
                                 </GlassCard>

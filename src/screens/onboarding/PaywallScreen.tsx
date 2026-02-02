@@ -21,6 +21,8 @@ import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { useRevenueCat } from '../../hooks/useRevenueCat';
+import { useUserData } from '../../context/UserDataContext';
+import { useAuthContext } from '../../context/AuthContext';
 import * as Haptics from 'expo-haptics';
 
 type PaywallScreenProps = {
@@ -63,6 +65,8 @@ const features = [
 
 export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium } = useRevenueCat();
+    const { hasCompletedOnboarding } = useUserData();
+    const { isAuthenticated } = useAuthContext();
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
@@ -77,16 +81,37 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
         }
     }, [currentOffering]);
 
-    // Navigate away if user is already premium
+    // Navigate away if user is already premium (but only if not loading and RevenueCat is initialized)
+    // IMPORTANT: Only navigate if user has completed onboarding AND is premium
     useEffect(() => {
-        if (isPremium) {
-            // User already has premium, navigate to main app
+        // Only skip paywall if:
+        // 1. Not loading
+        // 2. Premium is confirmed true
+        // 3. We have offerings loaded (meaning RevenueCat is working)
+        // 4. User has completed onboarding (to prevent skipping before onboarding is done)
+        // 5. User is authenticated (required to access Main app)
+        if (!isLoading && isPremium && currentOffering !== null && hasCompletedOnboarding && isAuthenticated) {
+            console.log('✅ User has premium, completed onboarding, and is authenticated → navigating to Main');
+            // User has everything needed, navigate to main app
             navigation.getParent()?.reset({
                 index: 0,
                 routes: [{ name: 'Main' }],
             });
+        } else if (!isLoading && isPremium && hasCompletedOnboarding && !isAuthenticated) {
+            console.log('ℹ️ User has premium but not authenticated → navigating to Auth');
+            // User has premium but needs to log in
+            navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
+            });
+        } else if (!isLoading && isPremium && !hasCompletedOnboarding) {
+            console.log('ℹ️ User has premium but onboarding not complete, staying on paywall');
+        } else if (!isLoading && !isPremium) {
+            console.log('ℹ️ User does not have premium, showing paywall');
+        } else if (isLoading) {
+            console.log('⏳ Loading subscription status...');
         }
-    }, [isPremium, navigation]);
+    }, [isPremium, isLoading, currentOffering, hasCompletedOnboarding, isAuthenticated, navigation]);
 
     const handleSubscribe = async () => {
         if (!selectedPackage) {
@@ -99,8 +124,30 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await purchasePackage(selectedPackage);
             
-            // Success - navigation will happen automatically via isPremium effect
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            // Check if user is authenticated after purchase
+            if (!isAuthenticated) {
+                // Purchase successful but user is anonymous - need to log in to link purchase
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert(
+                    'Purchase Successful! 🎉',
+                    'Your subscription is active, but you need to create an account to access premium features. Let\'s get you set up!',
+                    [
+                        {
+                            text: 'Create Account',
+                            onPress: () => {
+                                // Navigate to Auth screen
+                                navigation.getParent()?.reset({
+                                    index: 0,
+                                    routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
+                                });
+                            },
+                        },
+                    ]
+                );
+            } else {
+                // User is authenticated - navigation will happen automatically via isPremium effect
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }
         } catch (error: any) {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             
