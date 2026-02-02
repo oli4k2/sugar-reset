@@ -82,20 +82,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 uid: fbUser?.uid,
                 email: fbUser?.email,
                 emailVerified: fbUser?.emailVerified,
-                phoneNumber: fbUser?.phoneNumber,
                 providerId: fbUser?.providerData?.[0]?.providerId,
                 providers: fbUser?.providerData?.map(p => p?.providerId),
             });
-            
-            // IMPORTANT: If user exists but has no valid identifier (email/phone), treat as not authenticated
-            // This handles cases where auth state might be stale
-            if (fbUser && !fbUser.email && !fbUser.phoneNumber) {
-                console.warn('⚠️ User exists but has no email or phone - treating as not authenticated');
-                setFirebaseUser(null);
-                setUser(null);
-                setIsLoading(false);
-                return;
-            }
             
             setFirebaseUser(fbUser);
 
@@ -158,29 +147,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         };
     }, []);
 
-    const isUnverified = !!firebaseUser && firebaseUser.email && !firebaseUser.emailVerified;
+    // For OAuth (Google/Apple), users are always verified - no email verification needed
+    const isUnverified = false;
 
-    // Only consider authenticated if we have a valid Firebase user
-    // For email/password: must be verified
-    // For OAuth (Google/Apple): no verification needed
-    const isAuthenticated = !!firebaseUser && (
-        !firebaseUser.email || // OAuth providers might not have email
-        firebaseUser.emailVerified || // Email verified
-        firebaseUser.providerData.some(p => {
-            const providerId = p?.providerId || '';
-            return providerId.includes('google') || providerId.includes('apple');
-        }) // OAuth providers don't need email verification
-    );
+    // User is authenticated if they have a Firebase user
+    // OAuth users (Google/Apple) are automatically verified
+    const isAuthenticated = !!firebaseUser;
 
     const refreshUser = async () => {
         if (auth.currentUser) {
             await auth.currentUser.reload();
-            // Force state update by creating a new reference or just setting it again
-            // Fetch latest user profile from Firestore
             try {
                 const profile = await userService.getUserProfile(auth.currentUser.uid);
                 if (profile) {
-                    // Ensure photoURL from Auth is available in user profile if not explicitly saved
                     if (!profile.photoURL && auth.currentUser.photoURL) {
                         profile.photoURL = auth.currentUser.photoURL;
                     }
@@ -210,4 +189,3 @@ export function AuthProvider({ children }: AuthProviderProps) {
 }
 
 export default AuthContext;
-

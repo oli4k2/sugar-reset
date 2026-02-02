@@ -42,7 +42,6 @@ import {
 import {
     LoginScreen,
     SignUpScreen,
-    ForgotPasswordScreen,
     VerificationPendingScreen,
 } from '../screens/auth';
 
@@ -364,7 +363,6 @@ export default function RootNavigator() {
                         >
                             <AuthStack.Screen name="Login" component={LoginScreen} />
                             <AuthStack.Screen name="SignUp" component={SignUpScreen} />
-                            <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                         </AuthStack.Navigator>
                     )}
                 </RootStack.Screen>

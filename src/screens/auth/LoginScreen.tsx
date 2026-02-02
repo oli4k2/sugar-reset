@@ -1,7 +1,7 @@
 /**
  * LoginScreen
  * 
- * User login with sky theme.
+ * User login with Google/Apple sign-in only.
  */
 
 import React, { useState } from 'react';
@@ -10,7 +10,6 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    TextInput,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -25,7 +24,6 @@ import * as Crypto from 'expo-crypto';
 
 import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
-import { GlassCard } from '../../components/GlassCard';
 import { useAuth } from '../../hooks/useAuth';
 
 type LoginScreenProps = {
@@ -33,44 +31,11 @@ type LoginScreenProps = {
 };
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
-    const { signIn, signInWithGoogle, signInWithApple } = useAuth();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
+    const { signInWithGoogle, signInWithApple } = useAuth();
+
     const [googleLoading, setGoogleLoading] = useState(false);
     const [appleLoading, setAppleLoading] = useState(false);
     const [error, setError] = useState('');
-
-    const handleLogin = async () => {
-        setLoading(true);
-        setError('');
-
-        try {
-            const success = await signIn(email.trim(), password);
-            if (success) {
-                // Navigate to Main app after successful login
-                console.log('Login successful - navigating to Main');
-                navigation.getParent()?.reset({
-                    index: 0,
-                    routes: [{ name: 'Main' }],
-                });
-            } else {
-                setError('Invalid email or password');
-                setLoading(false);
-            }
-        } catch (err: any) {
-            console.error('Login error:', err);
-            const errorMessage = err?.message || 'Failed to sign in';
-            if (errorMessage.includes('invalid-credential') || errorMessage.includes('user-not-found')) {
-                setError('Invalid email or password');
-            } else if (errorMessage.includes('too-many-requests')) {
-                setError('Too many attempts. Try again later.');
-            } else {
-                setError('Login failed. Please try again.');
-            }
-            setLoading(false);
-        }
-    };
 
     const handleGoogleSignIn = async () => {
         setGoogleLoading(true);
@@ -84,10 +49,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             if (idToken) {
                 const success = await signInWithGoogle(idToken);
                 if (success) {
-                    navigation.getParent()?.reset({
-                        index: 0,
-                        routes: [{ name: 'Main' }],
-                    });
+                    // Navigation handled by RootNavigator
+                    console.log('Google sign-in successful');
                 } else {
                     setError('Google sign-in failed');
                 }
@@ -96,7 +59,9 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             }
         } catch (err: any) {
             console.error('Google sign-in error:', err);
-            setError('Google sign-in failed. Please try again.');
+            if (err.code !== 'SIGN_IN_CANCELLED' && err.code !== '12501') {
+                setError('Google sign-in failed. Please try again.');
+            }
         } finally {
             setGoogleLoading(false);
         }
@@ -124,10 +89,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             if (credential.identityToken) {
                 const success = await signInWithApple(credential.identityToken, nonce);
                 if (success) {
-                    navigation.getParent()?.reset({
-                        index: 0,
-                        routes: [{ name: 'Main' }],
-                    });
+                    // Navigation handled by RootNavigator
+                    console.log('Apple sign-in successful');
                 } else {
                     setError('Apple sign-in failed');
                 }
@@ -146,16 +109,12 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         }
     };
 
-    const handleForgotPassword = () => {
-        navigation.navigate('ForgotPassword');
-    };
-
     const handleSignUp = () => {
         navigation.navigate('SignUp');
     };
 
-    const isValid = email.includes('@') && password.length >= 6;
     const isAppleSignInAvailable = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 13;
+    const isLoading = googleLoading || appleLoading;
 
     return (
         <LooviBackground variant="coralTop">
@@ -168,108 +127,59 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                         style={styles.scrollView}
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
                     >
                         {/* Header */}
                         <View style={styles.header}>
                             <Text style={styles.emoji}>👋</Text>
                             <Text style={styles.title}>Welcome back</Text>
-                            <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+                            <Text style={styles.subtitle}>
+                                Sign in to continue your journey
+                            </Text>
                         </View>
 
-                        {/* Social Sign-In */}
-                        {Platform.OS === 'ios' && isAppleSignInAvailable && (
+                        {/* Sign-In Options */}
+                        <View style={styles.buttonsContainer}>
+                            {Platform.OS === 'ios' && isAppleSignInAvailable && (
+                                <TouchableOpacity
+                                    style={[styles.socialButton, styles.appleButton]}
+                                    onPress={handleAppleSignIn}
+                                    disabled={isLoading}
+                                    activeOpacity={0.8}
+                                >
+                                    {appleLoading ? (
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
+                                            <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            )}
+
                             <TouchableOpacity
-                                style={[styles.socialButton, styles.appleButton]}
-                                onPress={handleAppleSignIn}
-                                disabled={appleLoading || loading || googleLoading}
+                                style={[styles.socialButton, styles.googleButton]}
+                                onPress={handleGoogleSignIn}
+                                disabled={isLoading}
                                 activeOpacity={0.8}
                             >
-                                {appleLoading ? (
-                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                {googleLoading ? (
+                                    <ActivityIndicator size="small" color={looviColors.text.primary} />
                                 ) : (
                                     <>
-                                        <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-                                        <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                                        <Ionicons name="logo-google" size={22} color="#EA4335" />
+                                        <Text style={[styles.socialButtonText, styles.googleButtonText]}>
+                                            Continue with Google
+                                        </Text>
                                     </>
                                 )}
                             </TouchableOpacity>
-                        )}
-
-                        <TouchableOpacity
-                            style={[styles.socialButton, styles.googleButton]}
-                            onPress={handleGoogleSignIn}
-                            disabled={googleLoading || loading || appleLoading}
-                            activeOpacity={0.8}
-                        >
-                            {googleLoading ? (
-                                <ActivityIndicator size="small" color={looviColors.text.primary} />
-                            ) : (
-                                <>
-                                    <Ionicons name="logo-google" size={20} color="#EA4335" />
-                                    <Text style={[styles.socialButtonText, styles.googleButtonText]}>
-                                        Continue with Google
-                                    </Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Divider */}
-                        <View style={styles.dividerContainer}>
-                            <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>or</Text>
-                            <View style={styles.dividerLine} />
                         </View>
 
-                        {/* Form */}
-                        <GlassCard variant="light" padding="lg" style={styles.formCard}>
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Email</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    placeholder="your@email.com"
-                                    placeholderTextColor={looviColors.text.muted}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                            </View>
-
-                            <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Password</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    placeholder="••••••••"
-                                    placeholderTextColor={looviColors.text.muted}
-                                    secureTextEntry
-                                    autoCapitalize="none"
-                                />
-                            </View>
-
-                            <TouchableOpacity onPress={handleForgotPassword}>
-                                <Text style={styles.forgotText}>Forgot password?</Text>
-                            </TouchableOpacity>
-
-                            {error ? (
-                                <Text style={styles.errorText}>{error}</Text>
-                            ) : null}
-                        </GlassCard>
-
-                        {/* Login Button */}
-                        <TouchableOpacity
-                            style={[styles.loginButton, !isValid && styles.loginButtonDisabled]}
-                            onPress={handleLogin}
-                            disabled={!isValid || loading}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.loginButtonText}>
-                                {loading ? 'Signing in...' : 'Sign In'}
-                            </Text>
-                        </TouchableOpacity>
+                        {/* Error Message */}
+                        {error ? (
+                            <Text style={styles.errorText}>{error}</Text>
+                        ) : null}
 
                         {/* Sign Up Link */}
                         <View style={styles.signUpRow}>
@@ -297,75 +207,66 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing['2xl'],
+        paddingTop: spacing['3xl'],
         paddingBottom: spacing['2xl'],
+        flex: 1,
+        justifyContent: 'center',
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing['2xl'],
+        marginBottom: spacing['3xl'],
     },
     emoji: {
-        fontSize: 48,
-        marginBottom: spacing.md,
+        fontSize: 64,
+        marginBottom: spacing.lg,
     },
     title: {
         fontSize: 28,
         fontWeight: '700',
         color: looviColors.text.primary,
         marginBottom: spacing.sm,
+        textAlign: 'center',
     },
     subtitle: {
-        fontSize: 15,
-        fontWeight: '400',
-        color: looviColors.text.secondary,
-    },
-    formCard: {
-        marginBottom: spacing.xl,
-    },
-    inputGroup: {
-        marginBottom: spacing.lg,
-    },
-    inputLabel: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: looviColors.text.secondary,
-        marginBottom: spacing.sm,
-    },
-    input: {
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-        borderRadius: borderRadius.lg,
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
         fontSize: 16,
         fontWeight: '400',
-        color: looviColors.text.primary,
+        color: looviColors.text.secondary,
+        textAlign: 'center',
     },
-    forgotText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: looviColors.accent.primary,
-        textAlign: 'right',
-    },
-    loginButton: {
-        backgroundColor: looviColors.accent.primary,
-        paddingVertical: 18,
-        borderRadius: 30,
-        alignItems: 'center',
+    buttonsContainer: {
+        gap: spacing.md,
         marginBottom: spacing.xl,
-        shadowColor: looviColors.accent.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 5,
     },
-    loginButtonDisabled: {
-        backgroundColor: 'rgba(0, 0, 0, 0.1)',
-        shadowOpacity: 0,
+    socialButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.md,
+        paddingVertical: 16,
+        borderRadius: borderRadius.xl,
     },
-    loginButtonText: {
+    appleButton: {
+        backgroundColor: '#000000',
+    },
+    googleButton: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+    },
+    socialButtonText: {
         fontSize: 17,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    googleButtonText: {
+        color: looviColors.text.primary,
+    },
+    errorText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: looviColors.accent.error,
+        textAlign: 'center',
+        marginBottom: spacing.lg,
     },
     signUpRow: {
         flexDirection: 'row',
@@ -380,53 +281,5 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: looviColors.accent.primary,
-    },
-    errorText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: looviColors.accent.error,
-        textAlign: 'center',
-        marginTop: spacing.md,
-    },
-    socialButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.sm,
-        paddingVertical: 14,
-        borderRadius: borderRadius.lg,
-        marginBottom: spacing.md,
-    },
-    appleButton: {
-        backgroundColor: '#000000',
-    },
-    googleButton: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 0, 0, 0.1)',
-    },
-    socialButtonText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#FFFFFF',
-    },
-    googleButtonText: {
-        color: looviColors.text.primary,
-    },
-    dividerContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: spacing.xl,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    },
-    dividerText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: looviColors.text.tertiary,
-        marginHorizontal: spacing.md,
     },
 });

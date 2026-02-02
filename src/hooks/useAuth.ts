@@ -1,7 +1,8 @@
 /**
  * useAuth Hook
  * 
- * Authentication methods for sign in, sign up, and sign out.
+ * Authentication methods for sign in with Google/Apple.
+ * No password authentication - social sign-in only.
  */
 
 import { useState, useCallback } from 'react';
@@ -23,12 +24,9 @@ interface AuthError {
 interface UseAuthReturn {
     isLoading: boolean;
     error: AuthError | null;
-    signInWithPhoneNumber: (phoneNumber: string) => Promise<string>; // Returns verification ID
-    verifyOTP: (verificationId: string, code: string) => Promise<boolean>;
     signOut: () => Promise<void>;
     signInWithGoogle: (idToken: string) => Promise<boolean>;
     signInWithApple: (identityToken: string, nonce: string) => Promise<boolean>;
-    sendVerificationEmail: () => Promise<boolean>;
     reloadUser: () => Promise<void>;
     clearError: () => void;
 }
@@ -38,16 +36,16 @@ interface UseAuthReturn {
  */
 const getErrorMessage = (code: string): string => {
     switch (code) {
+        case 'auth/account-exists-with-different-credential':
+            return 'An account already exists with this email using a different sign-in method.';
+        case 'auth/invalid-credential':
+            return 'Invalid credentials. Please try again.';
+        case 'auth/operation-not-allowed':
+            return 'This sign-in method is not enabled.';
+        case 'auth/user-disabled':
+            return 'This account has been disabled.';
         case 'auth/user-not-found':
-            return 'No account found with this email.';
-        case 'auth/wrong-password':
-            return 'Incorrect password. Please try again.';
-        case 'auth/email-already-in-use':
-            return 'An account already exists with this email.';
-        case 'auth/weak-password':
-            return 'Password should be at least 6 characters.';
-        case 'auth/invalid-email':
-            return 'Please enter a valid email address.';
+            return 'No account found.';
         case 'auth/too-many-requests':
             return 'Too many attempts. Please try again later.';
         case 'auth/network-request-failed':
@@ -63,69 +61,6 @@ export function useAuth(): UseAuthReturn {
 
     const clearError = useCallback(() => {
         setError(null);
-    }, []);
-
-    /**
-     * Sign in with phone number (sends OTP)
-     * Returns verification ID to be used with verifyOTP
-     * 
-     * NOTE: This requires Firebase Phone Auth to be enabled in Firebase Console
-     * and may require additional setup for React Native/Expo
-     */
-    const signInWithPhoneNumber = useCallback(async (phoneNumber: string): Promise<string> => {
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            // Format phone number (ensure it starts with +)
-            const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
-            
-            // For React Native/Expo, we need to use a different approach
-            // Firebase Phone Auth in React Native requires react-native-firebase or expo-firebase
-            // For now, we'll use a placeholder that needs to be implemented with the correct library
-            
-            // TODO: Implement with react-native-firebase or expo-firebase
-            // Example:
-            // const confirmation = await auth().signInWithPhoneNumber(formattedPhone);
-            // return confirmation.verificationId;
-            
-            throw new Error('Phone authentication not yet implemented. Please use Google or Apple sign-in.');
-        } catch (err: any) {
-            setIsLoading(false);
-            setError({
-                code: err.code || 'phone-auth-not-implemented',
-                message: err.message || getErrorMessage(err.code),
-            });
-            throw err;
-        }
-    }, []);
-
-    /**
-     * Verify OTP code
-     */
-    const verifyOTP = useCallback(async (
-        verificationId: string,
-        code: string,
-        displayName?: string
-    ): Promise<boolean> => {
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            // TODO: Implement with react-native-firebase or expo-firebase
-            // Example:
-            // const credential = auth.PhoneAuthProvider.credential(verificationId, code);
-            // const { user } = await auth().signInWithCredential(credential);
-            
-            throw new Error('OTP verification not yet implemented.');
-        } catch (err: any) {
-            setIsLoading(false);
-            setError({
-                code: err.code || 'otp-verification-not-implemented',
-                message: err.message || getErrorMessage(err.code),
-            });
-            return false;
-        }
     }, []);
 
     /**
@@ -243,61 +178,13 @@ export function useAuth(): UseAuthReturn {
         }
     }, []);
 
-    /**
-     * Send verification email via website API
-     */
-    const sendVerificationEmail = useCallback(async (): Promise<boolean> => {
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            const user = auth.currentUser;
-            if (!user) throw new Error('No user logged in');
-
-            console.log('Fetching ID token for user:', user.uid);
-            const idToken = await user.getIdToken(true);
-            console.log('ID Token fetched, length:', idToken?.length);
-
-            // Call website API
-            const response = await fetch('https://www.craveless.info/api/auth/send-verification', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                const errorMessage = typeof data.error === 'object'
-                    ? JSON.stringify(data.error)
-                    : data.error || 'Failed to send email';
-                throw new Error(errorMessage);
-            }
-
-            return true;
-        } catch (err: any) {
-            console.error('Send verification error:', err);
-            setError({
-                code: 'verification-failed',
-                message: err.message || 'Failed to send verification email',
-            });
-            return false;
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
     return {
         isLoading,
         error,
-        signInWithPhoneNumber,
-        verifyOTP,
         signOut,
         signInWithGoogle,
         signInWithApple,
         clearError,
-        sendVerificationEmail,
         reloadUser,
     };
 }
