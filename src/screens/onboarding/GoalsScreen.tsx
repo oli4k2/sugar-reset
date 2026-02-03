@@ -105,8 +105,11 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
     };
 
     const handleContinue = async () => {
-        // Save goals
-        await updateOnboardingData({ goals: selectedGoals });
+        // Save goals and set default plan to cold_turkey
+        await updateOnboardingData({
+            goals: selectedGoals,
+            plan: 'cold_turkey', // All users default to cold turkey
+        });
 
         // Save savings goal if selected
         if (wantToSave && selectedSavingsGoal) {
@@ -117,7 +120,7 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
             });
         }
 
-        navigation.navigate('PlanSelection');
+        navigation.navigate('Promise');
     };
 
     // Can proceed if goals selected AND (not interested in savings OR savings goal selected)

@@ -155,7 +155,7 @@ export default function ProfileScreen() {
     const name = onboardingData.nickname || user?.displayName || firebaseUser?.displayName || 'Guest';
     const email = firebaseUser?.email || user?.email || 'Not signed in';
     const daysSugarFree = streakData?.currentStreak || 0;
-    const currentPlan = onboardingData.plan === 'cold_turkey' ? 'Cold Turkey' : 'Gradual Reduction';
+    const currentPlan = 'Cold Turkey'; // All users are on Cold Turkey
     const subscriptionType = isPremium ? 'Premium' : 'Free';
 
     // Health score display
@@ -163,28 +163,6 @@ export default function ProfileScreen() {
 
     const handleViewPlanDetails = () => {
         setShowPlanDetails(true);
-    };
-
-    const handleChangePlan = () => {
-        const newPlan = onboardingData.plan === 'cold_turkey' ? 'gradual' : 'cold_turkey';
-        const newPlanName = newPlan === 'cold_turkey' ? 'Cold Turkey' : 'Gradual Reduction';
-
-        Alert.alert(
-            'Change Plan',
-            `Switch to ${newPlanName}?\n\n${newPlan === 'cold_turkey'
-                ? '0g sugar from day 1 for 90 days. Maximum discipline.'
-                : '50g → 45g → ... → 20g → 0g at week 8, then maintain.'}`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Switch',
-                    onPress: async () => {
-                        await updateOnboardingData({ plan: newPlan });
-                        Alert.alert('Plan Updated', `You're now on the ${newPlanName} plan.`);
-                    }
-                },
-            ]
-        );
     };
 
     const handleRestorePurchases = async () => {
@@ -686,18 +664,6 @@ export default function ProfileScreen() {
                             <TouchableOpacity activeOpacity={1} style={styles.editModalContent}>
                                 <Text style={styles.editModalTitle}>Edit Profile</Text>
 
-                                {/* Auth Provider Badge */}
-                                {authProvider !== 'unknown' && (
-                                    <View style={styles.authProviderBadge}>
-                                        <Text style={styles.authProviderIcon}>
-                                            {authProvider === 'google' ? '🔵' : authProvider === 'apple' ? '🍎' : '✉️'}
-                                        </Text>
-                                        <Text style={styles.authProviderText}>
-                                            Signed in with {authProvider === 'google' ? 'Google' : authProvider === 'apple' ? 'Apple' : 'Email'}
-                                        </Text>
-                                    </View>
-                                )}
-
                                 {/* Avatar Selection */}
                                 <Text style={styles.inputLabel}>Profile Picture</Text>
                                 <View style={styles.avatarPickerSection}>
@@ -796,9 +762,8 @@ export default function ProfileScreen() {
                     {/* Plan Details Modal */}
                     <PlanDetailsModal
                         visible={showPlanDetails}
-                        planType={onboardingData.plan || 'cold_turkey'}
+                        planType="cold_turkey"
                         onClose={() => setShowPlanDetails(false)}
-                        onSwitchPlan={handleChangePlan}
                     />
 
                     {/* Notification Settings Modal */}
@@ -1075,25 +1040,6 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
         marginTop: -spacing.sm,
         marginLeft: spacing.xs,
-    },
-    authProviderBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(59, 130, 246, 0.08)',
-        borderRadius: borderRadius.lg,
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-        marginBottom: spacing.lg,
-        gap: spacing.xs,
-    },
-    authProviderIcon: {
-        fontSize: 14,
-    },
-    authProviderText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: looviColors.text.secondary,
     },
     readOnlyField: {
         backgroundColor: 'rgba(0, 0, 0, 0.02)',

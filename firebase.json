@@ -3,6 +3,20 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/auth/email-signin",
+        "destination": "/auth/email-signin.html"
+      }
+    ]
+  },
   "functions": [
     {
       "source": "functions",

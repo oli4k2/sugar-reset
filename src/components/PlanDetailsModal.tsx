@@ -19,7 +19,6 @@ interface PlanDetailsModalProps {
     visible: boolean;
     planType: PlanType;
     onClose: () => void;
-    onSwitchPlan?: () => void;
 }
 
 interface HabitPrinciple {
@@ -137,7 +136,7 @@ const HELPFUL_RESOURCES = [
     },
 ];
 
-export default function PlanDetailsModal({ visible, planType, onClose, onSwitchPlan }: PlanDetailsModalProps) {
+export default function PlanDetailsModal({ visible, planType, onClose }: PlanDetailsModalProps) {
     const planTitle = planType === 'cold_turkey' ? 'Cold Turkey Plan' : 'Gradual Reduction Plan';
     const planEmoji = planType === 'cold_turkey' ? '🚀' : '🌱';
 
@@ -241,54 +240,27 @@ export default function PlanDetailsModal({ visible, planType, onClose, onSwitchP
                             ))}
                         </View>
 
-                        {/* Plan-Specific Tips */}
-                        {planType === 'cold_turkey' ? (
-                            <GlassCard variant="light" padding="lg" style={styles.tipCard}>
-                                <Text style={styles.tipEmoji}>💪</Text>
-                                <Text style={styles.tipTitle}>Cold Turkey Success Tips</Text>
-                                <Text style={styles.tipText}>
-                                    Days 3-5 are typically the hardest. Your brain is adjusting to lower dopamine.
-                                    This is temporary! By day 7, cravings drop significantly. By day 14, you'll feel clearer
-                                    and more energized than you have in years.
-                                </Text>
-                            </GlassCard>
-                        ) : (
-                            <GlassCard variant="light" padding="lg" style={styles.tipCard}>
-                                <Text style={styles.tipEmoji}>🌱</Text>
-                                <Text style={styles.tipTitle}>Gradual Plan Success Tips</Text>
-                                <Text style={styles.tipText}>
-                                    You'll start at 50g and reduce by 5g each week. At week 7 (20g), you'll make the
-                                    jump to 0g at week 8! Then maintain zero for 5 more weeks to lock in the habit
-                                    permanently. The maintenance phase is crucial - by week 11, you'll have passed
-                                    the 66-day habit formation threshold.
-                                </Text>
-                            </GlassCard>
-                        )}
+                        {/* Cold Turkey Success Tips */}
+                        <GlassCard variant="light" padding="lg" style={styles.tipCard}>
+                            <Text style={styles.tipEmoji}>💪</Text>
+                            <Text style={styles.tipTitle}>Cold Turkey Success Tips</Text>
+                            <Text style={styles.tipText}>
+                                Days 3-5 are typically the hardest. Your brain is adjusting to lower dopamine.
+                                This is temporary! By day 7, cravings drop significantly. By day 14, you'll feel clearer
+                                and more energized than you have in years.
+                            </Text>
+                        </GlassCard>
                     </ScrollView>
 
-                    {/* Footer Actions - Updated with Switch Plan */}
+                    {/* Footer Actions */}
                     <View style={styles.bottomContainer}>
-                        <View style={styles.footerButtons}>
-                            {onSwitchPlan && (
-                                <TouchableOpacity
-                                    style={styles.switchButton}
-                                    onPress={() => {
-                                        onClose();
-                                        setTimeout(onSwitchPlan, 300);
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.switchButtonText}>Switch Plan</Text>
-                                </TouchableOpacity>
-                            )}
-                            <TouchableOpacity
-                                style={styles.closeButton}
-                                onPress={onClose}
-                                activeOpacity={0.8}
-                            >
-                                <Text style={styles.closeButtonText}>Got it!</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={onClose}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.closeButtonText}>Got it!</Text>
+                        </TouchableOpacity>
                     </View>
                 </SafeAreaView>
             </View>

@@ -404,16 +404,14 @@ export default function HomeScreen() {
 
     const hasCheckedInToday = !!todayCheckIn || !!checkInHistory[new Date().toISOString().split('T')[0]];
 
-    // Get plan guidance
-    const planType = (onboardingData.plan || 'cold_turkey') as PlanType;
+    // Get plan guidance - always Cold Turkey
+    const planType = 'cold_turkey' as PlanType;
     const guidance = getTodayGuidance(planType, startDate);
 
-    // Get daily limit for gradual plan  
-    const currentWeek = getCurrentWeek(startDate); // Only takes startDate
+    // For cold turkey, daily limit is always 0
+    const currentWeek = getCurrentWeek(startDate);
     const planDetails = getPlanDetails(planType);
-    const dailyLimit = planType === 'gradual' && currentWeek <= planDetails.weeklyLimits.length
-        ? planDetails.weeklyLimits[currentWeek - 1].dailyGrams
-        : 0;
+    const dailyLimit = 0; // Cold turkey: no sugar allowed
 
     // Handle check-in for a specific date from calendar
     const handleDayPress = (date: Date) => {
@@ -865,7 +863,7 @@ export default function HomeScreen() {
                             setCheckInResult(null);
                         }}
                         onCheckIn={handleCheckInSubmit}
-                        planType={(onboardingData.plan as 'cold_turkey' | 'gradual') || 'cold_turkey'}
+                        planType="cold_turkey"
                         startDate={startDate}
                     />
 

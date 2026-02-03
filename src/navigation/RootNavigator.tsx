@@ -20,6 +20,7 @@ import { colors } from '../theme';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
 import { useRevenueCat } from '../hooks/useRevenueCat';
+import { useEmailLinkHandler } from '../hooks/useEmailLinkHandler';
 
 // Onboarding Screens
 import {
@@ -32,7 +33,6 @@ import {
     SugarResetGraphScreen,
     FeatureShowcaseScreen,
     GoalsScreen,
-    PlanSelectionScreen,
     PromiseScreen,
     PaywallScreen,
     SymptomsScreen,
@@ -208,7 +208,10 @@ export default function RootNavigator() {
     const { isLoading: authLoading, isAuthenticated, isUnverified } = useAuthContext();
     const { hasCompletedOnboarding, isLoading: userDataLoading } = useUserData();
     const { isPremium, isLoading: revenueCatLoading } = useRevenueCat();
-    
+
+    // Handle email magic link deep links
+    const { isProcessing: isProcessingEmailLink } = useEmailLinkHandler();
+
     // IMPORTANT: All hooks must be called before any conditional returns
     const navigationRef = useRef<NavigationContainerRef<any>>(null);
     const lastNavigationState = useRef<{ hasCompletedOnboarding: boolean; isAuthenticated: boolean; isPremium: boolean } | null>(null);
@@ -217,7 +220,7 @@ export default function RootNavigator() {
 
     // Determine initial route based on auth, onboarding completion, and premium status
     let initialRouteName: 'Main' | 'Onboarding' | 'Auth' = 'Onboarding';
-    
+
     if (!isLoading) {
         // Debug: Log all navigation state
         console.log('🧭 Navigation State:', {
@@ -228,7 +231,7 @@ export default function RootNavigator() {
             userDataLoading,
             revenueCatLoading,
         });
-        
+
         if (hasCompletedOnboarding && !isAuthenticated) {
             // Onboarding complete but user needs to authenticate
             initialRouteName = 'Auth';
@@ -255,9 +258,9 @@ export default function RootNavigator() {
         // Don't navigate while loading or if unverified
         if (isLoading || isUnverified) return;
         if (!navigationRef.current) return;
-        
+
         const currentState = { hasCompletedOnboarding, isAuthenticated, isPremium };
-        
+
         // Skip if state hasn't changed
         if (lastNavigationState.current &&
             lastNavigationState.current.hasCompletedOnboarding === currentState.hasCompletedOnboarding &&
@@ -265,9 +268,9 @@ export default function RootNavigator() {
             lastNavigationState.current.isPremium === currentState.isPremium) {
             return;
         }
-        
+
         lastNavigationState.current = currentState;
-        
+
         const currentRoute = navigationRef.current.getCurrentRoute();
         const currentRouteName = currentRoute?.name;
 
@@ -345,7 +348,6 @@ export default function RootNavigator() {
 
                             {/* Phase 3: Commitment */}
                             <OnboardingStack.Screen name="Goals" component={GoalsScreen} />
-                            <OnboardingStack.Screen name="PlanSelection" component={PlanSelectionScreen} />
                             <OnboardingStack.Screen name="Promise" component={PromiseScreen} />
                             <OnboardingStack.Screen name="Paywall" component={PaywallScreen} />
                         </OnboardingStack.Navigator>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signing in to Craveless...</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+            width: 100%;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            text-align: left;
+        }
+        .instructions ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+        .instructions li {
+            margin: 0.5rem 0;
+        }
+        code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+            word-break: break-all;
+            font-size: 0.9em;
+            display: block;
+            margin: 0.5rem 0;
+        }
+        .button {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 12px 24px;
+            border-radius: 24px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 1rem;
+            transition: transform 0.2s;
+        }
+        .button:hover {
+            transform: scale(1.05);
+        }
+        .qr-code {
+            margin: 1.5rem 0;
+        }
+        .qr-container {
+            width: 200px;
+            height: 200px;
+            background: white;
+            border-radius: 8px;
+            margin: 0 auto;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .qr-container canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner" id="spinner"></div>
+        <h1 id="title">Signing you in...</h1>
+        <p id="message">Redirecting to the app...</p>
+        <div id="desktop-instructions" style="display: none;">
+            <div class="instructions">
+                <h2>📱 Open on Your Phone</h2>
+                <p>To complete sign-in, you need to open this link on your mobile device:</p>
+                <ol>
+                    <li><strong>Copy this link:</strong>
+                        <code id="link-to-copy"></code>
+                    </li>
+                    <li><strong>Send it to your phone</strong> (via text, email, or QR code below)</li>
+                    <li><strong>Open the link on your phone</strong> - it will automatically open the Craveless app</li>
+                </ol>
+                <div class="qr-code">
+                    <p style="margin-bottom: 0.5rem;">Or scan this QR code with your phone:</p>
+                    <div class="qr-container">
+                        <canvas id="qr-code"></canvas>
+                    </div>
+                </div>
+                <p style="text-align: center; margin-top: 1.5rem;">
+                    <button class="button" onclick="copyLink()">Copy Link</button>
+                </p>
+                <p style="font-size: 0.9em; margin-top: 1rem; opacity: 0.9;">
+                    Or manually copy the link above and open it on your phone.
+                </p>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+        // Extract the full URL including ALL query parameters
+        const currentUrl = window.location.href;
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // For the app deep link, we need to pass the FULL Firebase URL (not just parameters)
+        // This is because Firebase's isSignInWithEmailLink() needs the complete URL
+        const fullFirebaseUrl = currentUrl;
+        
+        // Build the app deep link URL - pass the full Firebase URL as a parameter
+        // The app will extract it and use it for sign-in
+        const appUrl = `craveless://auth/email-signin?url=${encodeURIComponent(fullFirebaseUrl)}`;
+        
+        // Detect if user is on mobile or desktop
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        function copyLink() {
+            navigator.clipboard.writeText(currentUrl).then(() => {
+                alert('Link copied! Now paste it on your phone.');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = currentUrl;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('Link copied! Now paste it on your phone.');
+            });
+        }
+        
+        if (isMobile) {
+            // On mobile: Try to open the app
+            console.log('Mobile device detected, redirecting to app:', appUrl);
+            window.location.href = appUrl;
+            
+            // Fallback: If app doesn't open after 2 seconds, show instructions
+            setTimeout(() => {
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('title').textContent = 'Open in App';
+                document.getElementById('message').textContent = 'If the app didn\'t open automatically:';
+                document.getElementById('desktop-instructions').style.display = 'block';
+                document.getElementById('link-to-copy').textContent = currentUrl;
+            }, 2000);
+        } else {
+            // On desktop: Show instructions immediately
+            console.log('Desktop device detected, showing instructions');
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('title').textContent = 'Open on Your Phone';
+            document.getElementById('message').textContent = 'This sign-in link needs to be opened on your mobile device.';
+            document.getElementById('desktop-instructions').style.display = 'block';
+            document.getElementById('link-to-copy').textContent = currentUrl;
+            
+            // Generate QR code
+            QRCode.toCanvas(document.getElementById('qr-code'), currentUrl, {
+                width: 180,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, function (error) {
+                if (error) {
+                    console.error('QR code generation error:', error);
+                    document.getElementById('qr-code').parentElement.innerHTML = 
+                        '<p style="color: rgba(255,255,255,0.7);">QR code unavailable. Please copy the link above.</p>';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+

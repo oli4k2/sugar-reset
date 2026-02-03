@@ -120,13 +120,10 @@ export function CheckInModal({
     };
 
     const renderChoice = () => {
-        const title = isColdTurkey ? 'How was today?' : `Today's Limit: ${dailyLimit}g`;
-        const subtitle = isColdTurkey ? 'Be honest with yourself' : weekTitle;
-
         return (
             <View style={styles.choiceContainer}>
-                <Text style={styles.title}>{title}</Text>
-                <Text style={styles.subtitle}>{subtitle}</Text>
+                <Text style={styles.title}>How was today?</Text>
+                <Text style={styles.subtitle}>Be honest with yourself</Text>
 
                 <View style={styles.choiceButtons}>
                     <TouchableOpacity
@@ -138,12 +135,8 @@ export function CheckInModal({
                         onPress={() => handleChoice(true)}
                     >
                         <Text style={styles.choiceEmoji}>✅</Text>
-                        <Text style={styles.choiceLabel}>
-                            {isColdTurkey ? 'Sugar-Free' : 'Within Limit'}
-                        </Text>
-                        <Text style={styles.choiceSubtext}>
-                            {isColdTurkey ? 'No added sugar today' : `Under ${dailyLimit}g`}
-                        </Text>
+                        <Text style={styles.choiceLabel}>Sugar-Free</Text>
+                        <Text style={styles.choiceSubtext}>No added sugar today</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -154,47 +147,11 @@ export function CheckInModal({
                         ]}
                         onPress={() => handleChoice(false)}
                     >
-                        <Text style={styles.choiceEmoji}>{isColdTurkey ? '🍬' : '⚠️'}</Text>
-                        <Text style={styles.choiceLabel}>
-                            {isColdTurkey ? 'Had Sugar' : 'Exceeded Limit'}
-                        </Text>
-                        <Text style={styles.choiceSubtext}>
-                            {isColdTurkey ? 'Reset tomorrow' : `Over ${dailyLimit}g`}
-                        </Text>
+                        <Text style={styles.choiceEmoji}>🍬</Text>
+                        <Text style={styles.choiceLabel}>Had Sugar</Text>
+                        <Text style={styles.choiceSubtext}>Reset tomorrow</Text>
                     </TouchableOpacity>
                 </View>
-
-                {/* Gram input for gradual plan */}
-                {!isColdTurkey && (
-                    <View style={styles.gramInputContainer}>
-                        <Text style={styles.gramInputLabel}>How much sugar did you have? (optional)</Text>
-                        <View style={styles.gramInputRow}>
-                            <TextInput
-                                style={styles.gramInput}
-                                placeholder="0"
-                                placeholderTextColor="#AAAAAA"
-                                value={sugarGrams}
-                                onChangeText={handleGramsChange}
-                                keyboardType="number-pad"
-                                maxLength={3}
-                                returnKeyType="done"
-                                onSubmitEditing={() => Keyboard.dismiss()}
-                            />
-                            <Text style={styles.gramInputUnit}>grams</Text>
-                        </View>
-                    </View>
-                )}
-
-                {/* Submit button for gradual plan (after selection) */}
-                {!isColdTurkey && sugarFree !== null && (
-                    <Button
-                        title="Complete Check-In"
-                        onPress={handleSubmit}
-                        loading={isLoading}
-                        fullWidth
-                        style={styles.submitButton}
-                    />
-                )}
             </View>
         );
     };
