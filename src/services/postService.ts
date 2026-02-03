@@ -28,6 +28,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Post } from '../types';
+import { profanityFilter } from './profanityFilter';
 
 // Remove local Post interface definition
 /* export interface Post ... (removed) */
@@ -84,6 +85,14 @@ export const postService = {
             avatarValue?: string | null;
         }
     ): Promise<string> {
+        // Check for profanity in title and content
+        if (profanityFilter.containsProfanity(title)) {
+            throw new Error('Your title contains inappropriate language. Please revise and try again.');
+        }
+        if (profanityFilter.containsProfanity(content)) {
+            throw new Error('Your post contains inappropriate language. Please revise and try again.');
+        }
+
         const postsRef = collection(db, 'posts');
 
         const newPost = {
@@ -252,6 +261,11 @@ export const postService = {
             avatarValue?: string | null;
         }
     ): Promise<string> {
+        // Check for profanity in comment
+        if (profanityFilter.containsProfanity(content)) {
+            throw new Error('Your comment contains inappropriate language. Please revise and try again.');
+        }
+
         const commentsRef = collection(db, 'posts', postId, 'comments');
 
         const newComment = {

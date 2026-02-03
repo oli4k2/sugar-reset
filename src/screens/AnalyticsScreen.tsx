@@ -40,6 +40,7 @@ import {
     WellnessMetrics,
     getNutritionInsights,
 } from '../services/healthScoringService';
+import { InsightDetailModal, InsightType } from '../components/InsightDetailModal';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -122,14 +123,13 @@ const getScoreLabel = (score: number): string => {
     return 'Needs Work';
 };
 
-// Generate personalized insights based on data
-// Generate personalized insights based on data
+// Generate personalized insights based on data - expanded with many more categories
 const generateInsights = (
     wellnessLogs: WellnessLogData[],
     scannedItems: ScannedItem[],
     nutritionInsights: ReturnType<typeof getNutritionInsights> | null
-): { icon: string; iconColor: string; title: string; message: string; action?: string; priority: number }[] => {
-    const insights: { icon: string; iconColor: string; title: string; message: string; action?: string; priority: number }[] = [];
+): { icon: string; iconColor: string; title: string; message: string; action?: string; insightType: InsightType; priority: number }[] => {
+    const insights: { icon: string; iconColor: string; title: string; message: string; action?: string; insightType: InsightType; priority: number }[] = [];
 
     // No data logged
     if (wellnessLogs.length === 0 && scannedItems.length === 0) {
@@ -139,6 +139,7 @@ const generateInsights = (
             title: 'Start Your Journey',
             message: 'Your health journey is waiting! Log your first meal or check-in to unlock personalized insights.',
             action: 'Log now',
+            insightType: 'consistency',
             priority: 1,
         }];
     }
@@ -153,8 +154,11 @@ const generateInsights = (
     const avgSleep = wellnessLogs.length > 0
         ? wellnessLogs.reduce((sum, log) => sum + log.sleepHours, 0) / wellnessLogs.length
         : 0;
+    const avgFocus = wellnessLogs.length > 0
+        ? wellnessLogs.reduce((sum, log) => sum + log.focus, 0) / wellnessLogs.length
+        : 0;
 
-    // Energy insight - Action based
+    // === ENERGY INSIGHTS ===
     if (avgEnergy > 0 && avgEnergy < 3) {
         insights.push({
             icon: 'flash',
@@ -162,94 +166,271 @@ const generateInsights = (
             title: 'Need an Energy Boost?',
             message: 'Feeling a bit drained? Boosting your protein intake can provide steady fuel. You\'ve got this!',
             action: 'Foods for energy',
+            insightType: 'energy',
             priority: 1,
+        });
+    } else if (avgEnergy >= 4) {
+        insights.push({
+            icon: 'flash',
+            iconColor: '#22C55E',
+            title: 'Energy Superstar! ⚡',
+            message: 'Your energy levels are fantastic! Whatever you\'re doing, keep it up.',
+            insightType: 'celebration',
+            priority: 5,
         });
     }
 
-    // Sleep insight - Action based
-    if (avgSleep > 0 && avgSleep < 7) {
+    // === SLEEP INSIGHTS ===
+    if (avgSleep > 0 && avgSleep < 6) {
         insights.push({
             icon: 'moon',
             iconColor: '#8B5CF6',
             title: 'Rest is Your Superpower',
-            message: 'A good night\'s sleep fights cravings better than willpower alone. Try winding down early tonight!',
+            message: 'Getting less than 6 hours? Sleep fights cravings better than willpower. Try winding down earlier!',
             action: 'Sleep tips',
-            priority: 2,
+            insightType: 'sleep',
+            priority: 1,
+        });
+    } else if (avgSleep >= 6 && avgSleep < 7) {
+        insights.push({
+            icon: 'moon',
+            iconColor: '#F5B461',
+            title: 'Almost There on Sleep',
+            message: 'You\'re close to optimal! Just 30-60 more minutes of sleep could boost your willpower significantly.',
+            action: 'Sleep tips',
+            insightType: 'sleep',
+            priority: 3,
+        });
+    } else if (avgSleep >= 7.5) {
+        insights.push({
+            icon: 'moon',
+            iconColor: '#22C55E',
+            title: 'Sleep Champion! 💤',
+            message: 'Great sleep habits! This is directly helping your sugar resistance and mood.',
+            insightType: 'celebration',
+            priority: 5,
         });
     }
 
-    // Sugar insight - Supportive
-    if (nutritionInsights && nutritionInsights.avgAddedSugar > 25) {
+    // === SUGAR INSIGHTS ===
+    if (nutritionInsights && nutritionInsights.avgAddedSugar > 40) {
         insights.push({
-            icon: 'water', // Suggest water/hydration
-            iconColor: '#3B82F6',
-            title: 'Hydrate & Reset',
-            message: 'Had some sugar? No worries! Hydrating and moving your body can help stabilize your levels quickly.',
-            action: 'Stabilize now',
+            icon: 'water',
+            iconColor: '#EF4444',
+            title: 'Time to Reset',
+            message: 'Sugar\'s been higher lately. That\'s okay! Let\'s hydrate and get back on track.',
+            action: 'Reset strategies',
+            insightType: 'hydration',
             priority: 1,
+        });
+    } else if (nutritionInsights && nutritionInsights.avgAddedSugar > 25) {
+        insights.push({
+            icon: 'water',
+            iconColor: '#3B82F6',
+            title: 'Hydrate & Stabilize',
+            message: 'Had some sugar? No worries! Hydrating and moving your body can help stabilize your levels.',
+            action: 'Stabilize now',
+            insightType: 'hydration',
+            priority: 2,
         });
     } else if (nutritionInsights && nutritionInsights.avgAddedSugar > 0 && nutritionInsights.avgAddedSugar <= 25) {
         insights.push({
             icon: 'checkmark-circle',
             iconColor: '#22C55E',
-            title: 'Crushing It!',
+            title: 'Crushing It on Sugar! 🎉',
             message: 'You\'re keeping sugar low and your body thanks you. Keep riding this wave of healthy choices!',
-            priority: 3,
+            action: 'Keep it up',
+            insightType: 'sugar_low',
+            priority: 4,
         });
     }
 
-    // Mood insight - Empathetic
+    // === MOOD INSIGHTS ===
     if (avgMood > 0 && avgMood < 3) {
         insights.push({
             icon: 'heart',
             iconColor: '#EC4899',
             title: 'Be Kind to Yourself',
-            message: 'It\'s okay to have tough days. Maybe a short walk, some music, or calling a friend could help lift your spirits?',
+            message: 'It\'s okay to have tough days. A short walk, music, or calling a friend could help lift your spirits.',
             action: 'Mood boosters',
+            insightType: 'mood',
             priority: 1,
+        });
+    } else if (avgMood >= 4) {
+        insights.push({
+            icon: 'heart',
+            iconColor: '#22C55E',
+            title: 'Great Mood Lately! 😊',
+            message: 'Your mood has been positive! Healthy eating and self-care are clearly working for you.',
+            insightType: 'celebration',
+            priority: 5,
         });
     }
 
-    // Protein insight - Educational/Action
-    if (nutritionInsights && nutritionInsights.avgProtein < 50) {
+    // === PROTEIN INSIGHTS ===
+    if (nutritionInsights && nutritionInsights.avgProtein < 40) {
         insights.push({
             icon: 'fitness',
             iconColor: '#3B82F6',
-            title: 'Fuel Your Body',
-            message: 'Adding a bit more protein to your meals can be a game changer for cravings and fullness.',
+            title: 'Fuel Your Body with Protein',
+            message: 'More protein can be a game changer for cravings and fullness. Try adding some to each meal!',
             action: 'High-protein ideas',
+            insightType: 'protein',
+            priority: 2,
+        });
+    } else if (nutritionInsights && nutritionInsights.avgProtein >= 60) {
+        insights.push({
+            icon: 'fitness',
+            iconColor: '#22C55E',
+            title: 'Protein Pro! 💪',
+            message: 'Excellent protein intake! This is helping you stay full and reduce cravings.',
+            insightType: 'celebration',
+            priority: 5,
+        });
+    }
+
+    // === FIBER INSIGHTS ===
+    if (nutritionInsights && nutritionInsights.avgFiber < 15) {
+        insights.push({
+            icon: 'leaf',
+            iconColor: '#22C55E',
+            title: 'Add More Fiber',
+            message: 'Fiber keeps you full and supports gut health. Try adding more vegetables and whole grains.',
+            action: 'Fiber-rich foods',
+            insightType: 'fiber',
+            priority: 3,
+        });
+    }
+
+    // === FOCUS INSIGHTS ===
+    if (avgFocus > 0 && avgFocus < 3) {
+        insights.push({
+            icon: 'bulb',
+            iconColor: '#F59E0B',
+            title: 'Boost Your Focus',
+            message: 'Brain fog? Try reducing sugar and adding omega-3 rich foods like salmon or walnuts.',
+            action: 'Brain foods',
+            insightType: 'energy',
             priority: 2,
         });
     }
 
-    // Correlation insight - Supportive observation
+    // === CORRELATION INSIGHTS ===
     if (nutritionInsights && nutritionInsights.avgAddedSugar > 30 && avgEnergy < 3) {
         insights.push({
             icon: 'git-compare',
             iconColor: '#EC4899',
-            title: 'Energy Connection',
-            message: 'Notice how energy dips when sugar is high? Try swapping a sweet treat for fruit to see if your energy steadies!',
+            title: 'Energy-Sugar Connection',
+            message: 'Notice how energy dips when sugar is high? Try swapping sweets for fruit to steady your energy!',
+            action: 'Learn more',
+            insightType: 'correlation',
             priority: 1,
         });
     }
 
-    // Positive streak insight - Celebration
+    if (avgSleep < 7 && avgMood < 3) {
+        insights.push({
+            icon: 'git-compare',
+            iconColor: '#8B5CF6',
+            title: 'Sleep-Mood Connection',
+            message: 'Low sleep and mood often go together. Even one extra hour of rest can brighten your outlook!',
+            action: 'Learn more',
+            insightType: 'sleep',
+            priority: 1,
+        });
+    }
+
+    // === STREAK/CONSISTENCY INSIGHTS ===
+    if (wellnessLogs.length >= 7) {
+        insights.push({
+            icon: 'flame',
+            iconColor: '#F59E0B',
+            title: 'Consistency Champion! 🔥',
+            message: `You've logged ${wellnessLogs.length} check-ins! Consistency is the key to lasting change.`,
+            action: 'Keep the streak',
+            insightType: 'streak',
+            priority: 4,
+        });
+    } else if (wellnessLogs.length >= 3) {
+        insights.push({
+            icon: 'trending-up',
+            iconColor: looviColors.accent.primary,
+            title: 'Building Momentum',
+            message: 'Great start! Keep logging daily to build a powerful health habit.',
+            action: 'Build consistency',
+            insightType: 'consistency',
+            priority: 3,
+        });
+    }
+
+    // === POSITIVE MOOD STREAK ===
     if (wellnessLogs.length >= 3) {
         const recentMood = wellnessLogs.slice(-3).reduce((sum, log) => sum + log.mood, 0) / 3;
         if (recentMood >= 4) {
             insights.push({
                 icon: 'star',
                 iconColor: '#F59E0B',
-                title: 'You\'re Glowing!',
-                message: 'Your consistent efforts are clearly paying off with great mood levels. Whatever you\'re doing, it\'s working!',
-                priority: 3,
+                title: 'You\'re Glowing! ✨',
+                message: 'Your consistent efforts are paying off with great mood levels. Whatever you\'re doing, it\'s working!',
+                insightType: 'celebration',
+                priority: 4,
             });
         }
     }
 
-    // Sort by priority and return top insights
-    return insights.sort((a, b) => a.priority - b.priority).slice(0, 4);
+    // === BREAKFAST INSIGHT ===
+    const morningItems = scannedItems.filter(item => {
+        const hour = new Date(item.timestamp).getHours();
+        return hour >= 5 && hour < 10;
+    });
+    if (morningItems.length === 0 && scannedItems.length > 0) {
+        insights.push({
+            icon: 'sunny',
+            iconColor: '#F5B461',
+            title: 'Start with Breakfast',
+            message: 'We don\'t see many morning meals. A protein-rich breakfast can stabilize your whole day!',
+            action: 'Breakfast ideas',
+            insightType: 'breakfast',
+            priority: 3,
+        });
+    }
+
+    // === SNACKING INSIGHT ===
+    const afternoonItems = scannedItems.filter(item => {
+        const hour = new Date(item.timestamp).getHours();
+        return hour >= 14 && hour < 17;
+    });
+    if (afternoonItems.length >= 3) {
+        const avgAfternoonSugar = afternoonItems.reduce((sum, item) => sum + (item.addedSugar || 0), 0) / afternoonItems.length;
+        if (avgAfternoonSugar > 10) {
+            insights.push({
+                icon: 'nutrition',
+                iconColor: '#F59E0B',
+                title: 'Afternoon Snack Swap',
+                message: 'Your afternoon snacks tend to be sugary. Try nuts, cheese, or veggies with hummus instead!',
+                action: 'Smart snacks',
+                insightType: 'snacking',
+                priority: 2,
+            });
+        }
+    }
+
+    // === MOTIVATIONAL FALLBACK ===
+    if (insights.length < 3) {
+        insights.push({
+            icon: 'compass',
+            iconColor: looviColors.accent.primary,
+            title: 'Stay on Course',
+            message: 'Every healthy choice moves you forward. Keep tracking and you\'ll unlock more personalized insights!',
+            insightType: 'consistency',
+            priority: 5,
+        });
+    }
+
+    // Sort by priority (lower = more important) and return top 6
+    return insights.sort((a, b) => a.priority - b.priority).slice(0, 6);
 };
+
 
 export default function AnalyticsScreen() {
     const navigation = useNavigation<any>();
@@ -262,6 +443,7 @@ export default function AnalyticsScreen() {
     const [showInfoModal, setShowInfoModal] = useState<'overall' | 'nutrition' | 'wellness' | null>(null);
     const [showFoodScanner, setShowFoodScanner] = useState(false);
     const [showWellnessModal, setShowWellnessModal] = useState(false);
+    const [showInsightModal, setShowInsightModal] = useState<InsightType | null>(null);
     const { onboardingData, addJournalEntry, refreshStreakFromFoodLogs } = useUserData();
 
     // Load wellness logs and food data
@@ -630,7 +812,7 @@ export default function AnalyticsScreen() {
                         {/* Personalized Insights Section - THE MAIN FOCUS */}
                         <View style={styles.insightsSection}>
                             <Text style={styles.insightsSectionTitle}>Your Insights</Text>
-                            <Text style={styles.insightsSectionSubtitle}>Personalized recommendations based on your data</Text>
+                            <Text style={styles.insightsSectionSubtitle}>Tap any insight for actionable tips</Text>
 
                             {insights.map((insight, index) => (
                                 <TouchableOpacity
@@ -640,6 +822,7 @@ export default function AnalyticsScreen() {
                                         insight.priority === 1 && styles.insightCardPriority,
                                     ]}
                                     activeOpacity={0.8}
+                                    onPress={() => setShowInsightModal(insight.insightType)}
                                 >
                                     <View style={[styles.insightIconContainer, { backgroundColor: `${insight.iconColor}15` }]}>
                                         <Ionicons name={insight.icon as any} size={24} color={insight.iconColor} />
@@ -782,6 +965,12 @@ export default function AnalyticsScreen() {
                         onClose={() => setShowWellnessModal(false)}
                         onSave={handleWellnessSave}
                         selectedDate={new Date().toISOString().split('T')[0]}
+                    />
+
+                    <InsightDetailModal
+                        visible={showInsightModal !== null}
+                        insightType={showInsightModal}
+                        onClose={() => setShowInsightModal(null)}
                     />
                 </SafeAreaView>
             </LooviBackground>

@@ -33,9 +33,14 @@ export function useEmailLinkHandler(): EmailLinkHandlerState {
             // Can be either:
             // 1. Direct Firebase URL: https://sugar-reset.firebaseapp.com/auth/email-signin?...
             // 2. App deep link with encoded URL: craveless://auth/email-signin?url=ENCODED_URL
+            // 3. Web URL opened in app (universal link): https://sugar-reset.firebaseapp.com/auth/email-signin?...
             let firebaseUrl = url;
             
-            if (url.startsWith('craveless://')) {
+            // Check if it's already a Firebase URL (web URL opened directly in app)
+            if (url.startsWith('https://') && url.includes('firebaseapp.com') && url.includes('/auth/email-signin')) {
+                firebaseUrl = url;
+                console.log('🔗 Direct Firebase URL detected:', firebaseUrl);
+            } else if (url.startsWith('craveless://')) {
                 try {
                     // Parse the deep link: craveless://auth/email-signin?url=ENCODED_URL
                     const match = url.match(/craveless:\/\/auth\/email-signin\?url=(.+)/);

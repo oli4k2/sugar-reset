@@ -338,6 +338,33 @@ export const notificationService = {
     },
 
     /**
+     * Disable all notifications - cancel scheduled and remove push token
+     */
+    async disableAllNotifications(userId: string): Promise<void> {
+        try {
+            // Cancel all scheduled local notifications
+            await Notifications.cancelAllScheduledNotificationsAsync();
+
+            // Clear badge
+            await this.setBadgeCount(0);
+
+            // Remove push token from Firestore so no push notifications are sent
+            if (userId) {
+                const userRef = doc(db, 'users', userId);
+                await setDoc(userRef, {
+                    pushToken: null,
+                    pushTokenUpdatedAt: serverTimestamp(),
+                }, { merge: true });
+            }
+
+            console.log('✅ All notifications disabled');
+        } catch (error) {
+            console.error('Error disabling notifications:', error);
+            throw error;
+        }
+    },
+
+    /**
      * Schedule a local daily check-in reminder
      */
     async scheduleDailyReminder(hour: number = 20, minute: number = 0): Promise<void> {

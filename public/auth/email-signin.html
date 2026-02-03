@@ -120,8 +120,13 @@
                 <p style="text-align: center; margin-top: 1.5rem;">
                     <button class="button" onclick="copyLink()">Copy Link</button>
                 </p>
+                <div style="background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; padding: 12px; margin-top: 1rem; border-radius: 4px;">
+                    <p style="font-size: 0.85em; margin: 0; color: rgba(255,255,255,0.9);">
+                        <strong>Development Mode:</strong> If you're testing with Expo Go, deep links won't work automatically. Copy the link above, open the Craveless app, and the app will detect the link from your clipboard when you open it.
+                    </p>
+                </div>
                 <p style="font-size: 0.9em; margin-top: 1rem; opacity: 0.9;">
-                    Or manually copy the link above and open it on your phone.
+                    In production builds, the app will open automatically.
                 </p>
             </div>
         </div>
@@ -145,7 +150,11 @@
         
         function copyLink() {
             navigator.clipboard.writeText(currentUrl).then(() => {
-                alert('Link copied! Now paste it on your phone.');
+                // Show a more helpful message
+                const message = isMobile 
+                    ? 'Link copied! Open the Craveless app and paste this link in the app to complete sign-in.'
+                    : 'Link copied! Now paste it on your phone in the Craveless app.';
+                alert(message);
             }).catch(() => {
                 // Fallback for older browsers
                 const textarea = document.createElement('textarea');
@@ -154,23 +163,47 @@
                 textarea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
-                alert('Link copied! Now paste it on your phone.');
+                const message = isMobile 
+                    ? 'Link copied! Open the Craveless app and paste this link to complete sign-in.'
+                    : 'Link copied! Now paste it on your phone in the Craveless app.';
+                alert(message);
             });
         }
         
         if (isMobile) {
-            // On mobile: Try to open the app
+            // On mobile: Try multiple methods to open the app
             console.log('Mobile device detected, redirecting to app:', appUrl);
+            
+            // Method 1: Try immediate redirect
             window.location.href = appUrl;
             
-            // Fallback: If app doesn't open after 2 seconds, show instructions
+            // Method 2: Try with a hidden iframe (for iOS)
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = appUrl;
+            document.body.appendChild(iframe);
+            
+            // Method 3: Try window.open as fallback
+            setTimeout(() => {
+                try {
+                    window.open(appUrl, '_blank');
+                } catch (e) {
+                    console.log('window.open failed:', e);
+                }
+            }, 500);
+            
+            // Always show instructions after a short delay (for development/fallback)
+            // In production builds, the app will open and user won't see this
             setTimeout(() => {
                 document.getElementById('spinner').style.display = 'none';
-                document.getElementById('title').textContent = 'Open in App';
-                document.getElementById('message').textContent = 'If the app didn\'t open automatically:';
+                document.getElementById('title').textContent = 'Complete Sign-In';
+                document.getElementById('message').textContent = 'To complete sign-in, copy the link below and paste it in the Craveless app:';
                 document.getElementById('desktop-instructions').style.display = 'block';
                 document.getElementById('link-to-copy').textContent = currentUrl;
-            }, 2000);
+                
+                // Auto-copy to clipboard
+                copyLink();
+            }, 1000);
         } else {
             // On desktop: Show instructions immediately
             console.log('Desktop device detected, showing instructions');

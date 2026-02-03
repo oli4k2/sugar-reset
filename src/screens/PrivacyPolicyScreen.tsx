@@ -121,13 +121,13 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: colors.text.primary,
+        color: '#000000',
         marginBottom: spacing.md,
     },
     paragraph: {
         fontSize: 15,
         lineHeight: 24,
-        color: colors.text.secondary,
+        color: '#000000',
         marginBottom: spacing.sm,
     },
     bulletPoint: {
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     },
     bullet: {
         fontSize: 15,
-        color: colors.text.secondary,
+        color: '#000000',
         marginRight: spacing.sm,
         marginTop: 2,
     },
@@ -145,11 +145,11 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 15,
         lineHeight: 24,
-        color: colors.text.secondary,
+        color: '#000000',
     },
     bold: {
         fontWeight: '600',
-        color: colors.text.primary,
+        color: '#000000',
     },
     footer: {
         alignItems: 'center',

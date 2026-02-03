@@ -25,14 +25,14 @@ export default function TermsOfServiceScreen() {
                     <GlassCard variant="light" padding="lg" style={styles.card}>
                         <Text style={styles.sectionTitle}>1. Acceptance of Terms</Text>
                         <Text style={styles.paragraph}>
-                            By accessing and using the SugarReset application, you accept and agree to be bound by the terms and provision of this agreement.
+                            By accessing and using the Craveless application, you accept and agree to be bound by the terms and provision of this agreement.
                         </Text>
                     </GlassCard>
 
                     <GlassCard variant="light" padding="lg" style={styles.card}>
                         <Text style={styles.sectionTitle}>2. Educational Purpose</Text>
                         <Text style={styles.paragraph}>
-                            The content provided in SugarReset is for educational and informational purposes only. It is not intended to substitute for professional medical advice, diagnosis, or treatment.
+                            The content provided in Craveless is for educational and informational purposes only. It is not intended to substitute for professional medical advice, diagnosis, or treatment.
                         </Text>
                         <Text style={styles.paragraph}>
                             Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.
@@ -49,14 +49,14 @@ export default function TermsOfServiceScreen() {
                     <GlassCard variant="light" padding="lg" style={styles.card}>
                         <Text style={styles.sectionTitle}>4. Intellectual Property</Text>
                         <Text style={styles.paragraph}>
-                            All content included on this app, such as text, graphics, logos, button icons, images, and software, is the property of SugarReset or its content suppliers and protected by international copyright laws.
+                            All content included on this app, such as text, graphics, logos, button icons, images, and software, is the property of Craveless or its content suppliers and protected by international copyright laws.
                         </Text>
                     </GlassCard>
 
                     <GlassCard variant="light" padding="lg" style={styles.card}>
                         <Text style={styles.sectionTitle}>5. Disclaimer of Warranties</Text>
                         <Text style={styles.paragraph}>
-                            This app is provided "as is" without any representations or warranties, express or implied. SugarReset makes no representations or warranties in relation to this app or the information and materials provided.
+                            This app is provided "as is" without any representations or warranties, express or implied. Craveless makes no representations or warranties in relation to this app or the information and materials provided.
                         </Text>
                     </GlassCard>
 
@@ -102,13 +102,13 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: colors.text.primary,
+        color: '#000000',
         marginBottom: spacing.md,
     },
     paragraph: {
         fontSize: 15,
         lineHeight: 24,
-        color: colors.text.secondary,
+        color: '#000000',
         marginBottom: spacing.sm,
     },
     footer: {
