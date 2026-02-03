@@ -45,7 +45,7 @@ export default function TermsOfServicePage() {
               1. Acceptance of Terms
             </h2>
             <p className="text-loovi-text-secondary leading-relaxed">
-              By accessing and using the SugarReset application, you accept and agree to be bound by the terms and provision of this agreement.
+              By accessing and using the Craveless application, you accept and agree to be bound by the terms and provision of this agreement.
             </p>
           </div>
 
@@ -55,7 +55,7 @@ export default function TermsOfServicePage() {
               2. Educational Purpose
             </h2>
             <p className="text-loovi-text-secondary mb-4 leading-relaxed">
-              The content provided in SugarReset is for educational and informational purposes only. It is not intended to substitute for professional medical advice, diagnosis, or treatment.
+              The content provided in Craveless is for educational and informational purposes only. It is not intended to substitute for professional medical advice, diagnosis, or treatment.
             </p>
             <p className="text-loovi-text-secondary leading-relaxed">
               Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.
@@ -78,7 +78,7 @@ export default function TermsOfServicePage() {
               4. Intellectual Property
             </h2>
             <p className="text-loovi-text-secondary leading-relaxed">
-              All content included on this app, such as text, graphics, logos, button icons, images, and software, is the property of SugarReset or its content suppliers and protected by international copyright laws.
+              All content included on this app, such as text, graphics, logos, button icons, images, and software, is the property of Craveless or its content suppliers and protected by international copyright laws.
             </p>
           </div>
 
@@ -88,7 +88,7 @@ export default function TermsOfServicePage() {
               5. Subscriptions and Payments
             </h2>
             <p className="text-loovi-text-secondary mb-4 leading-relaxed">
-              SugarReset offers premium subscription plans that provide access to additional features:
+              Craveless offers premium subscription plans that provide access to additional features:
             </p>
             <ul className="space-y-3 text-loovi-text-secondary mb-4">
               <li className="flex gap-3">
@@ -143,7 +143,7 @@ export default function TermsOfServicePage() {
               7. Limitation of Liability
             </h2>
             <p className="text-loovi-text-secondary leading-relaxed">
-              To the maximum extent permitted by law, SugarReset shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses resulting from your use of the app.
+              To the maximum extent permitted by law, Craveless shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses resulting from your use of the app.
             </p>
           </div>
 
@@ -153,7 +153,7 @@ export default function TermsOfServicePage() {
               8. Disclaimer of Warranties
             </h2>
             <p className="text-loovi-text-secondary leading-relaxed">
-              This app is provided "as is" without any representations or warranties, express or implied. SugarReset makes no representations or warranties in relation to this app or the information and materials provided.
+              This app is provided "as is" without any representations or warranties, express or implied. Craveless makes no representations or warranties in relation to this app or the information and materials provided.
             </p>
           </div>
 

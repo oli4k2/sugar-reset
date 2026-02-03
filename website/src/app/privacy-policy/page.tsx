@@ -106,7 +106,7 @@ export default function PrivacyPolicyPage() {
               4. Health Data
             </h2>
             <p className="text-loovi-text-secondary mb-4 leading-relaxed">
-              SugarReset integrates with Apple HealthKit (iOS) and Google Fit (Android) to help you track your nutrition data:
+              Craveless integrates with Apple HealthKit (iOS) and Google Fit (Android) to help you track your nutrition data:
             </p>
             <ul className="space-y-3 text-loovi-text-secondary mb-4">
               <li className="flex gap-3">
