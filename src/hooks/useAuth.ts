@@ -117,58 +117,75 @@ export function useAuth(): UseAuthReturn {
         try {
             // Use Resend API ONLY for beautiful email design
             console.log('📧 Sending magic link via Resend API to:', email);
+            console.log('🔗 API Endpoint: https://www.craveless.info/api/auth/send-magic-link');
             
-            const response = await fetch('https://www.craveless.info/api/auth/send-magic-link', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: email.trim().toLowerCase(),
-                    redirectUrl,
-                }),
-            });
-
-            // Get response text first to check if it's empty
-            const responseText = await response.text();
-            console.log('📡 API Response status:', response.status);
-            console.log('📡 API Response text:', responseText.substring(0, 500)); // Log first 500 chars
-
-            if (!response.ok) {
-                let errorMessage = 'Failed to send email';
-                try {
-                    if (responseText) {
-                        const errorData = JSON.parse(responseText);
-                        errorMessage = errorData.error || errorMessage;
-                    } else {
-                        errorMessage = `Server error (${response.status})`;
-                    }
-                } catch (e) {
-                    errorMessage = responseText || `Server error (${response.status})`;
-                }
-                throw new Error(errorMessage);
-            }
-
-            if (!responseText) {
-                throw new Error('Empty response from server');
-            }
-
-            let result;
+            let response;
+            let responseText;
+            
             try {
-                result = JSON.parse(responseText);
-            } catch (e) {
-                console.error('❌ Failed to parse JSON response:', e);
-                throw new Error('Invalid response from server');
-            }
-            
-            if (!result.success) {
-                throw new Error(result.error || 'Failed to send email');
-            }
+                response = await fetch('https://www.craveless.info/api/auth/send-magic-link', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email.trim().toLowerCase(),
+                        redirectUrl,
+                    }),
+                });
 
-            // Store email locally for when user clicks the link
-            await AsyncStorage.setItem(EMAIL_STORAGE_KEY, email);
-            console.log('✅ Magic link sent successfully via Resend');
-            return true;
+                // Get response text first to check if it's empty
+                responseText = await response.text();
+                console.log('📡 API Response status:', response.status);
+                console.log('📡 API Response text:', responseText.substring(0, 500)); // Log first 500 chars
+
+                // If 405 or 404, the API might not be deployed yet
+                if (response.status === 405 || response.status === 404) {
+                    throw new Error(`API endpoint not available (${response.status}). Please deploy the website API first.`);
+                }
+
+                if (!response.ok) {
+                    let errorMessage = 'Failed to send email';
+                    try {
+                        if (responseText) {
+                            const errorData = JSON.parse(responseText);
+                            errorMessage = errorData.error || errorMessage;
+                        } else {
+                            errorMessage = `Server error (${response.status})`;
+                        }
+                    } catch (e) {
+                        errorMessage = responseText || `Server error (${response.status})`;
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                if (!responseText) {
+                    throw new Error('Empty response from server');
+                }
+
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('❌ Failed to parse JSON response:', e);
+                    throw new Error('Invalid response from server');
+                }
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to send email');
+                }
+
+                // Store email locally for when user clicks the link
+                await AsyncStorage.setItem(EMAIL_STORAGE_KEY, email);
+                console.log('✅ Magic link sent successfully via Resend');
+                return true;
+            } catch (fetchError: any) {
+                // If it's a network error or the API isn't deployed, provide helpful error
+                if (fetchError.message?.includes('405') || fetchError.message?.includes('404') || fetchError.message?.includes('not available')) {
+                    throw new Error('The email API is not deployed yet. Please deploy the website to Vercel first. See website/DEPLOY.md for instructions.');
+                }
+                throw fetchError;
+            }
         } catch (err: any) {
             console.error('❌ Send email link error:', err);
             console.error('❌ Error code:', err.code);
