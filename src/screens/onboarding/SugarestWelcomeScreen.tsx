@@ -68,69 +68,58 @@ export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScr
                         },
                     ]}
                 >
-                    {/* Logo with fade animation */}
-                    <Animated.View
-                        style={[
-                            styles.logoContainer,
-                            {
-                                opacity: fadeAnim,
-                                transform: [{
-                                    scale: fadeAnim.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [0.8, 1]
-                                    })
-                                }]
-                            }
-                        ]}
-                    >
-                        <Animated.Image
-                            source={require('../../public/craveless_icon.png')}
-                            style={styles.logoIcon}
-                            resizeMode="contain"
-                        />
-                        <GradientText
-                            text="craveless"
-                            colors={['#FF6B35', '#E8A87C', '#D4896A']}
-                            fontSize={getResponsiveFontSize(24)}
-                            fontWeight="700"
-                            style={styles.logoText}
-                        />
-                    </Animated.View>
+                    {/* Centered Content */}
+                    <View style={styles.centeredContent}>
+                        {/* Welcome Message */}
+                        <View style={styles.welcomeSection}>
+                            <GradientText
+                                text={"Welcome to\nCraveless"}
+                                colors={['#C97B5D', '#D4896A', '#E8A87C']}
+                                fontSize={getResponsiveFontSize(34)}
+                                fontWeight="800"
+                                style={styles.welcomeTitle}
+                            />
+                            <Text style={styles.welcomeSubtitle}>
+                                Join thousands of others breaking the cycle of sugar addiction through science and community support.
+                            </Text>
 
-                    {/* Welcome Message */}
-                    <View style={styles.welcomeSection}>
-                        <GradientText
-                            text="Welcome to Craveless"
-                            colors={['#FF6B35', '#E8A87C', '#D4896A']}
-                            fontSize={getResponsiveFontSize(28)}
-                            fontWeight="900"
-                            style={styles.welcomeTitle}
-                        />
-                        <Text style={styles.welcomeSubtitle}>
-                            Join thousands of users breaking the cycle of sugar addiction through science and community support.
-                        </Text>
-
-                        {/* Features Row - Horizontal */}
-                        <View style={styles.featuresRow}>
-                            <View style={styles.featureItem}>
-                                <Text style={styles.featureIcon}>🎯</Text>
-                                <Text style={styles.featureLabel}>Personalized</Text>
-                            </View>
-                            <View style={styles.featureItem}>
-                                <Text style={styles.featureIcon}>📊</Text>
-                                <Text style={styles.featureLabel}>Science-Backed</Text>
-                            </View>
-                            <View style={styles.featureItem}>
-                                <Text style={styles.featureIcon}>💪</Text>
-                                <Text style={styles.featureLabel}>Social Support</Text>
+                            {/* Features Row - Horizontal */}
+                            <View style={styles.featuresRow}>
+                                <View style={styles.featureItem}>
+                                    <View style={styles.iconContainer}>
+                                        <Image 
+                                            source={require('../../public/feature_personalized.png')}
+                                            style={styles.featureIcon}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                    <Text style={styles.featureLabel}>Personalized</Text>
+                                </View>
+                                <View style={styles.featureItem}>
+                                    <View style={styles.iconContainer}>
+                                        <Image 
+                                            source={require('../../public/feature_science.png')}
+                                            style={styles.featureIcon}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                    <Text style={styles.featureLabel}>Science-Backed</Text>
+                                </View>
+                                <View style={styles.featureItem}>
+                                    <View style={styles.iconContainer}>
+                                        <Image 
+                                            source={require('../../public/feature_social.png')}
+                                            style={styles.featureIconSocial}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                    <Text style={styles.featureLabel}>Social Support</Text>
+                                </View>
                             </View>
                         </View>
                     </View>
 
-                    {/* Spacer */}
-                    <View style={styles.spacer} />
-
-                    {/* Continue Button */}
+                    {/* Continue Button - Fixed at bottom */}
                     <TouchableOpacity
                         style={styles.continueButton}
                         onPress={handleContinue}
@@ -151,28 +140,20 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing['3xl'],
         paddingBottom: spacing['2xl'],
+    },
+    centeredContent: {
+        flex: 1,
         justifyContent: 'center',
-    },
-    logoContainer: {
-        alignItems: 'center',
-        marginBottom: spacing['2xl'],
-    },
-    logoIcon: {
-        width: SCREEN_WIDTH * 0.15,
-        height: SCREEN_WIDTH * 0.15,
-        marginBottom: spacing.xs,
-    },
-    logoText: {
-        marginTop: spacing.xs,
     },
     welcomeSection: {
         alignItems: 'center',
-        marginBottom: spacing['2xl'],
     },
     welcomeTitle: {
-        marginBottom: spacing.md,
+        textAlign: 'center',
+        lineHeight: getResponsiveFontSize(42),
+        letterSpacing: -0.5,
+        marginBottom: spacing.lg,
     },
     welcomeSubtitle: {
         fontSize: 15,
@@ -180,7 +161,7 @@ const styles = StyleSheet.create({
         color: looviColors.text.secondary,
         textAlign: 'center',
         lineHeight: 22,
-        marginBottom: spacing['2xl'],
+        marginBottom: 40,
         paddingHorizontal: spacing.md,
     },
     featuresRow: {
@@ -194,18 +175,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
+    iconContainer: {
+        height: 60, // Fixed height to keep labels aligned
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
     featureIcon: {
-        fontSize: 32,
-        marginBottom: spacing.sm,
+        width: 46,
+        height: 46,
+    },
+    featureIconSocial: {
+        width: 53,
+        height: 53,
     },
     featureLabel: {
         fontSize: 13,
         fontWeight: '600',
         color: looviColors.text.primary,
         textAlign: 'center',
-    },
-    spacer: {
-        flex: 1,
     },
     continueButton: {
         backgroundColor: looviColors.accent.primary,

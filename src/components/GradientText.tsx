@@ -37,21 +37,26 @@ export function GradientText({
     // For Outfit/Inter bold, roughly 0.6 of fontSize per char average
     const charsPerLine = Math.floor(availableWidth / (fontSize * 0.6));
     
-    const words = text.split(' ');
+    const splitLines = text.split('\n');
     const lines: string[] = [];
-    let currentLine = '';
     
-    words.forEach(word => {
-        if ((currentLine + word).length > charsPerLine && currentLine.length > 0) {
+    splitLines.forEach(lineText => {
+        const words = lineText.split(' ');
+        let currentLine = '';
+        
+        words.forEach(word => {
+            if ((currentLine + word).length > charsPerLine && currentLine.length > 0) {
+                lines.push(currentLine.trim());
+                currentLine = word + ' ';
+            } else {
+                currentLine += word + ' ';
+            }
+        });
+        
+        if (currentLine.trim()) {
             lines.push(currentLine.trim());
-            currentLine = word + ' ';
-        } else {
-            currentLine += word + ' ';
         }
     });
-    if (currentLine.trim()) {
-        lines.push(currentLine.trim());
-    }
 
     const svgHeight = lines.length * lineHeight + (fontSize * 0.2); // Add some buffer
 
