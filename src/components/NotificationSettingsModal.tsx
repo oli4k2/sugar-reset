@@ -2,7 +2,8 @@
  * NotificationSettingsModal
  * 
  * A beautifully designed modal for notification preferences
- * with persuasive messaging to encourage enabling notifications.
+ * with a single toggle to enable/disable all notifications.
+ * Now actually connected to the notification service.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +15,7 @@ import {
     TouchableOpacity,
     Switch,
     Dimensions,
+    Alert,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +24,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { looviColors } from './LooviBackground';
 import { spacing, borderRadius } from '../theme';
+import { notificationService } from '../services/notificationService';
+import { useAuthContext } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -30,52 +34,10 @@ interface NotificationSettingsModalProps {
     onClose: () => void;
 }
 
-interface NotificationSetting {
-    id: string;
-    icon: string;
-    label: string;
-    description: string;
-    key: string;
-}
-
-const NOTIFICATION_SETTINGS: NotificationSetting[] = [
-    {
-        id: 'pledge',
-        icon: '🌅',
-        label: 'Morning Pledge',
-        description: 'Start each day with intention',
-        key: 'pledge',
-    },
-    {
-        id: 'journal',
-        icon: '🌙',
-        label: 'Evening Reflection',
-        description: 'Reflect on your daily progress',
-        key: 'journal',
-    },
-    {
-        id: 'streak',
-        icon: '🔥',
-        label: 'Streak Milestones',
-        description: 'Celebrate your achievements',
-        key: 'streak',
-    },
-    {
-        id: 'community',
-        icon: '💬',
-        label: 'Community Support',
-        description: 'Get encouragement from others',
-        key: 'community',
-    },
-];
-
 export function NotificationSettingsModal({ visible, onClose }: NotificationSettingsModalProps) {
-    const [settings, setSettings] = useState<Record<string, boolean>>({
-        pledge: true,
-        journal: true,
-        streak: true,
-        community: true,
-    });
+    const { user } = useAuthContext();
+    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Load settings on mount
     useEffect(() => {
@@ -84,12 +46,14 @@ export function NotificationSettingsModal({ visible, onClose }: NotificationSett
                 const stored = await AsyncStorage.getItem('notification_settings');
                 if (stored) {
                     const parsed = JSON.parse(stored);
-                    setSettings({
-                        pledge: parsed.pledge ?? true,
-                        journal: parsed.journal ?? true,
-                        streak: parsed.streak ?? true,
-                        community: parsed.community ?? true,
-                    });
+                    // Check if all notifications are enabled (for backwards compatibility)
+                    if (typeof parsed.allEnabled === 'boolean') {
+                        setNotificationsEnabled(parsed.allEnabled);
+                    } else {
+                        // Legacy format: check if any individual setting is enabled
+                        const anyEnabled = parsed.pledge ?? parsed.journal ?? parsed.streak ?? parsed.community ?? true;
+                        setNotificationsEnabled(anyEnabled);
+                    }
                 }
             } catch (e) {
                 console.warn('Failed to load notification settings:', e);
@@ -100,35 +64,64 @@ export function NotificationSettingsModal({ visible, onClose }: NotificationSett
         }
     }, [visible]);
 
-    const handleToggle = async (key: string, value: boolean) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const handleToggle = async (value: boolean) => {
+        if (isLoading) return;
 
-        const newSettings = { ...settings, [key]: value };
-        setSettings(newSettings);
-
-        try {
-            await AsyncStorage.setItem('notification_settings', JSON.stringify(newSettings));
-        } catch (e) {
-            console.warn('Failed to save notification settings:', e);
-        }
-    };
-
-    const enabledCount = Object.values(settings).filter(Boolean).length;
-    const allEnabled = enabledCount === NOTIFICATION_SETTINGS.length;
-
-    const handleEnableAll = async () => {
+        setIsLoading(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const newSettings = {
-            pledge: true,
-            journal: true,
-            streak: true,
-            community: true,
-        };
-        setSettings(newSettings);
+
         try {
+            if (value) {
+                // Enable notifications
+                if (user?.id) {
+                    // Register for push notifications
+                    const token = await notificationService.registerForPushNotifications(user.id);
+
+                    if (token) {
+                        // Schedule daily reminder at 8 PM
+                        await notificationService.scheduleDailyReminder(20, 0);
+                        console.log('✅ Notifications enabled with token:', token);
+                    } else {
+                        // Permission denied or not on device
+                        Alert.alert(
+                            'Permission Required',
+                            'Please enable notifications in your device settings to receive reminders.',
+                            [{ text: 'OK' }]
+                        );
+                        setIsLoading(false);
+                        return; // Don't update state if we couldn't enable
+                    }
+                }
+            } else {
+                // Disable notifications
+                if (user?.id) {
+                    await notificationService.disableAllNotifications(user.id);
+                    console.log('✅ Notifications disabled');
+                }
+            }
+
+            setNotificationsEnabled(value);
+
+            // Save the unified setting
+            const newSettings = {
+                allEnabled: value,
+                // Also set individual settings for backwards compatibility
+                pledge: value,
+                journal: value,
+                streak: value,
+                community: value,
+            };
+
             await AsyncStorage.setItem('notification_settings', JSON.stringify(newSettings));
-        } catch (e) {
-            console.warn('Failed to save notification settings:', e);
+
+            Haptics.notificationAsync(
+                value ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
+            );
+        } catch (error) {
+            console.error('Failed to toggle notifications:', error);
+            Alert.alert('Error', 'Failed to update notification settings. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -179,59 +172,35 @@ export function NotificationSettingsModal({ visible, onClose }: NotificationSett
                         </View>
                     </LinearGradient>
 
-                    {/* Settings List */}
+                    {/* Single Toggle Setting */}
                     <View style={styles.settingsContainer}>
-                        {NOTIFICATION_SETTINGS.map((setting, index) => (
-                            <View
-                                key={setting.id}
-                                style={[
-                                    styles.settingRow,
-                                    index < NOTIFICATION_SETTINGS.length - 1 && styles.settingRowBorder,
-                                ]}
-                            >
-                                <View style={styles.settingIcon}>
-                                    <Text style={styles.emoji}>{setting.icon}</Text>
-                                </View>
-                                <View style={styles.settingInfo}>
-                                    <Text style={styles.settingLabel}>{setting.label}</Text>
-                                    <Text style={styles.settingDescription}>{setting.description}</Text>
-                                </View>
-                                <Switch
-                                    value={settings[setting.key]}
-                                    onValueChange={(value) => handleToggle(setting.key, value)}
-                                    trackColor={{
-                                        false: 'rgba(0,0,0,0.1)',
-                                        true: looviColors.accent.success
-                                    }}
-                                    thumbColor="#FFFFFF"
-                                    ios_backgroundColor="rgba(0,0,0,0.1)"
-                                />
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingIcon}>
+                                <Text style={styles.emoji}>✨</Text>
                             </View>
-                        ))}
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>All Notifications</Text>
+                                <Text style={styles.settingDescription}>
+                                    Daily reminders, streak milestones & community support
+                                </Text>
+                            </View>
+                            <Switch
+                                value={notificationsEnabled}
+                                onValueChange={handleToggle}
+                                disabled={isLoading}
+                                trackColor={{
+                                    false: 'rgba(0,0,0,0.1)',
+                                    true: looviColors.accent.success
+                                }}
+                                thumbColor="#FFFFFF"
+                                ios_backgroundColor="rgba(0,0,0,0.1)"
+                            />
+                        </View>
                     </View>
-
-                    {/* Enable All Button */}
-                    {!allEnabled && (
-                        <TouchableOpacity
-                            style={styles.enableAllButton}
-                            onPress={handleEnableAll}
-                            activeOpacity={0.8}
-                        >
-                            <LinearGradient
-                                colors={[looviColors.accent.success, '#5fa352']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.enableAllGradient}
-                            >
-                                <Ionicons name="notifications" size={18} color="#FFFFFF" />
-                                <Text style={styles.enableAllText}>Enable All Reminders</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    )}
 
                     {/* Status indicator */}
                     <View style={styles.statusContainer}>
-                        {allEnabled ? (
+                        {notificationsEnabled ? (
                             <View style={styles.statusBadge}>
                                 <Ionicons name="checkmark-circle" size={16} color={looviColors.accent.success} />
                                 <Text style={[styles.statusText, { color: looviColors.accent.success }]}>
@@ -239,9 +208,12 @@ export function NotificationSettingsModal({ visible, onClose }: NotificationSett
                                 </Text>
                             </View>
                         ) : (
-                            <Text style={styles.statusText}>
-                                {enabledCount} of {NOTIFICATION_SETTINGS.length} reminders enabled
-                            </Text>
+                            <View style={styles.statusBadge}>
+                                <Ionicons name="notifications-off" size={16} color={looviColors.text.muted} />
+                                <Text style={styles.statusText}>
+                                    Notifications are disabled
+                                </Text>
+                            </View>
                         )}
                     </View>
                 </View>
@@ -334,64 +306,47 @@ const styles = StyleSheet.create({
     },
     settingsContainer: {
         paddingHorizontal: 20,
-        paddingTop: 8,
+        paddingTop: 16,
+        paddingBottom: 8,
     },
     settingRow: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 16,
-    },
-    settingRowBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.06)',
+        backgroundColor: 'rgba(242, 228, 216, 0.3)',
+        borderRadius: borderRadius.lg,
+        paddingHorizontal: 16,
     },
     settingIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: 'rgba(242, 228, 216, 0.5)', // warmBeige with opacity
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        backgroundColor: 'rgba(242, 228, 216, 0.7)',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 14,
     },
     emoji: {
-        fontSize: 22,
+        fontSize: 24,
     },
     settingInfo: {
         flex: 1,
     },
     settingLabel: {
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '600',
         color: looviColors.text.primary,
-        marginBottom: 2,
+        marginBottom: 4,
     },
     settingDescription: {
         fontSize: 13,
         color: looviColors.text.secondary,
-    },
-    enableAllButton: {
-        marginHorizontal: 20,
-        marginTop: 8,
-        borderRadius: borderRadius.lg,
-        overflow: 'hidden',
-    },
-    enableAllGradient: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        gap: 8,
-    },
-    enableAllText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#FFFFFF',
+        lineHeight: 18,
     },
     statusContainer: {
         alignItems: 'center',
-        paddingVertical: 16,
-        paddingBottom: 20,
+        paddingVertical: 20,
+        paddingBottom: 24,
     },
     statusBadge: {
         flexDirection: 'row',
@@ -399,7 +354,7 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     statusText: {
-        fontSize: 13,
+        fontSize: 14,
         color: looviColors.text.muted,
         fontWeight: '500',
     },

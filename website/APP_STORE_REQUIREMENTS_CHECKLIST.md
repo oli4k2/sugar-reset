@@ -252,3 +252,4 @@ This document outlines all the crucial components needed on your website and in 
 **Last Updated**: January 2026
 **Contact**: hello@scriptcollective.com
 
+

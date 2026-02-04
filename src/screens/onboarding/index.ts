@@ -17,7 +17,6 @@ export { default as FeatureShowcaseScreen } from './FeatureShowcaseScreen';
 
 // Commitment
 export { default as GoalsScreen } from './GoalsScreen';
-export { default as PlanSelectionScreen } from './PlanSelectionScreen';
 export { default as PromiseScreen } from './PromiseScreen';
 export { default as PaywallScreen } from './PaywallScreen';
 

@@ -60,6 +60,8 @@ import {
 import { PledgeModal } from '../components/PledgeModal';
 import { useAuthContext } from '../context/AuthContext';
 import { userService } from '../services/userService';
+import { MascotTip } from '../components/MascotTip';
+import { friendService } from '../services/friendService';
 
 function formatDuration(ms: number) {
     const seconds = Math.floor((ms / 1000) % 60);
@@ -105,6 +107,7 @@ export default function HomeScreen() {
     const [showWellnessModal, setShowWellnessModal] = useState(false);
     const [hasWellnessToday, setHasWellnessToday] = useState(false);
     const [todayWellnessData, setTodayWellnessData] = useState<WellnessLog | null>(null);
+    const [hasInnerCircleFriends, setHasInnerCircleFriends] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const fallbackDateRef = useRef(new Date().toISOString()); // Stable fallback
     const navigation = useNavigation<any>(); // Type as any to allow navigation to new modal screens
@@ -227,6 +230,20 @@ export default function HomeScreen() {
             }, 100);
         }
     }, [isFocused, getTargetIndex]);
+
+    // Load Inner Circle friend count
+    useEffect(() => {
+        const loadFriendCount = async () => {
+            if (!user?.id) return;
+            try {
+                const friends = await friendService.getInnerCircle(user.id);
+                setHasInnerCircleFriends(friends.length > 0);
+            } catch (error) {
+                console.error('Error loading friend count:', error);
+            }
+        };
+        loadFriendCount();
+    }, [user?.id]);
 
     // Load 7-day wellness averages with real date-based filtering
     // Refresh when wellness modal is closed
@@ -404,16 +421,14 @@ export default function HomeScreen() {
 
     const hasCheckedInToday = !!todayCheckIn || !!checkInHistory[new Date().toISOString().split('T')[0]];
 
-    // Get plan guidance
-    const planType = (onboardingData.plan || 'cold_turkey') as PlanType;
+    // Get plan guidance - always Cold Turkey
+    const planType = 'cold_turkey' as PlanType;
     const guidance = getTodayGuidance(planType, startDate);
 
-    // Get daily limit for gradual plan  
-    const currentWeek = getCurrentWeek(startDate); // Only takes startDate
+    // For cold turkey, daily limit is always 0
+    const currentWeek = getCurrentWeek(startDate);
     const planDetails = getPlanDetails(planType);
-    const dailyLimit = planType === 'gradual' && currentWeek <= planDetails.weeklyLimits.length
-        ? planDetails.weeklyLimits[currentWeek - 1].dailyGrams
-        : 0;
+    const dailyLimit = 0; // Cold turkey: no sugar allowed
 
     // Handle check-in for a specific date from calendar
     const handleDayPress = (date: Date) => {
@@ -518,44 +533,7 @@ export default function HomeScreen() {
                             endDate={new Date(startDate.getTime() + (planType === 'cold_turkey' ? 30 : 42) * 24 * 60 * 60 * 1000)}
                         />
 
-                        {/* Streak Status Banner - Food-based streak info */}
-                        {todayStatus && (
-                            <TouchableOpacity
-                                activeOpacity={0.85}
-                                onPress={() => setShowFoodScannerModal(true)}
-                                style={styles.streakStatusBanner}
-                            >
-                                <View style={[
-                                    styles.streakStatusContainer,
-                                    !todayStatus.hasLogs && styles.streakStatusWarning,
-                                    todayStatus.hasLogs && !todayStatus.isUnderTarget && styles.streakStatusDanger,
-                                    todayStatus.isStreakDay && styles.streakStatusSuccess,
-                                ]}>
-                                    <View style={styles.streakStatusLeft}>
-                                        <Text style={styles.streakStatusEmoji}>
-                                            {todayStatus.isStreakDay ? '✅' : !todayStatus.hasLogs ? '📝' : '⚠️'}
-                                        </Text>
-                                        <View>
-                                            <Text style={styles.streakStatusTitle}>
-                                                {todayStatus.isStreakDay
-                                                    ? `Day ${streakData?.currentStreak || 0} complete!`
-                                                    : !todayStatus.hasLogs
-                                                        ? 'Log food to build streak'
-                                                        : 'Sugar over target'}
-                                            </Text>
-                                            <Text style={styles.streakStatusSubtitle}>
-                                                {todayStatus.hasLogs
-                                                    ? `${todayStatus.totalSugar}g / ${todayStatus.dailyTarget}g sugar`
-                                                    : `Target: ${todayStatus.dailyTarget}g sugar`}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    {!todayStatus.isStreakDay && (
-                                        <Feather name="plus-circle" size={20} color={looviColors.accent.primary} />
-                                    )}
-                                </View>
-                            </TouchableOpacity>
-                        )}
+                        {/* Streak Status Banner - REMOVED, replaced by MascotTip below */}
 
                         {/* Streak Recovery Prompt */}
                         {canRecoverStreak && (
@@ -720,53 +698,47 @@ export default function HomeScreen() {
                             />
                         </View>
 
-                        {/* Your Next Task Section */}
-                        <Text style={styles.sectionTitle}>Your next task</Text>
-                        {/* Smart Call-to-Action */}
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            onPress={() => {
-                                // Navigate based on what's pending
-                                if (!hasPledgedToday) {
-                                    setShowPledgeModal(true);
-                                } else if (!wellnessAverages) {
-                                    setShowWellnessModal(true);
-                                } else if (!hasFoodLoggedToday) {
-                                    setShowFoodScannerModal(true);
-                                } else {
-                                    setShowWellnessModal(true);
+                        {/* Mascot Tips - Dynamic suggestions with friendly mascot */}
+                        <MascotTip
+                            hasPledgedToday={hasPledgedToday}
+                            hasFoodLoggedToday={hasFoodLoggedToday}
+                            hasWellnessToday={hasWellnessToday}
+                            hasInnerCircleFriends={hasInnerCircleFriends}
+                            currentStreak={streakData?.currentStreak || 0}
+                            healthScore={0}
+                            onTipPress={(action, friendId) => {
+                                switch (action) {
+                                    case 'pledge':
+                                        setShowPledgeModal(true);
+                                        break;
+                                    case 'track':
+                                        setShowFoodScannerModal(true);
+                                        break;
+                                    case 'journal':
+                                        setShowWellnessModal(true);
+                                        break;
+                                    case 'inner_circle':
+                                        navigation.navigate('Social', { openAddFriends: true });
+                                        break;
+                                    case 'analytics':
+                                        navigation.navigate('Analytics');
+                                        break;
+                                    case 'community':
+                                        navigation.navigate('Social');
+                                        break;
+                                    case 'cheer_friend':
+                                        // Navigate to friend's profile to send encouragement
+                                        if (friendId) {
+                                            navigation.navigate('Social', { viewFriendId: friendId });
+                                        } else {
+                                            navigation.navigate('Social');
+                                        }
+                                        break;
+                                    default:
+                                        break;
                                 }
                             }}
-                        >
-                            <GlassCard variant="light" padding="md" style={styles.ctaContainerGlass}>
-                                <View style={styles.ctaContent}>
-                                    <View style={styles.ctaIconContainer}>
-                                        <Feather
-                                            name={
-                                                !hasPledgedToday ? 'sun' :
-                                                    !hasFoodLoggedToday ? 'camera' :
-                                                        !wellnessAverages ? 'book' : 'check-circle'
-                                            }
-                                            size={20}
-                                            color={looviColors.accent.primary}
-                                        />
-                                    </View>
-                                    <View style={styles.ctaTextContainer}>
-                                        <Text style={styles.ctaTitle}>
-                                            {!hasPledgedToday ? 'Morning Check-In' :
-                                                !hasFoodLoggedToday ? 'Log Your Meal' :
-                                                    !wellnessAverages ? 'Evening Reflection' : 'All Done!'}
-                                        </Text>
-                                        <Text style={styles.ctaSubtitle}>
-                                            {!hasPledgedToday ? 'Start your day with intention' :
-                                                !hasFoodLoggedToday ? 'Take a photo of your food' :
-                                                    !wellnessAverages ? 'Rate your day & growth' : 'Great job today!'}
-                                        </Text>
-                                    </View>
-                                    <Feather name="chevron-right" size={20} color={looviColors.text.tertiary} />
-                                </View>
-                            </GlassCard>
-                        </TouchableOpacity>
+                        />
 
                         {/* Spacer */}
                         <View style={{ height: spacing.lg }} />
@@ -865,7 +837,7 @@ export default function HomeScreen() {
                             setCheckInResult(null);
                         }}
                         onCheckIn={handleCheckInSubmit}
-                        planType={(onboardingData.plan as 'cold_turkey' | 'gradual') || 'cold_turkey'}
+                        planType="cold_turkey"
                         startDate={startDate}
                     />
 

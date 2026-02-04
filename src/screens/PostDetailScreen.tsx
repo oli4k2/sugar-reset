@@ -33,6 +33,7 @@ import { useUserProfile } from '../context/UserProfileContext';
 import postService, { Comment } from '../services/postService';
 import { Post } from '../types';
 import { UserAvatar } from '../components/UserAvatar';
+import { adminService } from '../services/adminService';
 
 type PostDTO = Omit<Post, 'createdAt' | 'updatedAt'> & {
     createdAt: string;
@@ -63,11 +64,20 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const [newComment, setNewComment] = useState('');
     const [loadingComments, setLoadingComments] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
-    // Fetch comments and refresh post on mount
+    // Check admin status and fetch data on mount
     useEffect(() => {
         loadData();
+        checkAdminStatus();
     }, []);
+
+    const checkAdminStatus = async () => {
+        if (user?.id) {
+            const adminStatus = await adminService.isAdmin(user.id);
+            setIsAdmin(adminStatus);
+        }
+    };
 
     const loadData = async () => {
         try {
@@ -120,20 +130,25 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             setNewComment('');
             // Refresh comments
             await loadData();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error submitting comment:', error);
-            Alert.alert('Error', 'Failed to post comment. Please try again.');
+            // Show the error message (includes profanity filter message)
+            const message = error?.message || 'Failed to post comment. Please try again.';
+            Alert.alert('Error', message);
         } finally {
             setSubmitting(false);
         }
     };
 
     const handleDeletePost = async () => {
-        if (!user || user.id !== post.authorId) return;
+        const canDelete = user && (user.id === post.authorId || isAdmin);
+        if (!canDelete) return;
 
         Alert.alert(
             'Delete Post',
-            'Are you sure you want to delete this post? This cannot be undone.',
+            isAdmin && user?.id !== post.authorId
+                ? 'Admin: Are you sure you want to delete this post? This cannot be undone.'
+                : 'Are you sure you want to delete this post? This cannot be undone.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -141,7 +156,11 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await postService.deletePost(post.id, user.id);
+                            if (isAdmin && user?.id !== post.authorId) {
+                                await adminService.deletePostAsAdmin(post.id);
+                            } else if (user) {
+                                await postService.deletePost(post.id, user.id);
+                            }
                             navigation.goBack();
                         } catch (error) {
                             console.error('Error deleting post:', error);
@@ -154,11 +173,14 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     };
 
     const handleDeleteComment = async (comment: Comment) => {
-        if (!user || user.id !== comment.authorId) return;
+        const canDelete = user && (user.id === comment.authorId || isAdmin);
+        if (!canDelete) return;
 
         Alert.alert(
             'Delete Comment',
-            'Are you sure you want to delete this comment?',
+            isAdmin && user?.id !== comment.authorId
+                ? 'Admin: Are you sure you want to delete this comment?'
+                : 'Are you sure you want to delete this comment?',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -166,7 +188,11 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await postService.deleteComment(post.id, comment.id, user.id);
+                            if (isAdmin && user?.id !== comment.authorId) {
+                                await adminService.deleteCommentAsAdmin(post.id, comment.id);
+                            } else if (user) {
+                                await postService.deleteComment(post.id, comment.id, user.id);
+                            }
                             // Refresh comments
                             await loadData();
                         } catch (error) {
@@ -185,7 +211,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                 <Ionicons name="arrow-back" size={24} color={looviColors.text.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Post</Text>
-            {user?.id === post.authorId ? (
+            {(user?.id === post.authorId || isAdmin) ? (
                 <TouchableOpacity onPress={handleDeletePost} style={styles.backButton}>
                     <Ionicons name="trash-outline" size={22} color={looviColors.accent.warning} />
                 </TouchableOpacity>
@@ -276,7 +302,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                         <Text style={styles.commentTime}>{postService.getTimeAgo(item.createdAt)}</Text>
                     </View>
                 </TouchableOpacity>
-                {user?.id === item.authorId && (
+                {(user?.id === item.authorId || isAdmin) && (
                     <TouchableOpacity
                         onPress={() => handleDeleteComment(item)}
                         style={styles.deleteCommentButton}

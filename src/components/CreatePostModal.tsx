@@ -93,9 +93,11 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
                 { text: 'OK', onPress: handleClose }
             ]);
             onPostCreated?.();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating post:', error);
-            Alert.alert('Error', 'Failed to create post. Please try again.');
+            // Show the error message (includes profanity filter message)
+            const message = error?.message || 'Failed to create post. Please try again.';
+            Alert.alert('Error', message);
         } finally {
             setIsPosting(false);
         }

@@ -26,8 +26,6 @@ import { useNavigation } from '@react-navigation/native';
 import { spacing, borderRadius } from '../theme';
 import LooviBackground, { looviColors } from '../components/LooviBackground';
 import { GlassCard } from '../components/GlassCard';
-import PlanDetailsModal from '../components/PlanDetailsModal';
-import EditGoalsModal from '../components/EditGoalsModal';
 import { UserAvatar } from '../components/UserAvatar';
 import { AVATAR_EMOJIS } from '../constants/avatarConfig';
 
@@ -57,8 +55,6 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
         title: 'Account',
         items: [
             { id: 'profile', emoji: '👤', label: 'Edit Profile' },
-            { id: 'plan', emoji: '📋', label: 'My Plan' },
-            { id: 'subscription', emoji: '👑', label: 'Subscription' },
             { id: 'restore', emoji: '🔄', label: 'Restore Purchases' },
             { id: 'deleteAccount', emoji: '⚠️', label: 'Delete Account' },
         ],
@@ -99,7 +95,6 @@ export default function ProfileScreen() {
     const { signOut } = useAuth();
     const { restorePurchases, isPremium } = useRevenueCat();
     const navigation = useNavigation<any>();
-    const [showPlanDetails, setShowPlanDetails] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -155,37 +150,9 @@ export default function ProfileScreen() {
     const name = onboardingData.nickname || user?.displayName || firebaseUser?.displayName || 'Guest';
     const email = firebaseUser?.email || user?.email || 'Not signed in';
     const daysSugarFree = streakData?.currentStreak || 0;
-    const currentPlan = onboardingData.plan === 'cold_turkey' ? 'Cold Turkey' : 'Gradual Reduction';
-    const subscriptionType = isPremium ? 'Premium' : 'Free';
 
     // Health score display
     const healthScoreDisplay = latestHealthScore > 0 ? latestHealthScore : '--';
-
-    const handleViewPlanDetails = () => {
-        setShowPlanDetails(true);
-    };
-
-    const handleChangePlan = () => {
-        const newPlan = onboardingData.plan === 'cold_turkey' ? 'gradual' : 'cold_turkey';
-        const newPlanName = newPlan === 'cold_turkey' ? 'Cold Turkey' : 'Gradual Reduction';
-
-        Alert.alert(
-            'Change Plan',
-            `Switch to ${newPlanName}?\n\n${newPlan === 'cold_turkey'
-                ? '0g sugar from day 1 for 90 days. Maximum discipline.'
-                : '50g → 45g → ... → 20g → 0g at week 8, then maintain.'}`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Switch',
-                    onPress: async () => {
-                        await updateOnboardingData({ plan: newPlan });
-                        Alert.alert('Plan Updated', `You're now on the ${newPlanName} plan.`);
-                    }
-                },
-            ]
-        );
-    };
 
     const handleRestorePurchases = async () => {
         try {
@@ -528,12 +495,7 @@ export default function ProfileScreen() {
                             <Text style={styles.userName}>{name}</Text>
                             <Text style={styles.userEmail}>{email}</Text>
 
-                            {/* Subscription Badge */}
-                            <View style={styles.subscriptionBadge}>
-                                <Text style={styles.subscriptionText}>
-                                    {subscriptionType === 'Premium' ? '👑 Premium' : '✨ Free'}
-                                </Text>
-                            </View>
+
 
                             {/* Stats Cards - Streak, Health, Pledge */}
                             <View style={styles.floatingStatsRow}>
@@ -578,41 +540,37 @@ export default function ProfileScreen() {
                                             ]}
                                             activeOpacity={0.6}
                                             onPress={
-                                                item.id === 'plan'
-                                                    ? handleViewPlanDetails
-                                                    : item.id === 'profile'
-                                                        ? handleEditProfile
-                                                        : item.id === 'subscription'
-                                                            ? () => navigation.navigate('Paywall')
-                                                            : item.id === 'restore'
-                                                                ? handleRestorePurchases
-                                                                : item.id === 'deleteAccount'
-                                                                    ? handleDeleteAccount
-                                                                    : item.id === 'notifications'
-                                                                        ? () => setShowNotificationSettings(true)
-                                                                        : item.id === 'journal'
-                                                                            ? () => navigation.navigate('Journal')
-                                                                            : item.id === 'help'
-                                                                                ? () => navigation.navigate('Help')
-                                                                                : item.id === 'rate'
-                                                                                    ? async () => {
-                                                                                        if (await StoreReview.hasAction()) {
-                                                                                            StoreReview.requestReview();
-                                                                                        } else {
-                                                                                            Alert.alert('Rate App', 'You can rate us on the App Store!');
-                                                                                        }
-                                                                                    }
-                                                                                    : item.id === 'feedback'
-                                                                                        ? () => Linking.openURL('mailto:hello@scriptcollective.com')
-                                                                                        : item.id === 'privacy'
-                                                                                            ? () => navigation.navigate('PrivacyPolicy')
-                                                                                            : item.id === 'terms'
-                                                                                                ? () => navigation.navigate('TermsOfService')
-                                                                                                : item.id === 'clearData'
-                                                                                                    ? handleClearAllData
-                                                                                                    : item.id === 'cleanupCommunity'
-                                                                                                        ? handleCleanupCommunityData
-                                                                                                        : undefined
+                                                item.id === 'profile'
+                                                    ? handleEditProfile
+                                                    : item.id === 'restore'
+                                                        ? handleRestorePurchases
+                                                        : item.id === 'deleteAccount'
+                                                            ? handleDeleteAccount
+                                                            : item.id === 'notifications'
+                                                                ? () => setShowNotificationSettings(true)
+                                                                : item.id === 'journal'
+                                                                    ? () => navigation.navigate('Journal')
+                                                                    : item.id === 'help'
+                                                                        ? () => navigation.navigate('Help')
+                                                                        : item.id === 'rate'
+                                                                            ? async () => {
+                                                                                if (await StoreReview.hasAction()) {
+                                                                                    StoreReview.requestReview();
+                                                                                } else {
+                                                                                    Alert.alert('Rate App', 'You can rate us on the App Store!');
+                                                                                }
+                                                                            }
+                                                                            : item.id === 'feedback'
+                                                                                ? () => Linking.openURL('mailto:hello@scriptcollective.com')
+                                                                                : item.id === 'privacy'
+                                                                                    ? () => navigation.navigate('PrivacyPolicy')
+                                                                                    : item.id === 'terms'
+                                                                                        ? () => navigation.navigate('TermsOfService')
+                                                                                        : item.id === 'clearData'
+                                                                                            ? handleClearAllData
+                                                                                            : item.id === 'cleanupCommunity'
+                                                                                                ? handleCleanupCommunityData
+                                                                                                : undefined
                                             }
                                             disabled={(item.id === 'restore' && isRestoring) || (item.id === 'deleteAccount' && isDeletingAccount)}
                                         >
@@ -622,12 +580,6 @@ export default function ProfileScreen() {
                                                     styles.menuLabel,
                                                     item.id === 'deleteAccount' && styles.deleteMenuLabel
                                                 ]}>{item.label}</Text>
-                                                {item.id === 'plan' && (
-                                                    <Text style={styles.menuValue}>{currentPlan}</Text>
-                                                )}
-                                                {item.id === 'subscription' && (
-                                                    <Text style={styles.menuValue}>{subscriptionType}</Text>
-                                                )}
                                             </View>
                                             {item.id === 'restore' && isRestoring ? (
                                                 <ActivityIndicator size="small" color={looviColors.accent.primary} />
@@ -662,7 +614,7 @@ export default function ProfileScreen() {
                         />
 
                         {/* Version */}
-                        <Text style={styles.version}>SugarReset v1.0.0</Text>
+                        <Text style={styles.version}>Craveless v1.0.0</Text>
                     </ScrollView>
 
 
@@ -685,18 +637,6 @@ export default function ProfileScreen() {
                         >
                             <TouchableOpacity activeOpacity={1} style={styles.editModalContent}>
                                 <Text style={styles.editModalTitle}>Edit Profile</Text>
-
-                                {/* Auth Provider Badge */}
-                                {authProvider !== 'unknown' && (
-                                    <View style={styles.authProviderBadge}>
-                                        <Text style={styles.authProviderIcon}>
-                                            {authProvider === 'google' ? '🔵' : authProvider === 'apple' ? '🍎' : '✉️'}
-                                        </Text>
-                                        <Text style={styles.authProviderText}>
-                                            Signed in with {authProvider === 'google' ? 'Google' : authProvider === 'apple' ? 'Apple' : 'Email'}
-                                        </Text>
-                                    </View>
-                                )}
 
                                 {/* Avatar Selection */}
                                 <Text style={styles.inputLabel}>Profile Picture</Text>
@@ -792,22 +732,13 @@ export default function ProfileScreen() {
                         </TouchableOpacity>
                     </Modal>
 
-
-                    {/* Plan Details Modal */}
-                    <PlanDetailsModal
-                        visible={showPlanDetails}
-                        planType={onboardingData.plan || 'cold_turkey'}
-                        onClose={() => setShowPlanDetails(false)}
-                        onSwitchPlan={handleChangePlan}
-                    />
-
                     {/* Notification Settings Modal */}
                     <NotificationSettingsModal
                         visible={showNotificationSettings}
                         onClose={() => setShowNotificationSettings(false)}
                     />
                 </SafeAreaView>
-            </LooviBackground>
+            </LooviBackground >
         </>
     );
 }
@@ -1075,25 +1006,6 @@ const styles = StyleSheet.create({
         marginBottom: spacing.md,
         marginTop: -spacing.sm,
         marginLeft: spacing.xs,
-    },
-    authProviderBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(59, 130, 246, 0.08)',
-        borderRadius: borderRadius.lg,
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-        marginBottom: spacing.lg,
-        gap: spacing.xs,
-    },
-    authProviderIcon: {
-        fontSize: 14,
-    },
-    authProviderText: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: looviColors.text.secondary,
     },
     readOnlyField: {
         backgroundColor: 'rgba(0, 0, 0, 0.02)',

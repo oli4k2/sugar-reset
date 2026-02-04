@@ -45,10 +45,10 @@ export default function RefundPolicyPage() {
               1. Overview
             </h2>
             <p className="text-loovi-text-secondary mb-4 leading-relaxed">
-              SugarReset offers premium subscription services through in-app purchases. All purchases are processed by Apple (for iOS) or Google (for Android), and refunds are handled according to their respective policies.
+              Craveless offers premium subscription services through in-app purchases. All purchases are processed by Apple (for iOS) or Google (for Android), and refunds are handled according to their respective policies.
             </p>
             <p className="text-loovi-text-secondary leading-relaxed">
-              This policy outlines how refunds work for SugarReset subscriptions and how to request a refund.
+              This policy outlines how refunds work for Craveless subscriptions and how to request a refund.
             </p>
           </div>
 
@@ -90,7 +90,7 @@ export default function RefundPolicyPage() {
             <p className="text-loovi-text-secondary mb-4 leading-relaxed">
               Refund requests must be made through the platform where you made the purchase:
             </p>
-            
+
             <div className="mb-4">
               <h3 className="font-heading text-lg font-semibold text-loovi-text-primary mb-3">
                 For iOS (Apple App Store):
@@ -98,7 +98,7 @@ export default function RefundPolicyPage() {
               <ol className="list-decimal list-inside space-y-2 text-loovi-text-secondary ml-4">
                 <li>Go to <a href="https://reportaproblem.apple.com" target="_blank" rel="noopener noreferrer" className="text-loovi-text-primary hover:underline font-semibold">reportaproblem.apple.com</a></li>
                 <li>Sign in with your Apple ID</li>
-                <li>Find the SugarReset purchase</li>
+                <li>Find the Craveless purchase</li>
                 <li>Select "Report a Problem" and choose your reason</li>
                 <li>Follow the instructions to submit your refund request</li>
               </ol>
@@ -114,7 +114,7 @@ export default function RefundPolicyPage() {
               <ol className="list-decimal list-inside space-y-2 text-loovi-text-secondary ml-4">
                 <li>Open the Google Play Store app</li>
                 <li>Tap your profile icon → Payments & subscriptions</li>
-                <li>Find SugarReset in your subscription list</li>
+                <li>Find Craveless in your subscription list</li>
                 <li>Tap "Manage" → "Cancel subscription" or "Request refund"</li>
                 <li>Follow the prompts to complete your request</li>
               </ol>
@@ -202,4 +202,5 @@ export default function RefundPolicyPage() {
     </main>
   );
 }
+
 
