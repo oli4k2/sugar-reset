@@ -27,24 +27,28 @@ import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { useAuth } from '../../hooks/useAuth';
+import { useAuthContext } from '../../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type LoginScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Login'>;
 };
 
-type AuthStep = 'options' | 'email' | 'email-sent';
+type AuthStep = 'options' | 'email' | 'email-sent' | 'paste-link';
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
     const { 
         signInWithGoogle, 
         signInWithApple, 
         sendEmailLink,
+        completeEmailSignIn,
         error: authError,
         clearError,
     } = useAuth();
 
     const [step, setStep] = useState<AuthStep>('options');
     const [email, setEmail] = useState('');
+    const [linkUrl, setLinkUrl] = useState('');
     const [googleLoading, setGoogleLoading] = useState(false);
     const [appleLoading, setAppleLoading] = useState(false);
     const [emailLoading, setEmailLoading] = useState(false);
@@ -56,6 +60,14 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             setError(authError.message);
         }
     }, [authError]);
+
+    // Check if user was successfully signed in
+    const { isAuthenticated } = useAuthContext();
+    useEffect(() => {
+        if (isAuthenticated && (step === 'paste-link' || step === 'email-sent')) {
+            console.log('✅ User authenticated, navigation will happen automatically');
+        }
+    }, [isAuthenticated, step]);
 
     const handleGoogleSignIn = async () => {
         setGoogleLoading(true);
@@ -316,6 +328,16 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                                 </View>
 
                                 <TouchableOpacity
+                                    style={[styles.socialButton, styles.emailButton, { marginBottom: spacing.md }]}
+                                    onPress={() => setStep('paste-link')}
+                                >
+                                    <Ionicons name="link-outline" size={22} color={looviColors.text.primary} />
+                                    <Text style={[styles.socialButtonText, styles.emailButtonText]}>
+                                        Paste Link Manually
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
                                     style={styles.resendButton}
                                     onPress={handleSendEmailLink}
                                     disabled={emailLoading}
@@ -332,6 +354,102 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                                     onPress={() => setStep('email')}
                                 >
                                     <Text style={styles.changeEmailText}>Use a different email</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+
+                        {step === 'paste-link' && (
+                            <>
+                                <GlassCard variant="light" padding="lg" style={styles.formCard}>
+                                    <Text style={styles.inputLabel}>Paste Magic Link</Text>
+                                    <Text style={[styles.emailSentHint, { marginBottom: spacing.md }]}>
+                                        If the link didn't open automatically, paste it here:
+                                    </Text>
+                                    <TextInput
+                                        style={[styles.input, { minHeight: 100, textAlignVertical: 'top' }]}
+                                        value={linkUrl}
+                                        onChangeText={setLinkUrl}
+                                        placeholder="https://sugar-reset.firebaseapp.com/auth/email-signin?..."
+                                        placeholderTextColor={looviColors.text.muted}
+                                        multiline
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                </GlassCard>
+
+                                <TouchableOpacity
+                                    style={[styles.primaryButton, { marginTop: spacing.lg }]}
+                                    onPress={async () => {
+                                        if (!linkUrl.trim()) {
+                                            setError('Please paste the link from your email');
+                                            return;
+                                        }
+                                        setError('');
+                                        setEmailLoading(true);
+                                        clearError();
+                                        
+                                        const linkToVerify = linkUrl.trim();
+                                        console.log('🔗 Verifying link manually');
+                                        console.log('📋 Link length:', linkToVerify.length);
+                                        
+                                        // Check if email is stored
+                                        const EMAIL_STORAGE_KEY = '@auth_email_for_sign_in';
+                                        const storedEmail = await AsyncStorage.getItem(EMAIL_STORAGE_KEY);
+                                        console.log('📧 Stored email:', storedEmail || 'NOT FOUND');
+                                        
+                                        if (!storedEmail && email) {
+                                            // Store the email if we have it from the form
+                                            await AsyncStorage.setItem(EMAIL_STORAGE_KEY, email);
+                                            console.log('📧 Stored email from form:', email);
+                                        } else if (!storedEmail) {
+                                            setError(`No email found. Please request a new link.`);
+                                            setEmailLoading(false);
+                                            return;
+                                        }
+                                        
+                                        try {
+                                            const success = await completeEmailSignIn(linkToVerify);
+                                            console.log('✅ Link verification result:', success);
+                                            
+                                            if (success) {
+                                                console.log('✅ Sign-in successful! User should be authenticated now.');
+                                            } else {
+                                                setTimeout(() => {
+                                                    if (authError) {
+                                                        setError(authError.message);
+                                                    } else {
+                                                        setError('Invalid or expired link. Please request a new one.');
+                                                    }
+                                                }, 100);
+                                            }
+                                        } catch (err: any) {
+                                            console.error('❌ Link verification error:', err);
+                                            console.error('❌ Error code:', err.code);
+                                            console.error('❌ Error message:', err.message);
+                                            setError(err.message || 'Failed to verify link. Please try again.');
+                                        } finally {
+                                            setEmailLoading(false);
+                                        }
+                                    }}
+                                    disabled={emailLoading || !linkUrl.trim()}
+                                    activeOpacity={0.8}
+                                >
+                                    {emailLoading ? (
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                    ) : (
+                                        <Text style={styles.primaryButtonText}>Verify Link</Text>
+                                    )}
+                                </TouchableOpacity>
+                                
+                                {error && step === 'paste-link' && (
+                                    <Text style={styles.errorText}>{error}</Text>
+                                )}
+
+                                <TouchableOpacity
+                                    style={styles.changeEmailButton}
+                                    onPress={() => setStep('email-sent')}
+                                >
+                                    <Text style={styles.changeEmailText}>Back</Text>
                                 </TouchableOpacity>
                             </>
                         )}

@@ -45,35 +45,39 @@
             margin-top: 2rem;
             text-align: left;
         }
-        .instructions ol {
-            margin: 1rem 0;
-            padding-left: 1.5rem;
-        }
-        .instructions li {
-            margin: 0.5rem 0;
-        }
-        code {
+        .link-container {
             background: rgba(0, 0, 0, 0.3);
-            padding: 4px 8px;
-            border-radius: 4px;
-            word-break: break-all;
-            font-size: 0.9em;
-            display: block;
-            margin: 0.5rem 0;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .button {
-            display: inline-block;
+        .link-text {
+            flex: 1;
+            word-break: break-all;
+            font-size: 0.85em;
+            color: white;
+            text-align: left;
+        }
+        .copy-button {
             background: white;
             color: #667eea;
-            padding: 12px 24px;
-            border-radius: 24px;
-            text-decoration: none;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
             font-weight: 600;
-            margin-top: 1rem;
+            font-size: 0.9em;
+            cursor: pointer;
+            white-space: nowrap;
             transition: transform 0.2s;
         }
-        .button:hover {
+        .copy-button:hover {
             transform: scale(1.05);
+        }
+        .copy-button:active {
+            transform: scale(0.95);
         }
         .qr-code {
             margin: 1.5rem 0;
@@ -93,6 +97,27 @@
             max-width: 100%;
             max-height: 100%;
         }
+        .mobile-simple {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+        .mobile-link-button {
+            display: block;
+            background: white;
+            color: #667eea;
+            padding: 16px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1em;
+            margin: 1rem 0;
+            transition: transform 0.2s;
+        }
+        .mobile-link-button:hover {
+            transform: scale(1.02);
+        }
     </style>
 </head>
 <body>
@@ -100,49 +125,53 @@
         <div class="spinner" id="spinner"></div>
         <h1 id="title">Signing you in...</h1>
         <p id="message">Redirecting to the app...</p>
+        
+        <!-- Mobile Simple View -->
+        <div id="mobile-simple" style="display: none;">
+            <div class="mobile-simple">
+                <p style="margin-bottom: 1rem;">Click the link below to complete sign-in:</p>
+                <div class="link-container">
+                    <span class="link-text" id="mobile-link-text"></span>
+                    <button class="copy-button" onclick="copyLink()">Copy</button>
+                </div>
+                <a href="#" id="mobile-link-button" class="mobile-link-button" onclick="openApp(); return false;">
+                    Open in Craveless App
+                </a>
+            </div>
+        </div>
+        
+        <!-- Desktop Instructions -->
         <div id="desktop-instructions" style="display: none;">
             <div class="instructions">
                 <h2>📱 Open on Your Phone</h2>
                 <p>To complete sign-in, you need to open this link on your mobile device:</p>
-                <ol>
-                    <li><strong>Copy this link:</strong>
-                        <code id="link-to-copy"></code>
-                    </li>
-                    <li><strong>Send it to your phone</strong> (via text, email, or QR code below)</li>
-                    <li><strong>Open the link on your phone</strong> - it will automatically open the Craveless app</li>
-                </ol>
+                <div class="link-container">
+                    <span class="link-text" id="link-to-copy"></span>
+                    <button class="copy-button" onclick="copyLink()">Copy</button>
+                </div>
+                <p style="margin-top: 1rem;">Or scan this QR code with your phone:</p>
                 <div class="qr-code">
-                    <p style="margin-bottom: 0.5rem;">Or scan this QR code with your phone:</p>
                     <div class="qr-container">
                         <canvas id="qr-code"></canvas>
                     </div>
                 </div>
-                <p style="text-align: center; margin-top: 1.5rem;">
-                    <button class="button" onclick="copyLink()">Copy Link</button>
-                </p>
                 <div style="background: rgba(255, 193, 7, 0.1); border-left: 3px solid #ffc107; padding: 12px; margin-top: 1rem; border-radius: 4px;">
                     <p style="font-size: 0.85em; margin: 0; color: rgba(255,255,255,0.9);">
-                        <strong>Development Mode:</strong> If you're testing with Expo Go, deep links won't work automatically. Copy the link above, open the Craveless app, and the app will detect the link from your clipboard when you open it.
+                        <strong>Development Mode:</strong> If you're testing with Expo Go, copy the link above and paste it in the Craveless app.
                     </p>
                 </div>
-                <p style="font-size: 0.9em; margin-top: 1rem; opacity: 0.9;">
-                    In production builds, the app will open automatically.
-                </p>
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
         // Extract the full URL including ALL query parameters
         const currentUrl = window.location.href;
         const urlParams = new URLSearchParams(window.location.search);
         
         // For the app deep link, we need to pass the FULL Firebase URL (not just parameters)
-        // This is because Firebase's isSignInWithEmailLink() needs the complete URL
         const fullFirebaseUrl = currentUrl;
         
         // Build the app deep link URL - pass the full Firebase URL as a parameter
-        // The app will extract it and use it for sign-in
         const appUrl = `craveless://auth/email-signin?url=${encodeURIComponent(fullFirebaseUrl)}`;
         
         // Detect if user is on mobile or desktop
@@ -150,10 +179,9 @@
         
         function copyLink() {
             navigator.clipboard.writeText(currentUrl).then(() => {
-                // Show a more helpful message
                 const message = isMobile 
-                    ? 'Link copied! Open the Craveless app and paste this link in the app to complete sign-in.'
-                    : 'Link copied! Now paste it on your phone in the Craveless app.';
+                    ? 'Link copied! Paste it in the Craveless app.'
+                    : 'Link copied! Now paste it on your phone.';
                 alert(message);
             }).catch(() => {
                 // Fallback for older browsers
@@ -164,24 +192,31 @@
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
                 const message = isMobile 
-                    ? 'Link copied! Open the Craveless app and paste this link to complete sign-in.'
-                    : 'Link copied! Now paste it on your phone in the Craveless app.';
+                    ? 'Link copied! Paste it in the Craveless app.'
+                    : 'Link copied! Now paste it on your phone.';
                 alert(message);
             });
         }
         
-        if (isMobile) {
-            // On mobile: Try multiple methods to open the app
-            console.log('Mobile device detected, redirecting to app:', appUrl);
+        function openApp() {
+            // Try multiple methods to open the app
+            console.log('Attempting to open app with URL:', appUrl);
             
-            // Method 1: Try immediate redirect
+            // Method 1: Direct location change
             window.location.href = appUrl;
             
-            // Method 2: Try with a hidden iframe (for iOS)
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = appUrl;
-            document.body.appendChild(iframe);
+            // Method 2: Try with iframe (for iOS)
+            setTimeout(() => {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = appUrl;
+                document.body.appendChild(iframe);
+                
+                // Remove iframe after a moment
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 1000);
+            }, 100);
             
             // Method 3: Try window.open as fallback
             setTimeout(() => {
@@ -190,22 +225,120 @@
                 } catch (e) {
                     console.log('window.open failed:', e);
                 }
-            }, 500);
+            }, 200);
+        }
+        
+        function generateQRCode() {
+            const qrCanvas = document.getElementById('qr-code');
+            if (!qrCanvas) {
+                console.error('QR code canvas not found');
+                return;
+            }
             
-            // Always show instructions after a short delay (for development/fallback)
-            // In production builds, the app will open and user won't see this
+            // Check if QRCode library is loaded
+            if (typeof QRCode === 'undefined') {
+                console.error('QRCode library not loaded, retrying...');
+                // Retry after loading the script
+                loadQRCodeLibrary().then(() => {
+                    generateQRCode();
+                });
+                return;
+            }
+            
+            // Generate QR code with the Firebase web URL (not the deep link)
+            // Camera apps can open web URLs, which will then redirect to the app
+            // This is more reliable than using the deep link directly
+            try {
+                QRCode.toCanvas(qrCanvas, currentUrl, {
+                    width: 180,
+                    margin: 2,
+                    color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                    }
+                }, function (error) {
+                    if (error) {
+                        console.error('QR code generation error:', error);
+                        const qrContainer = qrCanvas.parentElement;
+                        if (qrContainer) {
+                            qrContainer.innerHTML = 
+                                '<p style="color: rgba(255,255,255,0.7);">QR code unavailable. Please copy the link above.</p>';
+                        }
+                    } else {
+                        console.log('✅ QR code generated successfully with Firebase URL');
+                    }
+                });
+            } catch (err) {
+                console.error('QR code generation exception:', err);
+            }
+        }
+        
+        function loadQRCodeLibrary() {
+            return new Promise((resolve, reject) => {
+                // Check if already loaded
+                if (typeof QRCode !== 'undefined') {
+                    resolve();
+                    return;
+                }
+                
+                // Try multiple CDN sources
+                const cdnUrls = [
+                    'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+                    'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js'
+                ];
+                
+                let currentIndex = 0;
+                
+                function tryLoad() {
+                    if (currentIndex >= cdnUrls.length) {
+                        console.error('❌ All QRCode CDN sources failed');
+                        reject();
+                        return;
+                    }
+                    
+                    const script = document.createElement('script');
+                    script.src = cdnUrls[currentIndex];
+                    script.onload = () => {
+                        console.log('✅ QRCode library loaded from:', cdnUrls[currentIndex]);
+                        resolve();
+                    };
+                    script.onerror = () => {
+                        console.warn('⚠️ Failed to load from:', cdnUrls[currentIndex]);
+                        currentIndex++;
+                        tryLoad();
+                    };
+                    document.head.appendChild(script);
+                }
+                
+                tryLoad();
+            });
+        }
+        
+        if (isMobile) {
+            // On mobile: Show simple view with just the link
+            console.log('Mobile device detected, showing simple view');
+            
+            // Try to open the app immediately
+            window.location.href = appUrl;
+            
+            // Also try with iframe for iOS
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = appUrl;
+            document.body.appendChild(iframe);
+            
+            // Show simple view after short delay
             setTimeout(() => {
                 document.getElementById('spinner').style.display = 'none';
                 document.getElementById('title').textContent = 'Complete Sign-In';
-                document.getElementById('message').textContent = 'To complete sign-in, copy the link below and paste it in the Craveless app:';
-                document.getElementById('desktop-instructions').style.display = 'block';
-                document.getElementById('link-to-copy').textContent = currentUrl;
-                
-                // Auto-copy to clipboard
-                copyLink();
-            }, 1000);
+                document.getElementById('message').textContent = '';
+                document.getElementById('mobile-simple').style.display = 'block';
+                document.getElementById('mobile-link-text').textContent = currentUrl;
+                document.getElementById('mobile-link-button').href = appUrl;
+            }, 500);
         } else {
-            // On desktop: Show instructions immediately
+            // On desktop: Show full instructions with QR code
             console.log('Desktop device detected, showing instructions');
             document.getElementById('spinner').style.display = 'none';
             document.getElementById('title').textContent = 'Open on Your Phone';
@@ -213,23 +346,29 @@
             document.getElementById('desktop-instructions').style.display = 'block';
             document.getElementById('link-to-copy').textContent = currentUrl;
             
-            // Generate QR code
-            QRCode.toCanvas(document.getElementById('qr-code'), currentUrl, {
-                width: 180,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                }
-            }, function (error) {
-                if (error) {
-                    console.error('QR code generation error:', error);
-                    document.getElementById('qr-code').parentElement.innerHTML = 
-                        '<p style="color: rgba(255,255,255,0.7);">QR code unavailable. Please copy the link above.</p>';
+            // Load QR code library and generate QR code
+            loadQRCodeLibrary().then(() => {
+                // Wait a bit more to ensure library is fully initialized
+                setTimeout(() => {
+                    generateQRCode();
+                }, 200);
+            }).catch(() => {
+                // Fallback: Use QR code API service
+                console.log('Using QR code API fallback');
+                const qrContainer = document.querySelector('.qr-container');
+                if (qrContainer) {
+                    const qrImage = document.createElement('img');
+                    // Use Firebase web URL (not deep link) so camera apps can open it
+                    qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(currentUrl)}`;
+                    qrImage.alt = 'QR Code';
+                    qrImage.style.maxWidth = '100%';
+                    qrImage.style.height = 'auto';
+                    qrContainer.innerHTML = '';
+                    qrContainer.appendChild(qrImage);
+                    console.log('✅ QR code loaded from API with Firebase URL');
                 }
             });
         }
     </script>
 </body>
 </html>
-

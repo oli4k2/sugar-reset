@@ -63,7 +63,12 @@ export async function POST(request: NextRequest) {
         };
 
         // Use generateSignInWithEmailLink from Firebase Admin
+        // This generates a UNIQUE one-time link with a unique oobCode each time
         const link = await admin.auth().generateSignInWithEmailLink(email, actionCodeSettings);
+        
+        // Log for debugging (remove in production)
+        console.log('Generated unique sign-in link for:', email);
+        console.log('Link contains oobCode:', link.includes('oobCode='));
 
         // Send email via Resend with simple, clean design (matching verification email style)
         const { data, error: resendError } = await resend.emails.send({
@@ -74,7 +79,7 @@ export async function POST(request: NextRequest) {
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #E8A87C;">Welcome to Craveless!</h1>
           <p>Please click the link below to verify your email address and start your journey.</p>
-          <a href="${link}" style="display: inline-block; background-color: #E8A87C; color: white; padding: 12px 24px; text-decoration: none; border-radius: 24px; font-weight: bold; margin: 16px 0;">Verify Email</a>
+          <a href="${link}" style="display: inline-block; background-color: #E8A87C; color: white; padding: 12px 24px; text-decoration: none; border-radius: 24px; font-weight: bold; margin: 16px 0; cursor: pointer;">Verify Email</a>
           <p style="color: #666; font-size: 14px;">If you didn't request this email, you can ignore it.</p>
         </div>
       `,

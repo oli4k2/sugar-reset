@@ -30,7 +30,7 @@ import FoodScannerModal from '../components/FoodScannerModal';
 import { FoodCalendar } from '../components/FoodCalendar';
 import { FoodLogList } from '../components/FoodLogList';
 import { FoodItemModal } from '../components/FoodItemModal';
-import JournalEntryModal from '../components/JournalEntryModal';
+import SimpleJournalModal from '../components/SimpleJournalModal';
 import {
     getScannedItems,
     getFoodCountsByDate,
@@ -53,6 +53,7 @@ export default function TrackingScreen() {
     const [showScannerModal, setShowScannerModal] = useState(false);
     const [showWellnessModal, setShowWellnessModal] = useState(false);
     const [showJournalModal, setShowJournalModal] = useState(false);
+    const [editingJournal, setEditingJournal] = useState<JournalEntry | null>(null);
     const [showFoodItemModal, setShowFoodItemModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ScannedItem | null>(null);
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -331,7 +332,10 @@ export default function TrackingScreen() {
                                     <Text style={styles.listTitle}>Journal</Text>
                                 </View>
                                 {isToday && (
-                                    <TouchableOpacity onPress={() => setShowJournalModal(true)}>
+                                    <TouchableOpacity onPress={() => {
+                                        setEditingJournal(null);
+                                        setShowJournalModal(true);
+                                    }}>
                                         <Text style={styles.addButton}>+ Add</Text>
                                     </TouchableOpacity>
                                 )}
@@ -340,12 +344,9 @@ export default function TrackingScreen() {
                                 <View style={styles.journalList}>
                                     {selectedDayJournals.map((entry, index) => (
                                         <View key={entry.id || index} style={styles.journalEntry}>
-                                            <Text style={styles.journalMood}>
-                                                {entry.mood === 'great' ? '😊' :
-                                                    entry.mood === 'good' ? '🙂' :
-                                                        entry.mood === 'okay' ? '😐' :
-                                                            entry.mood === 'struggling' ? '😔' : '😣'}
-                                            </Text>
+                                            <View style={styles.journalIconContainer}>
+                                                <Ionicons name="document-text" size={18} color={looviColors.accent.primary} />
+                                            </View>
                                             <View style={styles.journalContent}>
                                                 <Text style={styles.journalNote} numberOfLines={2}>
                                                     {entry.notes || 'No notes'}
@@ -360,8 +361,8 @@ export default function TrackingScreen() {
                                             <View style={styles.journalActions}>
                                                 <TouchableOpacity
                                                     onPress={() => {
-                                                        // TODO: Open edit modal with entry data
-                                                        Alert.alert('Edit', 'Edit functionality coming soon');
+                                                        setEditingJournal(entry);
+                                                        setShowJournalModal(true);
                                                     }}
                                                     style={styles.journalActionButton}
                                                 >
@@ -417,27 +418,22 @@ export default function TrackingScreen() {
                         existingData={selectedDayWellness}
                     />
 
-                    <JournalEntryModal
+                    <SimpleJournalModal
                         visible={showJournalModal}
-                        onClose={() => setShowJournalModal(false)}
-                        onSave={async (entry) => {
-                            // Convert numeric mood to semantic string if needed
-                            const moodMap: Record<number, any> = {
-                                5: 'great',
-                                4: 'good',
-                                3: 'okay',
-                                2: 'struggling',
-                                1: 'difficult'
-                            };
-
-                            const semanticMood = typeof entry.mood === 'number'
-                                ? moodMap[entry.mood] || 'okay'
-                                : entry.mood;
-
-                            addJournalEntry(new Date(), {
-                                ...entry,
-                                mood: semanticMood
-                            });
+                        onClose={() => {
+                            setShowJournalModal(false);
+                            setEditingJournal(null);
+                        }}
+                        existingEntry={editingJournal}
+                        date={new Date(selectedDate + 'T12:00:00')}
+                        onSave={async (notes: string) => {
+                            if (editingJournal) {
+                                // Update existing entry
+                                updateJournalEntry(editingJournal.id, { notes });
+                            } else {
+                                // Create new entry
+                                addJournalEntry(new Date(selectedDate + 'T12:00:00'), { notes });
+                            }
                         }}
                     />
 
@@ -546,8 +542,13 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0, 0, 0, 0.05)',
     },
-    journalMood: {
-        fontSize: 24,
+    journalIconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: `${looviColors.accent.primary}15`,
+        alignItems: 'center',
+        justifyContent: 'center',
         marginRight: spacing.md,
     },
     journalContent: {

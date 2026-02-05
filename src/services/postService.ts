@@ -54,7 +54,12 @@ const toDate = (timestamp: Timestamp | null): Date => {
     return timestamp ? timestamp.toDate() : new Date();
 };
 
-const getTimeAgo = (date: Date): string => {
+const getTimeAgo = (date: Date | null | undefined): string => {
+    // Handle null/undefined dates to prevent text rendering errors
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+        return '';
+    }
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));

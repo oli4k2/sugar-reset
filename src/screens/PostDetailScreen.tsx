@@ -245,10 +245,12 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                     />
                 </View>
                 <View style={styles.authorInfo}>
-                    <Text style={styles.authorName}>{post.authorName}</Text>
-                    <Text style={styles.timeInfo}>
-                        {postService.getTimeAgo(post.createdAt)}
-                    </Text>
+                    <Text style={styles.authorName}>{post.authorName || 'Unknown'}</Text>
+                    {postService.getTimeAgo(post.createdAt) ? (
+                        <Text style={styles.timeInfo}>
+                            {postService.getTimeAgo(post.createdAt)}
+                        </Text>
+                    ) : null}
                 </View>
             </TouchableOpacity>
 
@@ -298,8 +300,10 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                         />
                     </View>
                     <View style={styles.commentHeaderInfo}>
-                        <Text style={styles.commentAuthor}>{item.authorName}</Text>
-                        <Text style={styles.commentTime}>{postService.getTimeAgo(item.createdAt)}</Text>
+                        <Text style={styles.commentAuthor}>{item.authorName || 'Unknown'}</Text>
+                        {postService.getTimeAgo(item.createdAt) ? (
+                            <Text style={styles.commentTime}>{postService.getTimeAgo(item.createdAt)}</Text>
+                        ) : null}
                     </View>
                 </TouchableOpacity>
                 {(user?.id === item.authorId || isAdmin) && (

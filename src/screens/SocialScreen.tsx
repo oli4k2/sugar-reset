@@ -453,10 +453,12 @@ export default function SocialScreen() {
                                             />
                                         </View>
                                         <View>
-                                            <Text style={styles.authorName}>{post.authorName}</Text>
+                                            <Text style={styles.authorName}>{post.authorName || 'Unknown'}</Text>
                                         </View>
                                     </TouchableOpacity>
-                                    <Text style={styles.postTime}>{postService.getTimeAgo(post.createdAt)}</Text>
+                                    {postService.getTimeAgo(post.createdAt) ? (
+                                        <Text style={styles.postTime}>{postService.getTimeAgo(post.createdAt)}</Text>
+                                    ) : null}
                                 </View>
 
                                 {/* Post Content */}

@@ -57,11 +57,11 @@ export function FriendRequestCard({ request, onAccept, onDecline }: FriendReques
                     </Text>
                 </View>
                 <View style={styles.info}>
-                    <Text style={styles.name}>{request.fromName}</Text>
+                    <Text style={styles.name}>{request.fromName || 'Unknown'}</Text>
                     {request.fromUsername && (
                         <Text style={styles.username}>@{request.fromUsername}</Text>
                     )}
-                    <Text style={styles.time}>{timeAgo}</Text>
+                    {timeAgo ? <Text style={styles.time}>{timeAgo}</Text> : null}
                 </View>
             </View>
             <View style={styles.actions}>
@@ -98,7 +98,12 @@ export function FriendRequestCard({ request, onAccept, onDecline }: FriendReques
     );
 }
 
-function getTimeAgo(date: Date): string {
+function getTimeAgo(date: Date | null | undefined): string {
+    // Handle null/undefined dates to prevent text rendering errors
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+        return '';
+    }
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
