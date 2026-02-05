@@ -14,12 +14,12 @@ import {
     FlatList,
     Dimensions,
     Animated,
+    Image,
+    ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
-import LooviBackground, { looviColors } from '../../components/LooviBackground';
-import { AnimatedIllustration, IllustrationType } from '../../components/AnimatedIllustration';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -29,7 +29,7 @@ type SugarScienceScreenProps = {
 
 interface ScienceSlide {
     id: string;
-    illustration: IllustrationType;
+    image: ImageSourcePropType;
     title: string;
     body: string;
     backgroundColor: 'crimson' | 'navy';
@@ -38,35 +38,35 @@ interface ScienceSlide {
 const scienceSlides: ScienceSlide[] = [
     {
         id: '1',
-        illustration: 'brain',
+        image: require('../../../assets/images/onboarding/sugar_science_2.png'),
         title: 'Sugar hijacks your brain',
         body: "Added sugar triggers the same reward pathways as addictive substances. The more often it's used for relief, the stronger the pull becomes.",
         backgroundColor: 'crimson',
     },
     {
         id: '2',
-        illustration: 'brain',
+        image: require('../../../assets/images/onboarding/sugar_science_3.png'),
         title: 'Sugar breaks self-control',
         body: "Cravings start before conscious choice. This is why \"just eating less\" feels like a battle you keep losing.",
         backgroundColor: 'crimson',
     },
     {
         id: '3',
-        illustration: 'blood_sugar',
+        image: require('../../../assets/images/onboarding/sugar_science_5.png'),
         title: 'Sugar drains your energy',
         body: "Blood sugar spikes lead to crashes, fatigue, and mental fog. What feels like comfort is often the cause of the low.",
         backgroundColor: 'crimson',
     },
     {
         id: '4',
-        illustration: 'heart_health',
+        image: require('../../../assets/images/onboarding/sugar_science_4.png'),
         title: 'Sugar affects your body',
         body: "Excess consumption drives systemic inflammation and metabolic stress. Chronic reliance on sugar shifts your biology away from its natural balance.",
         backgroundColor: 'crimson',
     },
     {
         id: '5',
-        illustration: 'target_goals',
+        image: require('../../../assets/images/onboarding/sugar_science_6.png'),
         title: 'There is a way out',
         body: "The brain can relearn. Habits can be rewired. You don't have to fight this alone.",
         backgroundColor: 'navy',
@@ -119,10 +119,10 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
     const renderSlide = ({ item }: { item: ScienceSlide }) => (
         <View style={styles.slide}>
             <View style={styles.slideContent}>
-                <AnimatedIllustration
-                    name={item.illustration}
-                    size={160}
-                    animation="breathe"
+                <Image
+                    source={item.image}
+                    style={styles.slideImage}
+                    resizeMode="contain"
                 />
                 <Text style={styles.title}>{item.title}</Text>
                 <View style={styles.spacer} />
@@ -133,12 +133,33 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
 
     const isLastSlide = currentIndex === scienceSlides.length - 1;
 
-    // Determine background variant based on current slide
-    const currentSlide = scienceSlides[currentIndex];
-    const backgroundVariant = currentSlide?.backgroundColor === 'navy' ? 'solidNavy' : 'solidCrimson';
+    // Interpolate background color based on scroll position for smooth transition
+    // Transition starts at 50% through slide 4, so background is already navy
+    // by the time user reaches the last slide - this prevents the visible color change
+    const lastSlideIndex = scienceSlides.length - 1;
+    const transitionStart = (lastSlideIndex - 1) * SCREEN_WIDTH + SCREEN_WIDTH * 0.5;
+    const transitionEnd = lastSlideIndex * SCREEN_WIDTH;
+    
+    const backgroundColor = scrollX.interpolate({
+        inputRange: [
+            (lastSlideIndex - 1) * SCREEN_WIDTH,
+            transitionStart,
+            transitionEnd,
+        ],
+        outputRange: ['#B22222', '#B22222', '#1A237E'], // crimson to navy
+        extrapolate: 'clamp',
+    });
 
     return (
-        <LooviBackground variant={backgroundVariant}>
+        <View style={StyleSheet.absoluteFill}>
+            {/* Animated background that transitions smoothly based on scroll */}
+            <Animated.View 
+                style={[
+                    StyleSheet.absoluteFill,
+                    { backgroundColor }
+                ]}
+            />
+            <View style={{ flex: 1, backgroundColor: 'transparent' }}>
             <SafeAreaView style={styles.container}>
                 {/* Header with title */}
                 <View style={styles.header}>
@@ -205,7 +226,8 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
-        </LooviBackground>
+            </View>
+        </View>
     );
 }
 
@@ -249,6 +271,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingTop: spacing.xl,
         paddingHorizontal: spacing.screen.horizontal,
+    },
+    slideImage: {
+        width: 200,
+        height: 200,
+        marginBottom: spacing.lg,
     },
     title: {
         fontSize: 34,

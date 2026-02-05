@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { spacing, borderRadius } from '../../theme';
 import { useUserData } from '../../context/UserDataContext';
@@ -97,23 +96,13 @@ export default function SymptomsScreen({ navigation }: SymptomsScreenProps) {
     return (
         <LooviBackground variant="coralTop">
             <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity 
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
-                    >
-                        <Ionicons name="chevron-back" size={24} color={looviColors.text.primary} />
-                    </TouchableOpacity>
-                    <View style={styles.placeholder} />
-                </View>
-
                 <ScrollView 
                     style={styles.scrollView}
                     contentContainerStyle={styles.content}
                     showsVerticalScrollIndicator={false}
                 >
                     <Text style={styles.instructionText}>
-                        Select any symptoms below:
+                        Select your symptoms below:
                     </Text>
 
                     {SYMPTOMS_DATA.map((category) => (
@@ -168,18 +157,6 @@ export default function SymptomsScreen({ navigation }: SymptomsScreenProps) {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.screen.horizontal,
-        paddingVertical: spacing.sm,
-    },
-    backButton: {
-        padding: spacing.xs,
-    },
-    placeholder: {
         flex: 1,
     },
     scrollView: {

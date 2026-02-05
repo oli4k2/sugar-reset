@@ -281,6 +281,19 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const QUESTIONS = getQuestions(answers.gender);
     const question = QUESTIONS[currentQuestion];
     const progress = (currentQuestion + 1) / QUESTIONS.length;
+    
+    // Safety check: ensure question exists and currentQuestion is within bounds
+    if (!question || currentQuestion < 0 || currentQuestion >= QUESTIONS.length) {
+        return (
+            <LooviBackground variant="coralTop">
+                <SafeAreaView style={styles.container}>
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                        <Text>Loading...</Text>
+                    </View>
+                </SafeAreaView>
+            </LooviBackground>
+        );
+    }
 
     const animateTransition = (callback: () => void, direction: 'forward' | 'backward' = 'forward') => {
         if (isAnimating.current) return;
@@ -963,12 +976,13 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                 <SafeAreaView style={styles.container}>
                     <ScrollView
                         style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={styles.userInfoScrollContent}
                         showsVerticalScrollIndicator={false}
                     >
                         <Animated.View
                             style={[
                                 styles.questionContainer,
+                                { paddingTop: 0 },
                                 {
                                     opacity: fadeAnim,
                                     transform: [{ translateY: slideAnim }],
@@ -976,15 +990,20 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             ]}
                         >
                             {/* Question Header */}
-                            <View style={styles.questionHeader}>
-                                <Text style={styles.questionEmoji}>👤</Text>
+                            <View style={[styles.questionHeader, { marginBottom: spacing.md }]}>
+                                <View style={styles.questionImageContainer}>
+                                    <Image 
+                                        source={require('../../../assets/images/onboarding/user-info.png')} 
+                                        style={styles.questionImageExtraLarge}
+                                        resizeMode="contain"
+                                    />
+                                </View>
                                 <Text style={styles.questionTitle}>A little more about you</Text>
                             </View>
 
                             {/* UserInfo Content */}
-                            <View style={styles.userInfoContainer}>
+                            <View style={[styles.userInfoContainer, { marginTop: 0 }]}>
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>What should we call you?</Text>
                                     <TextInput
                                         style={styles.textInput}
                                         placeholder="Your name"
@@ -1026,8 +1045,8 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         // Adaptive spacing for smaller screens
         const adaptiveSpacing = {
             titleBottom: isSmallScreen ? spacing.sm : spacing.md,
-            sublineBottom: isSmallScreen ? spacing.xl : spacing['2xl'],
-            barStackTop: isSmallScreen ? spacing.xl : spacing['2xl'],
+            sublineBottom: isSmallScreen ? 6 : 10,
+            barStackTop: isSmallScreen ? 6 : 10,
             barStackBottom: isSmallScreen ? spacing.md : spacing.lg,
             barGap: isSmallScreen ? spacing.md : spacing.lg,
             disclaimerTop: isSmallScreen ? spacing.md : spacing.lg,
@@ -1205,20 +1224,28 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             >
                             {/* Question Header */}
                             <View style={styles.questionHeader}>
-                                {question.image ? (
-                                    <Image 
-                                        source={question.image} 
-                                        style={[
-                                            styles.questionImage,
-                                            question.id === 'dailySweetTimes' && styles.questionImageLarge
-                                        ]}
-                                        resizeMode="contain"
-                                    />
-                                ) : (
-                                    <Text style={styles.questionEmoji}>{question.emoji}</Text>
-                                )}
-                                <Text style={styles.questionTitle}>{question.title}</Text>
-                                {question.subtitle && (
+                                <View style={styles.questionImageContainer}>
+                                    {question?.image ? (
+                                        <Image 
+                                            source={question.image} 
+                                            style={[
+                                                styles.questionImage,
+                                                (question.id === 'dailySweetTimes' || 
+                                                 question.id === 'sugarSituations' || 
+                                                 question.id === 'reduceSugarAttempt' || 
+                                                 question.id === 'sugarVisibility' ||
+                                                 question.id === 'craveWhenNotHungry' ||
+                                                 question.id === 'avoidSugarDifficulty') && styles.questionImageLarge,
+                                                question.id === 'unconsciousSugar' && styles.questionImageExtraLarge
+                                            ]}
+                                            resizeMode="contain"
+                                        />
+                                    ) : (
+                                        <Text style={styles.questionEmoji}>{question?.emoji || ''}</Text>
+                                    )}
+                                </View>
+                                <Text style={styles.questionTitle}>{question?.title || ''}</Text>
+                                {question?.subtitle && (
                                     <Text style={styles.questionSubtitle}>{question.subtitle}</Text>
                                 )}
                             </View>
@@ -1312,6 +1339,11 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: 120,
     },
+    userInfoScrollContent: {
+        flexGrow: 1,
+        justifyContent: 'center',
+        paddingBottom: 140,
+    },
     questionContainer: {
         paddingHorizontal: spacing.screen.horizontal,
         paddingTop: spacing.xl,
@@ -1320,18 +1352,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: spacing.xl,
     },
+    questionImageContainer: {
+        height: 98,
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.md,
+    },
     questionEmoji: {
         fontSize: 48,
-        marginBottom: spacing.md,
     },
     questionImage: {
         width: 90,
         height: 90,
-        marginBottom: spacing.md,
     },
     questionImageLarge: {
         width: 98,
         height: 98,
+    },
+    questionImageExtraLarge: {
+        width: 105,
+        height: 105,
     },
     questionTitle: {
         fontSize: 24,
@@ -1625,12 +1666,6 @@ const styles = StyleSheet.create({
     },
     inputGroup: {
         gap: spacing.sm,
-    },
-    inputLabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: looviColors.text.primary,
-        textAlign: 'center',
     },
     otherInputContainer: {
         marginTop: spacing.xs,
