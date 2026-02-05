@@ -1,0 +1,27 @@
+{"location":"PromiseScreen.tsx:scrollEnabled","message":"scrollEnabled changed","data":{"scrollEnabled":true},"timestamp":1770317010280,"sessionId":"debug-session","hypothesisId":"H2,H4"}
+{"location":"PromiseScreen.tsx:hasSignature","message":"hasSignature changed","data":{"hasSignature":false},"timestamp":1770317010287,"sessionId":"debug-session","hypothesisId":"H5,H8"}
+{"location":"SignatureField.tsx:42","message":"onPanResponderGrant called","data":{"hasOnBegin":true},"timestamp":1770317011821,"sessionId":"debug-session","hypothesisId":"H1"}
+{"location":"PromiseScreen.tsx:onBegin","message":"onBegin callback","data":{"scrollEnabledBefore":true},"timestamp":1770317011822,"sessionId":"debug-session","hypothesisId":"H1,H2"}
+{"location":"SignatureField.tsx:44","message":"onBegin called","data":{},"timestamp":1770317011822,"sessionId":"debug-session","hypothesisId":"H1"}
+{"location":"SignatureField.tsx:49","message":"currentPath set","data":{"newPath":"M143,56.99998982747388","pathLength":22,"refPath":"M143,56.99998982747388"},"timestamp":1770317011822,"sessionId":"debug-session","hypothesisId":"H8","runId":"post-fix"}
+{"location":"PromiseScreen.tsx:scrollEnabled","message":"scrollEnabled changed","data":{"scrollEnabled":false},"timestamp":1770317012150,"sessionId":"debug-session","hypothesisId":"H2,H4"}
+{"location":"SignatureField.tsx:61","message":"onPanResponderRelease called","data":{"currentPathLength":0,"refPathLength":220,"hasOnEnd":true},"timestamp":1770317012441,"sessionId":"debug-session","hypothesisId":"H1,H6","runId":"post-fix"}
+{"location":"PromiseScreen.tsx:onEnd","message":"onEnd callback","data":{"scrollEnabledBefore":true},"timestamp":1770317012441,"sessionId":"debug-session","hypothesisId":"H1,H2"}
+{"location":"SignatureField.tsx:63","message":"onEnd called","data":{},"timestamp":1770317012441,"sessionId":"debug-session","hypothesisId":"H1","runId":"post-fix"}
+{"location":"SignatureField.tsx:64","message":"Path check passed, adding to paths","data":{"pathToSave":"M143,56.99998982747388 L179,64.66665649414062 L192","pathLength":220},"timestamp":1770317012441,"sessionId":"debug-session","hypothesisId":"H6,H7","runId":"post-fix"}
+{"location":"SignatureField.tsx:70","message":"Calling onSignatureChange(true)","data":{"hasCallback":true},"timestamp":1770317012441,"sessionId":"debug-session","hypothesisId":"H8","runId":"post-fix"}
+{"location":"PromiseScreen.tsx:onSignatureChange","message":"onSignatureChange callback","data":{"hasSignature":true},"timestamp":1770317012442,"sessionId":"debug-session","hypothesisId":"H5,H8"}
+{"location":"PromiseScreen.tsx:scrollEnabled","message":"scrollEnabled changed","data":{"scrollEnabled":true},"timestamp":1770317012463,"sessionId":"debug-session","hypothesisId":"H2,H4"}
+{"location":"PromiseScreen.tsx:hasSignature","message":"hasSignature changed","data":{"hasSignature":true},"timestamp":1770317012466,"sessionId":"debug-session","hypothesisId":"H5,H8"}
+{"location":"SignatureField.tsx:42","message":"onPanResponderGrant called","data":{"hasOnBegin":true},"timestamp":1770317013278,"sessionId":"debug-session","hypothesisId":"H1"}
+{"location":"PromiseScreen.tsx:onBegin","message":"onBegin callback","data":{"scrollEnabledBefore":true},"timestamp":1770317013278,"sessionId":"debug-session","hypothesisId":"H1,H2"}
+{"location":"SignatureField.tsx:44","message":"onBegin called","data":{},"timestamp":1770317013280,"sessionId":"debug-session","hypothesisId":"H1"}
+{"location":"SignatureField.tsx:49","message":"currentPath set","data":{"newPath":"M123,109.33332188924146","pathLength":23,"refPath":"M123,109.33332188924146"},"timestamp":1770317013281,"sessionId":"debug-session","hypothesisId":"H8","runId":"post-fix"}
+{"location":"PromiseScreen.tsx:scrollEnabled","message":"scrollEnabled changed","data":{"scrollEnabled":false},"timestamp":1770317013300,"sessionId":"debug-session","hypothesisId":"H2,H4"}
+{"location":"SignatureField.tsx:61","message":"onPanResponderRelease called","data":{"currentPathLength":0,"refPathLength":1064,"hasOnEnd":true},"timestamp":1770317014421,"sessionId":"debug-session","hypothesisId":"H1,H6","runId":"post-fix"}
+{"location":"PromiseScreen.tsx:onEnd","message":"onEnd callback","data":{"scrollEnabledBefore":true},"timestamp":1770317014421,"sessionId":"debug-session","hypothesisId":"H1,H2"}
+{"location":"SignatureField.tsx:63","message":"onEnd called","data":{},"timestamp":1770317014421,"sessionId":"debug-session","hypothesisId":"H1","runId":"post-fix"}
+{"location":"SignatureField.tsx:64","message":"Path check passed, adding to paths","data":{"pathToSave":"M123,109.33332188924146 L123.33333333333331,109.33","pathLength":1064},"timestamp":1770317014421,"sessionId":"debug-session","hypothesisId":"H6,H7","runId":"post-fix"}
+{"location":"SignatureField.tsx:70","message":"Calling onSignatureChange(true)","data":{"hasCallback":true},"timestamp":1770317014421,"sessionId":"debug-session","hypothesisId":"H8","runId":"post-fix"}
+{"location":"PromiseScreen.tsx:onSignatureChange","message":"onSignatureChange callback","data":{"hasSignature":true},"timestamp":1770317014421,"sessionId":"debug-session","hypothesisId":"H5,H8"}
+{"location":"PromiseScreen.tsx:scrollEnabled","message":"scrollEnabled changed","data":{"scrollEnabled":true},"timestamp":1770317014444,"sessionId":"debug-session","hypothesisId":"H2,H4"}

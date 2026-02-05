@@ -4,7 +4,7 @@
  * User makes a personal promise/commitment to themselves.
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -20,6 +20,7 @@ import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { useUserData } from '../../context/UserDataContext';
+import SignatureField from '../../components/SignatureField';
 
 type PromiseScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Promise'>;
@@ -27,10 +28,24 @@ type PromiseScreenProps = {
 };
 
 export default function PromiseScreen({ navigation, route }: PromiseScreenProps) {
-    const nickname = route.params?.nickname || 'Friend';
+    const { updateOnboardingData, completeOnboarding, onboardingData } = useUserData();
+    const nickname = route.params?.nickname || onboardingData?.nickname || 'Friend';
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
-    const { updateOnboardingData, completeOnboarding } = useUserData();
+    const [hasSignature, setHasSignature] = useState(false);
+    const [scrollEnabled, setScrollEnabled] = useState(true);
+
+    // #region agent log
+    useEffect(() => {
+        fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PromiseScreen.tsx:scrollEnabled',message:'scrollEnabled changed',data:{scrollEnabled},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2,H4'})}).catch(()=>{});
+    }, [scrollEnabled]);
+    // #endregion
+
+    // #region agent log
+    useEffect(() => {
+        fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PromiseScreen.tsx:hasSignature',message:'hasSignature changed',data:{hasSignature},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5,H8'})}).catch(()=>{});
+    }, [hasSignature]);
+    // #endregion
 
     useEffect(() => {
         Animated.parallel([
@@ -62,6 +77,8 @@ export default function PromiseScreen({ navigation, route }: PromiseScreenProps)
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    scrollEnabled={scrollEnabled}
+                    nestedScrollEnabled={false}
                 >
                     <Animated.View
                         style={[
@@ -74,7 +91,6 @@ export default function PromiseScreen({ navigation, route }: PromiseScreenProps)
                     >
                         {/* Header */}
                         <View style={styles.header}>
-                            <Text style={styles.emoji}>🤝</Text>
                             <Text style={styles.title}>Make a promise, {nickname}</Text>
                         </View>
 
@@ -102,31 +118,46 @@ export default function PromiseScreen({ navigation, route }: PromiseScreenProps)
                                 serve my goals and dreams.
                             </Text>
 
-                            <View style={styles.divider} />
-
-                            <Text style={styles.promiseFooter}>
-                                One day at a time. No judgment. Just progress.
-                            </Text>
                         </GlassCard>
 
-                        {/* Motivation */}
-                        <Text style={styles.motivation}>
-                            This is between you and yourself. {'\n'}
-                            We're just here to help you succeed.
-                        </Text>
+                        {/* Signature Field */}
+                        <View style={styles.signatureSection}>
+                            <SignatureField 
+                                onSignatureChange={(hasSignature) => {
+                                    // #region agent log
+                                    fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PromiseScreen.tsx:onSignatureChange',message:'onSignatureChange callback',data:{hasSignature},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5,H8'})}).catch(()=>{});
+                                    // #endregion
+                                    setHasSignature(hasSignature);
+                                }}
+                                onBegin={() => {
+                                    // #region agent log
+                                    fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PromiseScreen.tsx:onBegin',message:'onBegin callback',data:{scrollEnabledBefore:scrollEnabled},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2'})}).catch(()=>{});
+                                    // #endregion
+                                    setScrollEnabled(false);
+                                }}
+                                onEnd={() => {
+                                    // #region agent log
+                                    fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PromiseScreen.tsx:onEnd',message:'onEnd callback',data:{scrollEnabledBefore:scrollEnabled},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2'})}).catch(()=>{});
+                                    // #endregion
+                                    setScrollEnabled(true);
+                                }}
+                            />
+                        </View>
                     </Animated.View>
                 </ScrollView>
 
-                {/* Bottom Button */}
-                <View style={styles.bottomContainer}>
-                    <TouchableOpacity
-                        style={styles.promiseButton}
-                        onPress={handleMakePromise}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.promiseButtonText}>I Promise 💪</Text>
-                    </TouchableOpacity>
-                </View>
+                {/* Save Button */}
+                {hasSignature && (
+                    <View style={styles.bottomContainer}>
+                        <TouchableOpacity
+                            style={styles.saveButton}
+                            onPress={handleMakePromise}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.saveButtonText}>Save</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </SafeAreaView>
         </LooviBackground>
     );
@@ -149,11 +180,7 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing['2xl'],
-    },
-    emoji: {
-        fontSize: 56,
-        marginBottom: spacing.md,
+        marginBottom: spacing.lg,
     },
     title: {
         fontSize: 26,
@@ -186,33 +213,17 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: looviColors.text.primary,
     },
-    divider: {
-        width: 60,
-        height: 2,
-        backgroundColor: 'rgba(0, 0, 0, 0.1)',
-        alignSelf: 'center',
-        marginVertical: spacing.lg,
-    },
-    promiseFooter: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: looviColors.text.tertiary,
-        textAlign: 'center',
-        fontStyle: 'italic',
-    },
-    motivation: {
-        fontSize: 14,
-        fontWeight: '400',
-        color: looviColors.text.tertiary,
-        textAlign: 'center',
-        lineHeight: 22,
+    signatureSection: {
+        marginTop: spacing.lg,
+        marginBottom: spacing.xl,
+        alignItems: 'center',
     },
     bottomContainer: {
         paddingHorizontal: spacing.screen.horizontal,
         paddingTop: spacing.md,
         paddingBottom: spacing['2xl'],
     },
-    promiseButton: {
+    saveButton: {
         backgroundColor: looviColors.accent.primary,
         paddingVertical: 18,
         borderRadius: 30,
@@ -223,7 +234,7 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 5,
     },
-    promiseButtonText: {
+    saveButtonText: {
         fontSize: 18,
         fontWeight: '700',
         color: '#FFFFFF',

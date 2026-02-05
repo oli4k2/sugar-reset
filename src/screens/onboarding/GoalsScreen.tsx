@@ -13,13 +13,13 @@ import {
     TouchableOpacity,
     ScrollView,
     Animated,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { useUserData } from '../../context/UserDataContext';
-import { AnimatedIllustration } from '../../components/AnimatedIllustration';
 
 type GoalsScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Goals'>;
@@ -142,7 +142,11 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
                     >
                         {/* Goals Header */}
                         <View style={styles.header}>
-                            <AnimatedIllustration name="🎯" size={100} animation="breathe" />
+                            <Image
+                                source={require('../../../assets/images/illustrations/target_goals.png')}
+                                style={styles.headerImage}
+                                resizeMode="contain"
+                            />
                             <Text style={styles.title}>What are your main goals?</Text>
                             <Text style={styles.subtitle}>Select all that apply</Text>
                         </View>
@@ -161,7 +165,6 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
                                         onPress={() => toggleGoal(goal.id)}
                                         activeOpacity={0.7}
                                     >
-                                        <Text style={styles.goalEmoji}>{goal.emoji}</Text>
                                         <Text style={[
                                             styles.goalLabel,
                                             isSelected && styles.goalLabelSelected,
@@ -283,6 +286,11 @@ const styles = StyleSheet.create({
     header: {
         alignItems: 'center',
         marginBottom: spacing.lg,
+    },
+    headerImage: {
+        width: 100,
+        height: 100,
+        marginBottom: spacing.md,
     },
     emoji: {
         fontSize: 48,
