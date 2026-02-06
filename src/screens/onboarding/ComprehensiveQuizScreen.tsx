@@ -998,7 +998,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                         resizeMode="contain"
                                     />
                                 </View>
-                                <Text style={styles.questionTitle}>A little more about you</Text>
+                                <Text style={styles.questionTitle}>What can we call you?</Text>
                             </View>
 
                             {/* UserInfo Content */}
