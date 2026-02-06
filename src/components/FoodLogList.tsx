@@ -43,12 +43,12 @@ function FoodItemRow({ item, onPress }: { item: ScannedItem; onPress: () => void
                 <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
                 <View style={styles.itemStats}>
                     <Text style={styles.itemStat}>
-                        <Text style={styles.itemStatValue}>{item.calories}</Text>
+                        <Text style={styles.itemStatValue}>{Math.round(item.calories || 0)}</Text>
                         <Text style={styles.itemStatUnit}> kcal</Text>
                     </Text>
                     <Text style={styles.itemStatDivider}>•</Text>
                     <Text style={styles.itemStat}>
-                        <Text style={styles.itemStatValue}>{item.sugar}</Text>
+                        <Text style={styles.itemStatValue}>{Math.round((item.sugar || 0) * 10) / 10}</Text>
                         <Text style={styles.itemStatUnit}>g sugar</Text>
                     </Text>
                 </View>
@@ -77,12 +77,18 @@ export function FoodLogList({ items, onItemPress, emptyMessage }: FoodLogListPro
         );
     }
 
-    // Calculate totals
-    const totals = items.reduce((acc, item) => ({
-        calories: acc.calories + item.calories,
-        sugar: acc.sugar + item.sugar,
-        protein: acc.protein + item.protein,
+    // Calculate totals and round to prevent floating-point precision issues
+    const rawTotals = items.reduce((acc, item) => ({
+        calories: acc.calories + (item.calories || 0),
+        sugar: acc.sugar + (item.sugar || 0),
+        protein: acc.protein + (item.protein || 0),
     }), { calories: 0, sugar: 0, protein: 0 });
+
+    const totals = {
+        calories: Math.round(rawTotals.calories),
+        sugar: Math.round(rawTotals.sugar * 10) / 10, // One decimal for sugar
+        protein: Math.round(rawTotals.protein),
+    };
 
     return (
         <View style={styles.container}>

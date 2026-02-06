@@ -106,10 +106,35 @@ export default function ProfileScreen() {
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
 
-    // Update pledge status from context (real-time)
+    // Fetch pledge status from Firebase (same source as UserProfilePopup)
     useEffect(() => {
-        setHasPledgedToday(!!todayCheckIn);
-    }, [todayCheckIn]);
+        const loadPledgeStatus = async () => {
+            if (!firebaseUser?.uid) {
+                // Fallback to context if not authenticated
+                setHasPledgedToday(!!todayCheckIn);
+                return;
+            }
+
+            try {
+                const { doc, getDoc } = await import('firebase/firestore');
+                const { db } = await import('../config/firebase');
+                const statsDoc = await getDoc(doc(db, 'userStats', firebaseUser.uid));
+
+                if (statsDoc.exists()) {
+                    const data = statsDoc.data();
+                    setHasPledgedToday(data.pledgedToday || false);
+                } else {
+                    setHasPledgedToday(false);
+                }
+            } catch (error) {
+                console.warn('Failed to fetch pledge status:', error);
+                // Fallback to context
+                setHasPledgedToday(!!todayCheckIn);
+            }
+        };
+
+        loadPledgeStatus();
+    }, [firebaseUser?.uid, todayCheckIn]);
 
     // Determine auth provider type
     const authProvider = useMemo((): 'google' | 'apple' | 'email' | 'unknown' => {

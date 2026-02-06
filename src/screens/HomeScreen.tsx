@@ -964,7 +964,7 @@ export default function HomeScreen() {
                             // Trigger layout animation for the button change
                             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
-                            // Sync pledgedToday to Firebase for UserProfilePopup
+                            // Sync pledgedToday to Firebase for UserProfilePopup and ProfileScreen
                             if (isAuthenticated && user?.id) {
                                 try {
                                     await userService.syncUserStats(user.id, {

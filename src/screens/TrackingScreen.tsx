@@ -163,6 +163,25 @@ export default function TrackingScreen() {
             }
 
             await AsyncStorage.setItem(WELLNESS_LOGS_KEY, JSON.stringify(logs));
+
+            // If thoughts were provided, also create a journal entry so it appears in Journal section
+            if (log.thoughts && log.thoughts.trim()) {
+                // Determine mood based on the mood rating (1-5 scale)
+                const moodMapping: Record<number, 'great' | 'good' | 'okay' | 'struggling' | 'difficult'> = {
+                    5: 'great',
+                    4: 'good',
+                    3: 'okay',
+                    2: 'struggling',
+                    1: 'difficult',
+                };
+                const mood = moodMapping[log.mood] || 'okay';
+
+                addJournalEntry(new Date(log.date + 'T12:00:00'), {
+                    mood,
+                    notes: log.thoughts.trim(),
+                });
+            }
+
             // Refresh the displayed wellness data
             loadSelectedDayWellness();
             Alert.alert('Saved!', 'Your wellness log has been saved.');

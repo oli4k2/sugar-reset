@@ -135,11 +135,13 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
         if (!startTimeRef.current) return;
         const elapsed = Date.now() - startTimeRef.current;
         const p = Math.min(elapsed / DURATION, 1);
-        const delay = Math.max(50, 400 * (1 - p) + 50);
+        // Reduced frequency: min 100ms (was 50), base 300ms (was 400)
+        const delay = Math.max(100, 300 * (1 - p) + 100);
 
         if (p >= 1) return;
-        if (p > 0.7) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (p > 0.8) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        else if (p > 0.3) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        // Skip early haptics to reduce calls
 
         hapticTimeoutRef.current = setTimeout(runHapticLoop, delay);
     };
@@ -162,11 +164,11 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
                     useNativeDriver: false,
                 }).start();
 
-                // 2. Jitter 
+                // 2. Jitter - Slowed down for smoother animation
                 Animated.loop(
                     Animated.sequence([
-                        Animated.timing(tensionDriver, { toValue: 1, duration: 50, useNativeDriver: false }),
-                        Animated.timing(tensionDriver, { toValue: -1, duration: 50, useNativeDriver: false }),
+                        Animated.timing(tensionDriver, { toValue: 1, duration: 80, useNativeDriver: false }),
+                        Animated.timing(tensionDriver, { toValue: -1, duration: 80, useNativeDriver: false }),
                     ])
                 ).start();
 

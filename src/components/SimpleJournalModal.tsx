@@ -89,7 +89,7 @@ export default function SimpleJournalModal({
         >
             <KeyboardAvoidingView
                 style={styles.overlay}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <View style={styles.container}>
                     {/* Header */}
@@ -162,8 +162,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        maxHeight: '90%',
-        minHeight: 400,
+        maxHeight: '85%',
     },
     header: {
         flexDirection: 'row',
