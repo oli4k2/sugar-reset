@@ -67,7 +67,7 @@ export default function PromiseScreen({ navigation, route }: PromiseScreenProps)
         // Mark promise as confirmed and complete onboarding
         await updateOnboardingData({ promiseConfirmed: true });
         await completeOnboarding();
-        navigation.navigate('Paywall');
+        navigation.navigate('PersonalizedPlan');
     };
 
     return (

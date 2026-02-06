@@ -176,9 +176,10 @@ const styles = StyleSheet.create({
         paddingBottom: 100,
     },
     header: {
-        paddingHorizontal: spacing.screen.horizontal,
+        paddingLeft: spacing.screen.horizontal + spacing.card.lg,
+        paddingRight: spacing.screen.horizontal,
         paddingTop: spacing.xl,
-        alignItems: 'center',
+        alignItems: 'flex-start',
         marginBottom: spacing.xl,
     },
     headerTitle: {
@@ -187,11 +188,13 @@ const styles = StyleSheet.create({
         color: looviColors.text.primary,
         marginBottom: spacing.xs,
         letterSpacing: -0.5,
+        textAlign: 'left',
     },
     headerSubtitle: {
         fontSize: 17,
         fontWeight: '400',
         color: looviColors.text.secondary,
+        textAlign: 'left',
     },
     expertCard: {
         marginHorizontal: spacing.screen.horizontal,

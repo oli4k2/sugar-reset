@@ -53,6 +53,8 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
     const [wantToSave, setWantToSave] = useState<boolean | null>(null);
     const [selectedSavingsGoal, setSelectedSavingsGoal] = useState<string | null>(null);
 
+    const moneyGoalSelected = selectedGoals.includes('money');
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const savingsSlide = useRef(new Animated.Value(20)).current;
@@ -95,6 +97,14 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
         }
     }, [wantToSave]);
 
+    // If user unselects "Save money", hide/reset savings flow
+    useEffect(() => {
+        if (!moneyGoalSelected) {
+            setWantToSave(null);
+            setSelectedSavingsGoal(null);
+        }
+    }, [moneyGoalSelected]);
+
     const toggleGoal = (goalId: string) => {
         setSelectedGoals(prev => {
             if (prev.includes(goalId)) {
@@ -112,7 +122,7 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
         });
 
         // Save savings goal if selected
-        if (wantToSave && selectedSavingsGoal) {
+        if (moneyGoalSelected && wantToSave === true && selectedSavingsGoal) {
             const goal = SAVINGS_OPTIONS.find(g => g.id === selectedSavingsGoal);
             await updateOnboardingData({
                 savingsGoal: goal?.label || selectedSavingsGoal,
@@ -123,8 +133,15 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
         navigation.navigate('Promise');
     };
 
-    // Can proceed if goals selected AND (not interested in savings OR savings goal selected)
-    const canProceed = selectedGoals.length > 0 && (wantToSave === false || (wantToSave === true && selectedSavingsGoal !== null));
+    // Can proceed if goals selected AND:
+    // - "Save money" not selected, OR
+    // - user answered "Not now", OR
+    // - user answered "Yes" and picked a savings goal
+    const canProceed =
+        selectedGoals.length > 0 &&
+        (!moneyGoalSelected ||
+            wantToSave === false ||
+            (wantToSave === true && selectedSavingsGoal !== null));
 
     return (
         <LooviBackground variant="blueBottom">
@@ -181,8 +198,8 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
                             })}
                         </View>
 
-                        {/* Savings Question - Only show after goals selected */}
-                        {selectedGoals.length > 0 && (
+                        {/* Savings Question - Only show if "Save money" goal selected */}
+                        {moneyGoalSelected && (
                             <View style={styles.savingsSection}>
                                 <Text style={styles.savingsTitle}>💰 Want to save money for something special?</Text>
                                 <Text style={styles.savingsSubtitle}>
