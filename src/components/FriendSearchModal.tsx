@@ -45,6 +45,8 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
     const [sendingTo, setSendingTo] = useState<string | null>(null);
     const [hasSearched, setHasSearched] = useState(false);
     const [searchError, setSearchError] = useState<string | null>(null);
+    const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+    const [pendingRequestIds, setPendingRequestIds] = useState<Set<string>>(new Set());
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleSearch = useCallback(async (query: string) => {
@@ -122,8 +124,27 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                     console.warn('⚠️ Failed to sync displayNameLower:', err);
                 });
             }
+
+            // Load friends and outgoing requests to check status
+            loadFriendsAndRequests();
         }
     }, [visible, user, onboardingData.nickname]);
+
+    // Load current friends and pending outgoing requests
+    const loadFriendsAndRequests = async () => {
+        if (!user?.id) return;
+        try {
+            // Get current friends
+            const friends = await friendService.getInnerCircle(user.id);
+            setFriendIds(new Set(friends.map(f => f.uid)));
+
+            // Get outgoing friend requests
+            const outgoing = await friendService.getOutgoingRequests(user.id);
+            setPendingRequestIds(new Set(outgoing.map(r => r.toUid)));
+        } catch (error) {
+            console.error('Error loading friends/requests:', error);
+        }
+    };
 
     const handleSendRequest = async (toUser: User) => {
         if (!user) return;
@@ -165,39 +186,56 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
         onClose();
     };
 
-    const renderUserItem = ({ item }: { item: User }) => (
-        <GlassCard variant="light" padding="md" style={styles.userCard}>
-            <View style={styles.userRow}>
-                <View style={[styles.avatar, { backgroundColor: looviColors.accent.primary }]}>
-                    <Text style={styles.avatarText}>
-                        {(item.displayName || item.email)?.[0]?.toUpperCase() || '?'}
-                    </Text>
-                </View>
-                <View style={styles.userInfo}>
-                    <Text style={styles.userName}>
-                        {item.displayName || 'Anonymous'}
-                    </Text>
-                    {item.email && (
-                        <Text style={styles.userEmail}>{item.email}</Text>
-                    )}
-                </View>
-                <TouchableOpacity
-                    style={[styles.addButton, sendingTo === item.id && styles.addButtonDisabled]}
-                    onPress={() => handleSendRequest(item)}
-                    disabled={sendingTo === item.id}
-                >
-                    {sendingTo === item.id ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
+    const renderUserItem = ({ item }: { item: User }) => {
+        const isFriend = friendIds.has(item.id);
+        const isPending = pendingRequestIds.has(item.id);
+
+        return (
+            <GlassCard variant="light" padding="md" style={styles.userCard}>
+                <View style={styles.userRow}>
+                    <View style={[styles.avatar, { backgroundColor: looviColors.accent.primary }]}>
+                        <Text style={styles.avatarText}>
+                            {(item.displayName || item.email)?.[0]?.toUpperCase() || '?'}
+                        </Text>
+                    </View>
+                    <View style={styles.userInfo}>
+                        <Text style={styles.userName}>
+                            {item.displayName || 'Anonymous'}
+                        </Text>
+                        {item.email && (
+                            <Text style={styles.userEmail}>{item.email}</Text>
+                        )}
+                    </View>
+                    {isFriend ? (
+                        <View style={styles.friendsButton}>
+                            <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
+                            <Text style={styles.friendsButtonText}>Friends</Text>
+                        </View>
+                    ) : isPending ? (
+                        <View style={styles.pendingButton}>
+                            <Ionicons name="time" size={16} color={looviColors.text.tertiary} />
+                            <Text style={styles.pendingButtonText}>Pending</Text>
+                        </View>
                     ) : (
-                        <>
-                            <Ionicons name="person-add" size={16} color="#FFFFFF" />
-                            <Text style={styles.addButtonText}>Add</Text>
-                        </>
+                        <TouchableOpacity
+                            style={[styles.addButton, sendingTo === item.id && styles.addButtonDisabled]}
+                            onPress={() => handleSendRequest(item)}
+                            disabled={sendingTo === item.id}
+                        >
+                            {sendingTo === item.id ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                                <>
+                                    <Ionicons name="person-add" size={16} color="#FFFFFF" />
+                                    <Text style={styles.addButtonText}>Add</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
                     )}
-                </TouchableOpacity>
-            </View>
-        </GlassCard>
-    );
+                </View>
+            </GlassCard>
+        );
+    };
 
     return (
         <Modal
@@ -424,6 +462,34 @@ const styles = StyleSheet.create({
         color: looviColors.text.tertiary,
         textAlign: 'center',
         marginTop: spacing.md,
+    },
+    friendsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.lg,
+    },
+    friendsButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#22C55E',
+    },
+    pendingButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.lg,
+    },
+    pendingButtonText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: looviColors.text.tertiary,
     },
 });
 

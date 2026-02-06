@@ -211,19 +211,19 @@ export default function PanicScreen() {
                             onPress={() => handlePress('DistractMe')}
                         >
                             <LinearGradient
-                                colors={['rgba(99, 102, 241, 0.2)', 'rgba(67, 56, 202, 0.1)']}
+                                colors={['rgba(217, 123, 102, 0.25)', 'rgba(217, 123, 102, 0.1)']}
                                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                                 style={StyleSheet.absoluteFillObject}
                             />
                             <View style={styles.cardContent}>
-                                <View style={[styles.iconContainer, { backgroundColor: 'rgba(129, 140, 248, 0.2)' }]}>
-                                    <Feather name="zap" size={24} color="#818CF8" />
+                                <View style={[styles.iconContainer, { backgroundColor: 'rgba(217, 123, 102, 0.3)' }]}>
+                                    <Feather name="zap" size={24} color="#D97B66" />
                                 </View>
                                 <View style={styles.cardTextContainer}>
                                     <Text style={styles.cardLabel}>Distract Me</Text>
                                     <Text style={styles.cardTag}>Shift your focus</Text>
                                 </View>
-                                <Feather name="chevron-right" size={20} color="#818CF8" />
+                                <Feather name="chevron-right" size={20} color="#D97B66" />
                             </View>
                         </TouchableOpacity>
 
@@ -234,25 +234,25 @@ export default function PanicScreen() {
                                 activeOpacity={0.9}
                                 onPress={() => handlePress('Reasons')}
                             >
-                                <LinearGradient colors={['rgba(99, 102, 241, 0.2)', 'rgba(67, 56, 202, 0.1)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                                <LinearGradient colors={['rgba(217, 123, 102, 0.2)', 'rgba(217, 123, 102, 0.1)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                                 <View style={styles.cardContentSquare}>
-                                    <View style={[styles.iconContainerSmall, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
-                                        <Feather name="anchor" size={22} color="#34D399" />
+                                    <View style={[styles.iconContainerSmall, { backgroundColor: 'rgba(127, 176, 105, 0.25)' }]}>
+                                        <Feather name="anchor" size={22} color="#7FB069" />
                                     </View>
                                     <Text style={styles.cardLabelSmall}>My Why</Text>
                                 </View>
                             </TouchableOpacity>
 
-                            {/* 3. SOS */}
+                            {/* 3. Inner Circle */}
                             <TouchableOpacity
                                 style={[styles.bentoCard, styles.cardSquare]}
                                 activeOpacity={0.9}
                                 onPress={() => handlePress('InnerCircle')}
                             >
-                                <LinearGradient colors={['rgba(99, 102, 241, 0.2)', 'rgba(67, 56, 202, 0.1)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
+                                <LinearGradient colors={['rgba(217, 123, 102, 0.2)', 'rgba(217, 123, 102, 0.1)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject} />
                                 <View style={styles.cardContentSquare}>
-                                    <View style={[styles.iconContainerSmall, { backgroundColor: 'rgba(248, 113, 113, 0.15)' }]}>
-                                        <Feather name="users" size={22} color="#F87171" />
+                                    <View style={[styles.iconContainerSmall, { backgroundColor: 'rgba(232, 168, 124, 0.25)' }]}>
+                                        <Feather name="users" size={22} color="#E8A87C" />
                                     </View>
                                     <Text style={styles.cardLabelSmall}>Inner Circle</Text>
                                 </View>
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         overflow: 'hidden',
         borderWidth: 1,
-        borderColor: 'rgba(129, 140, 248, 0.3)',
+        borderColor: 'rgba(217, 123, 102, 0.3)',
     },
     cardLarge: {
         width: '100%',

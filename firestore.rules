@@ -15,6 +15,11 @@ service cloud.firestore {
       return request.auth.uid == uid;
     }
     
+    // Check if user is an admin (exists in admins collection)
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
     // ================================
     // USER PROFILES
     // ================================
@@ -114,13 +119,13 @@ service cloud.firestore {
          request.resource.data.authorId == request.auth.uid &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt']))
         ||
-        // Any authenticated user can only update commentCount or upvotes
+        // Any authenticated user can only update commentCount or upvotes (for voting/commenting)
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentCount', 'upvotes']))
       );
       
-      // Only author can delete their own post
+      // Author or admin can delete a post
       allow delete: if isAuthenticated() && 
-        resource.data.authorId == request.auth.uid;
+        (resource.data.authorId == request.auth.uid || isAdmin());
       
       // Votes subcollection
       match /votes/{voteId} {
@@ -144,8 +149,9 @@ service cloud.firestore {
         allow update: if isAuthenticated() && 
           resource.data.authorId == request.auth.uid;
           
+        // Author or admin can delete a comment
         allow delete: if isAuthenticated() && 
-          resource.data.authorId == request.auth.uid;
+          (resource.data.authorId == request.auth.uid || isAdmin());
       }
     }
     
@@ -168,6 +174,21 @@ service cloud.firestore {
       
       // SECURITY: Block all client-side writes to global stats
       // Updates must be performed by Cloud Functions
+      allow write: if false;
+    }
+    
+    // ================================
+    // ADMINS (Content Moderation)
+    // ================================
+    
+    match /admins/{userId} {
+      // Any authenticated user can check if they are an admin
+      // This allows the app to show/hide admin features
+      allow read: if isAuthenticated();
+      
+      // SECURITY: Block all client-side writes to admin collection
+      // Admin users must be added manually via Firebase Console
+      // To add an admin: Create a document with the user's UID as the document ID
       allow write: if false;
     }
   }

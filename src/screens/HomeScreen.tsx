@@ -626,9 +626,9 @@ export default function HomeScreen() {
                                         disabled = !isPledged;
                                     } else if (item.type === 'journal') {
                                         isCompleted = isJournaled;
-                                        label = "Journal";
+                                        label = "Wellness";
                                         subLabel = "Evening";
-                                        iconEmoji = isJournaled ? "✅" : "📓";
+                                        iconName = isJournaled ? "checkmark" : "heart";
                                         // When done: Green background
                                         bg = isJournaled ? looviColors.accent.success : 'rgba(235, 110, 95, 0.9)'; // Orange/Red for Evening/Incomplete
                                         shadow = '#7FB069';
@@ -678,7 +678,7 @@ export default function HomeScreen() {
                                                             <AppIcon
                                                                 emoji={iconEmoji}
                                                                 size={32}
-                                                                color={isJournaled && item.type === 'journal' ? '#FFFFFF' : "#FFFFFF"}
+                                                                color="#FFFFFF"
                                                             />
                                                         ) : (
                                                             <Ionicons

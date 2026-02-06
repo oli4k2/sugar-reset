@@ -106,19 +106,10 @@ export default function ProfileScreen() {
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
 
-    // Load pledge status
+    // Update pledge status from context (real-time)
     useEffect(() => {
-        const loadPledgeStatus = async () => {
-            try {
-                const lastPledge = await AsyncStorage.getItem('last_pledge_date');
-                const today = new Date().toISOString().split('T')[0];
-                setHasPledgedToday(lastPledge === today);
-            } catch (e) {
-                console.warn('Failed to load pledge status:', e);
-            }
-        };
-        loadPledgeStatus();
-    }, []);
+        setHasPledgedToday(!!todayCheckIn);
+    }, [todayCheckIn]);
 
     // Determine auth provider type
     const authProvider = useMemo((): 'google' | 'apple' | 'email' | 'unknown' => {

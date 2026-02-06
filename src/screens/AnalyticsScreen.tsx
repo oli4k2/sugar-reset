@@ -718,7 +718,7 @@ export default function AnalyticsScreen() {
                     >
                         {/* Header */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>Analytics</Text>
+                            <Text style={styles.title}>Health</Text>
                             <Text style={styles.subtitle}>Your personalized health analysis</Text>
                         </View>
 

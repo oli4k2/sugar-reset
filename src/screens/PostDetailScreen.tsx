@@ -65,6 +65,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const [loadingComments, setLoadingComments] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [hasVoted, setHasVoted] = useState(false);
 
     // Check admin status and fetch data on mount
     useEffect(() => {
@@ -89,6 +90,12 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             // Fetch comments
             const fetchedComments = await postService.getComments(post.id);
             setComments(fetchedComments);
+
+            // Check if user has voted on this post
+            if (user) {
+                const vote = await postService.getUserVote(post.id, user.id);
+                setHasVoted(vote !== null);
+            }
         } catch (error) {
             console.error('Error loading post details:', error);
         } finally {
@@ -99,11 +106,15 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const handleUpvote = async () => {
         if (!user) return;
         try {
-            // Optimistic update
-            setPost(prev => ({ ...prev, upvotes: prev.upvotes + 1 }));
+            // Optimistic update - toggle based on current state
+            setPost(prev => ({ ...prev, upvotes: hasVoted ? prev.upvotes - 1 : prev.upvotes + 1 }));
+            setHasVoted(!hasVoted);
+
             await postService.upvotePost(post.id, user.id);
         } catch (error) {
             console.error('Error upvoting:', error);
+            // Revert on error
+            loadData();
         }
     };
 
@@ -268,9 +279,18 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                     ))}
                 </View>
 
-                <TouchableOpacity style={styles.upvoteButton} onPress={handleUpvote}>
-                    <Ionicons name="arrow-up" size={18} color={looviColors.text.secondary} />
-                    <Text style={styles.upvoteText}>{post.upvotes}</Text>
+                <TouchableOpacity
+                    style={[styles.upvoteButton, hasVoted && styles.upvoteButtonActive]}
+                    onPress={handleUpvote}
+                >
+                    <Ionicons
+                        name={hasVoted ? "arrow-up-circle" : "arrow-up"}
+                        size={18}
+                        color={hasVoted ? looviColors.accent.primary : looviColors.text.secondary}
+                    />
+                    <Text style={[styles.upvoteText, hasVoted && styles.upvoteTextActive]}>
+                        {post.upvotes}
+                    </Text>
                 </TouchableOpacity>
             </View>
         </GlassCard>
@@ -474,6 +494,12 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         color: looviColors.text.secondary,
+    },
+    upvoteButtonActive: {
+        backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    },
+    upvoteTextActive: {
+        color: looviColors.accent.primary,
     },
     commentsLabel: {
         fontSize: 16,

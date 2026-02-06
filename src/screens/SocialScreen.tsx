@@ -138,6 +138,20 @@ export default function SocialScreen() {
         try {
             const fetchedPosts = await postService.getPosts(sortFilter, 20);
             setPosts(fetchedPosts);
+
+            // Load user votes for all posts
+            if (user) {
+                const votesMap = new Map<string, 'up' | 'down'>();
+                await Promise.all(
+                    fetchedPosts.map(async (post) => {
+                        const vote = await postService.getUserVote(post.id, user.id);
+                        if (vote) {
+                            votesMap.set(post.id, vote);
+                        }
+                    })
+                );
+                setUserVotes(votesMap);
+            }
         } catch (error) {
             console.error('Error loading posts:', error);
         }
@@ -316,8 +330,8 @@ export default function SocialScreen() {
 
         try {
             await Share.share({
-                message: `Hey! I'm using Sugar Reset to track my sugar-free journey and would love for you to join my Inner Circle! 🍃\n\nDownload the app and add me as a friend:\n${inviteLink}`,
-                title: `${userName} invited you to Sugar Reset`,
+                message: `Hey! I'm using Craveless: Sugar reset to track my sugar-free journey and would love for you to join my Inner Circle! 🍃\n\nDownload the app and add me as a friend:\n${inviteLink}`,
+                title: `${userName} invited you to Craveless: Sugar reset`,
             });
         } catch (error) {
             console.error('Error sharing invite:', error);
@@ -366,19 +380,35 @@ export default function SocialScreen() {
     const renderCommunityTab = () => {
         const handleUpvote = async (postId: string) => {
             if (!user) return;
+
+            const hasVoted = userVotes.has(postId);
+
             try {
                 // Optimistic update
                 setPosts(prev => prev.map(p => {
                     if (p.id === postId) {
-                        return { ...p, upvotes: p.upvotes + 1 }; // Simplified optimistic update
+                        // Toggle: if already voted, remove vote; otherwise add
+                        return { ...p, upvotes: hasVoted ? p.upvotes - 1 : p.upvotes + 1 };
                     }
                     return p;
                 }));
+
+                // Optimistic vote state update
+                setUserVotes(prev => {
+                    const newMap = new Map(prev);
+                    if (hasVoted) {
+                        newMap.delete(postId);
+                    } else {
+                        newMap.set(postId, 'up');
+                    }
+                    return newMap;
+                });
+
                 await postService.upvotePost(postId, user.id);
-                // Background refresh to sync
-                loadPosts();
             } catch (error) {
                 console.error('Error upvoting:', error);
+                // Revert on error
+                loadPosts();
             }
         };
 
@@ -480,11 +510,21 @@ export default function SocialScreen() {
                                         </View>
 
                                         <TouchableOpacity
-                                            style={styles.minimalUpvoteButton}
+                                            style={[
+                                                styles.minimalUpvoteButton,
+                                                userVotes.has(post.id) && styles.minimalUpvoteButtonActive
+                                            ]}
                                             onPress={() => handleUpvote(post.id)}
                                         >
-                                            <Ionicons name="arrow-up" size={16} color={looviColors.text.secondary} />
-                                            <Text style={styles.minimalUpvoteText}>{post.upvotes}</Text>
+                                            <Ionicons
+                                                name={userVotes.has(post.id) ? "arrow-up-circle" : "arrow-up"}
+                                                size={16}
+                                                color={userVotes.has(post.id) ? looviColors.accent.primary : looviColors.text.secondary}
+                                            />
+                                            <Text style={[
+                                                styles.minimalUpvoteText,
+                                                userVotes.has(post.id) && styles.minimalUpvoteTextActive
+                                            ]}>{post.upvotes}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -1094,6 +1134,12 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
         color: looviColors.text.primary,
+    },
+    minimalUpvoteButtonActive: {
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    },
+    minimalUpvoteTextActive: {
+        color: looviColors.accent.primary,
     },
     postActions: {
         flexDirection: 'row',

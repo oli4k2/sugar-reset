@@ -393,7 +393,9 @@ export default function TrackingScreen() {
                                 </View>
                             ) : (
                                 <View style={styles.emptyJournal}>
-                                    <Text style={styles.emptyEmoji}>📝</Text>
+                                    <View style={styles.emptyIconContainer}>
+                                        <Feather name="edit-3" size={28} color={looviColors.accent.primary} />
+                                    </View>
                                     <Text style={styles.emptyText}>
                                         {isToday ? "How are you feeling today?" : "No journal entries this day"}
                                     </Text>
@@ -578,8 +580,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: spacing.lg,
     },
-    emptyEmoji: {
-        fontSize: 32,
+    emptyIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: `${looviColors.accent.primary}15`,
+        alignItems: 'center',
+        justifyContent: 'center',
         marginBottom: spacing.sm,
     },
     emptyText: {

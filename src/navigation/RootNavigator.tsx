@@ -125,7 +125,7 @@ function MainTabNavigator() {
                 options={{
                     tabBarLabel: '',
                     tabBarStyle: {
-                        backgroundColor: 'rgba(255, 250, 245, 0.98)',
+                        backgroundColor: 'rgba(30, 41, 59, 0.98)',
                         borderTopColor: 'transparent',
                         borderTopWidth: 0,
                         paddingTop: 6,
@@ -136,7 +136,8 @@ function MainTabNavigator() {
                         left: 0,
                         right: 0,
                     },
-                    tabBarIcon: ({ focused }) => (
+                    tabBarActiveTintColor: '#D97B66',
+                    tabBarIcon: ({ focused, color }) => (
                         <View style={{
                             alignItems: 'center',
                             marginBottom: 20,
@@ -161,7 +162,7 @@ function MainTabNavigator() {
                             <Text style={{
                                 fontSize: 7,
                                 fontWeight: '600',
-                                color: focused ? '#EF4444' : 'rgba(107, 114, 128, 0.7)',
+                                color: focused ? '#EF4444' : color,
                                 marginTop: 4,
                                 letterSpacing: -0.5,
                             }}>CRAVING</Text>
@@ -173,7 +174,7 @@ function MainTabNavigator() {
                 name="Analytics"
                 component={AnalyticsScreen}
                 options={{
-                    tabBarLabel: 'Analytics',
+                    tabBarLabel: 'Health',
                     tabBarIcon: ({ color, focused }) => (
                         <Feather name="bar-chart-2" size={22} color={color} style={{ opacity: focused ? 1 : 0.6 }} />
                     ),
