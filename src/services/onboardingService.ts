@@ -28,7 +28,7 @@ export interface OnboardingData {
     nickname?: string;
     age?: string;
     symptoms?: string[];
-    
+
     // Legacy fields (kept for backwards compatibility)
     consumptionShift?: string;
     dailySugarGrams?: number;
@@ -84,6 +84,15 @@ async function getOnboardingData(): Promise<OnboardingData> {
  */
 async function clearOnboardingData(): Promise<void> {
     await storageService.remove(storageService.KEYS.ONBOARDING_DATA);
+    await storageService.remove(storageService.KEYS.HAS_COMPLETED_ONBOARDING);
+}
+
+/**
+ * Reset onboarding completion flag (for logout)
+ * This allows users to see the landing page again after logging out
+ */
+async function resetOnboardingCompletion(): Promise<void> {
+    await storageService.remove(storageService.KEYS.HAS_COMPLETED_ONBOARDING);
 }
 
 /**
@@ -111,6 +120,7 @@ export const onboardingService = {
     clearOnboardingData,
     completeOnboarding,
     hasCompletedOnboarding,
+    resetOnboardingCompletion,
 };
 
 export default onboardingService;

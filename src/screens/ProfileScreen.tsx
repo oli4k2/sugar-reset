@@ -32,6 +32,7 @@ import { AVATAR_EMOJIS } from '../constants/avatarConfig';
 import { useUserData } from '../context/UserDataContext';
 import { userService } from '../services/userService';
 import { dataCleanupService } from '../services/dataCleanupService';
+import { onboardingService } from '../services/onboardingService';
 import { useAuthContext } from '../context/AuthContext';
 import { useAuth } from '../hooks/useAuth';
 import { useRevenueCat } from '../hooks/useRevenueCat';
@@ -311,6 +312,8 @@ export default function ProfileScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
+                            // Reset onboarding completion so user lands on landing page
+                            await onboardingService.resetOnboardingCompletion();
                             await signOut();
                             navigation.reset({
                                 index: 0,
