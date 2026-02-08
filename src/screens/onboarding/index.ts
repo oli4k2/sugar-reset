@@ -18,6 +18,8 @@ export { default as FeatureShowcaseScreen } from './FeatureShowcaseScreen';
 // Commitment
 export { default as GoalsScreen } from './GoalsScreen';
 export { default as PromiseScreen } from './PromiseScreen';
+export { default as PersonalizedPlanScreen } from './PersonalizedPlanScreen';
+export { default as PlanRevealScreen } from './PlanRevealScreen';
 export { default as PaywallScreen } from './PaywallScreen';
 
 // Legacy (keeping for backwards compatibility)

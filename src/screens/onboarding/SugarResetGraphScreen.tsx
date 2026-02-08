@@ -12,7 +12,6 @@ import {
     TouchableOpacity,
     Image,
     Dimensions,
-    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -34,12 +33,11 @@ export default function SugarResetGraphScreen({ navigation }: SugarResetGraphScr
     return (
         <LooviBackground variant="subtle">
             <SafeAreaView style={styles.container}>
-                <ScrollView 
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                >
+                <View style={styles.main}>
                     <View style={styles.content}>
+                        <View style={styles.header}>
+                            <Text style={styles.title}>From cravings to control</Text>
+                        </View>
                         <Image
                             source={graphSource}
                             style={styles.graph}
@@ -49,7 +47,7 @@ export default function SugarResetGraphScreen({ navigation }: SugarResetGraphScr
                             Beat the sugar cycle 82% faster with Craveless.
                         </Text>
                     </View>
-                </ScrollView>
+                </View>
 
                 <View style={styles.footer}>
                     <TouchableOpacity
@@ -69,17 +67,24 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    scrollView: {
+    main: {
         flex: 1,
-    },
-    scrollContent: {
-        flexGrow: 1,
         justifyContent: 'center',
-        paddingBottom: 100,
     },
     content: {
         paddingHorizontal: spacing.screen.horizontal,
         alignItems: 'center',
+    },
+    header: {
+        alignItems: 'center',
+        marginBottom: spacing.lg,
+    },
+    title: {
+        fontSize: 26,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+        textAlign: 'center',
+        letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: 14.5,
@@ -96,7 +101,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.screen.horizontal,
         paddingBottom: spacing.xl,
         paddingTop: spacing.md,
-        backgroundColor: 'rgba(255,250,245,0.95)',
+        backgroundColor: 'transparent',
     },
     continueButton: {
         backgroundColor: looviColors.accent.primary,

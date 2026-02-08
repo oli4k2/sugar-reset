@@ -162,6 +162,8 @@ export type OnboardingStackParamList = {
     // Phase 3: Commitment
     Goals: undefined;
     Promise: { nickname?: string };
+    PersonalizedPlan: undefined;
+    PlanReveal: undefined;
     Paywall: undefined;
 
     // Legacy (keep for backwards compatibility)

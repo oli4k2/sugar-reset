@@ -239,9 +239,10 @@ const getQuestions = (gender: string | null): Question[] => {
 
 export default function ComprehensiveQuizScreen({ navigation, route }: ComprehensiveQuizScreenProps) {
     const { updateOnboardingData } = useUserData();
+    const skipToUserInfo = !!route.params?.skip;
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [showResult, setShowResult] = useState(false);
-    const [showUserInfo, setShowUserInfo] = useState(false);
+    const [showUserInfo, setShowUserInfo] = useState(skipToUserInfo);
     const [isCalculating, setIsCalculating] = useState(false);
 
     // Answers state
@@ -269,14 +270,6 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     
     // Swipe gesture tracking
     const isAnimating = useRef(false);
-
-    // Handle skip from params - skip quiz and results, go directly to userInfo
-    useEffect(() => {
-        if (route.params?.skip) {
-            // Skip all quiz questions and results, go directly to userInfo screen
-            setShowUserInfo(true);
-        }
-    }, [route.params?.skip]);
 
     const QUESTIONS = getQuestions(answers.gender);
     const question = QUESTIONS[currentQuestion];
@@ -998,7 +991,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                         resizeMode="contain"
                                     />
                                 </View>
-                                <Text style={styles.questionTitle}>A little more about you</Text>
+                                <Text style={styles.questionTitle}>What can we call you?</Text>
                             </View>
 
                             {/* UserInfo Content */}

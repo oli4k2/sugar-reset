@@ -15,6 +15,8 @@ import {
     TouchableOpacity,
     ScrollView,
     Animated,
+    Image,
+    ImageSourcePropType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,7 +31,7 @@ type SuccessStoriesScreenProps = {
 interface ExpertQuote {
     id: string;
     name: string;
-    avatar: string;
+    avatar: ImageSourcePropType;
     title: string;
     headline: string;
     quote: string;
@@ -38,43 +40,35 @@ interface ExpertQuote {
 const EXPERT_QUOTES: ExpertQuote[] = [
     {
         id: '1',
-        name: 'Andrew Huberman, Ph.D.',
-        avatar: '👨‍🔬',
-        title: 'Neuroscientist & Stanford Professor',
-        headline: 'Reset your dopamine balance.',
-        quote: 'Quitting sugar is less about willpower and more about reclaiming your brain\'s chemistry. Resetting your dopamine balance can dramatically improve motivation and everyday pleasure.',
+        name: 'Dr. Casey Means',
+        avatar: require('../../../assets/images/onboarding/expert_casey_means.png'),
+        title: 'Author of \'Good Energy\'',
+        headline: 'The Worst Cellular Offender',
+        quote: 'Of all the levers most damaging our cells and preventing \'Good Energy,\' I believe the worst offender may be added sugar. We need to see refined added sugar for what it is: an addictive, dangerous drug.',
     },
     {
         id: '2',
-        name: 'Steven Bartlett',
-        avatar: '🎙️',
-        title: 'Host of \'The Diary of a CEO\'',
-        headline: 'Reclaim your mental sovereignty.',
-        quote: 'If you depend on anything, it\'s bad. Ultra-processed foods are poison. When you quit, you break the cycle of consumption and misery and reclaim your control.',
+        name: 'Dr. Mindy Pelz',
+        avatar: require('../../../assets/images/onboarding/expert_mindy_pelz.png'),
+        title: 'Author of \'Fast Like a Girl\'',
+        headline: 'Reactivate Your Immune System',
+        quote: 'One of the greatest ways you can suppress your immune system is by eating sugar. Getting your body out of insulin resistance can save your life.',
     },
     {
         id: '3',
-        name: 'Dr. Mark Hyman',
-        avatar: '⚕️',
-        title: 'Functional Medicine Physician',
-        headline: 'Stop the biological hijacking.',
-        quote: 'Our hormones and brain chemistry are hijacked by sugar. Not metaphorically, but biologically. Quitting sugar is the fastest way to rapidly improve your health.',
+        name: 'Jessie Inchauspé',
+        avatar: require('../../../assets/images/onboarding/expert_jessie_inchauspe.png'),
+        title: 'The Glucose Goddess & Biochemist',
+        headline: 'Slowing the Aging Process',
+        quote: 'Fructose molecules glycate things 10 times as fast as glucose, generating much more damage. Since browning is aging and aging is browning, slowing down the browning reaction in your body leads to a longer life.',
     },
     {
         id: '4',
-        name: 'Jessie Inchauspé',
-        avatar: '🔬',
-        title: 'The Glucose Goddess & Biochemist',
-        headline: 'Slow down the aging process.',
-        quote: 'Fructose molecules glycate things 10 times as fast as glucose. Since aging is essentially \'browning\' from the inside, reducing sugar leads to a longer, more vibrant life.',
-    },
-    {
-        id: '5',
-        name: 'Dr. Robert Lustig',
-        avatar: '👨‍⚕️',
-        title: 'Pediatric Endocrinologist',
-        headline: 'Neutralize the chronic toxin.',
-        quote: 'Sugar is a chronic toxin that kills you slowly by promoting chronic disease, regardless of your weight. Quitting is the only way to stop the metabolic damage.',
+        name: 'Sarah Wilson',
+        avatar: require('../../../assets/images/onboarding/expert_sarah_wilson.png'),
+        title: 'Author of \'I Quit Sugar\'',
+        headline: 'Freedom from Addiction',
+        quote: 'Sugar is a drug. We know that sugar interacts with reward systems in the brain in much the same way as addictive drugs. I went sugar-free and I became freed from sugar.',
     },
 ];
 
@@ -132,7 +126,7 @@ export default function SuccessStoriesScreen({ navigation }: SuccessStoriesScree
                             >
                                 {/* Expert Header */}
                                 <View style={styles.expertHeader}>
-                                    <Text style={styles.expertAvatar}>{expert.avatar}</Text>
+                                    <Image source={expert.avatar} style={styles.expertAvatar} resizeMode="contain" />
                                     <View style={styles.expertInfo}>
                                         <View style={styles.expertNameRow}>
                                             <Text style={styles.expertName}>{expert.name}</Text>
@@ -182,9 +176,10 @@ const styles = StyleSheet.create({
         paddingBottom: 100,
     },
     header: {
-        paddingHorizontal: spacing.screen.horizontal,
+        paddingLeft: spacing.screen.horizontal + spacing.card.lg,
+        paddingRight: spacing.screen.horizontal,
         paddingTop: spacing.xl,
-        alignItems: 'center',
+        alignItems: 'flex-start',
         marginBottom: spacing.xl,
     },
     headerTitle: {
@@ -193,11 +188,13 @@ const styles = StyleSheet.create({
         color: looviColors.text.primary,
         marginBottom: spacing.xs,
         letterSpacing: -0.5,
+        textAlign: 'left',
     },
     headerSubtitle: {
         fontSize: 17,
         fontWeight: '400',
         color: looviColors.text.secondary,
+        textAlign: 'left',
     },
     expertCard: {
         marginHorizontal: spacing.screen.horizontal,
@@ -205,13 +202,13 @@ const styles = StyleSheet.create({
     },
     expertHeader: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'flex-end',
         gap: spacing.md,
         marginBottom: spacing.md,
     },
     expertAvatar: {
-        fontSize: 48,
-        marginTop: 4,
+        width: 42,
+        height: 42,
     },
     expertInfo: {
         flex: 1,

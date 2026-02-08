@@ -36,6 +36,8 @@ import {
     PromiseScreen,
     PaywallScreen,
     SymptomsScreen,
+    PersonalizedPlanScreen,
+    PlanRevealScreen,
 } from '../screens/onboarding';
 
 // Auth Screens
@@ -278,7 +280,10 @@ export default function RootNavigator() {
         // If authenticated and completed onboarding, go to Main (regardless of premium)
         // Premium users get full access, non-premium can access paywall from Main
         if (isAuthenticated && hasCompletedOnboarding) {
-            if (currentRouteName !== 'Main' && currentRouteName !== 'Paywall') {
+            if (currentRouteName !== 'Main' && 
+                currentRouteName !== 'Paywall' && 
+                currentRouteName !== 'PersonalizedPlan' && 
+                currentRouteName !== 'PlanReveal') {
                 console.log('🔄 Navigating to Main (authenticated and onboarding complete)', {
                     isPremium,
                 });
@@ -291,7 +296,10 @@ export default function RootNavigator() {
         // If onboarding complete but not authenticated, navigate to Auth
         // But only if we're not already on Auth or Paywall (let Paywall handle its own navigation)
         else if (hasCompletedOnboarding && !isAuthenticated) {
-            if (currentRouteName !== 'Auth' && currentRouteName !== 'Paywall') {
+            if (currentRouteName !== 'Auth' && 
+                currentRouteName !== 'Paywall' && 
+                currentRouteName !== 'PersonalizedPlan' && 
+                currentRouteName !== 'PlanReveal') {
                 console.log('🔄 Navigating to Auth (onboarding complete, not authenticated)');
                 navigationRef.current.reset({
                     index: 0,
@@ -350,6 +358,8 @@ export default function RootNavigator() {
                             {/* Phase 3: Commitment */}
                             <OnboardingStack.Screen name="Goals" component={GoalsScreen} />
                             <OnboardingStack.Screen name="Promise" component={PromiseScreen} />
+                            <OnboardingStack.Screen name="PersonalizedPlan" component={PersonalizedPlanScreen} />
+                            <OnboardingStack.Screen name="PlanReveal" component={PlanRevealScreen} />
                             <OnboardingStack.Screen name="Paywall" component={PaywallScreen} />
                         </OnboardingStack.Navigator>
                     )}
