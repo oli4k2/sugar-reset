@@ -293,6 +293,16 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                     console.warn('Failed to sync streak to Firestore:', syncError);
                 }
             }
+
+            // Schedule grace period notifications if needed
+            const { notificationService } = await import('../services/notificationService');
+            if (result.gracePeriodRemaining > 0 && !result.todayStatus?.hasLogs) {
+                // User is in grace period - schedule warning notification
+                await notificationService.scheduleGracePeriodWarning(result.gracePeriodRemaining);
+            } else {
+                // User has logged food or not in grace period - cancel any pending warnings
+                await notificationService.cancelGracePeriodWarnings();
+            }
         } catch (error) {
             console.error('Error calculating streak from food logs:', error);
         }

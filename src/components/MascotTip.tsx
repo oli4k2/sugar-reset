@@ -3,10 +3,10 @@
  * 
  * A friendly mascot that peeks from the left side of the screen
  * with dynamic, context-aware tips and suggestions.
- * Now with glass morphism styling to match app theme.
+ * Supports tap navigation between tips with pagination dots.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
     View,
     Text,
@@ -14,13 +14,10 @@ import {
     TouchableOpacity,
     Animated,
     Image,
-    Dimensions,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Tip categories with navigation targets
 export interface MascotTipData {
@@ -30,9 +27,10 @@ export interface MascotTipData {
     title: string;
     subtitle: string;
     action?: string; // Navigation target or action
-    category: 'task' | 'social' | 'analytics' | 'motivation' | 'streak';
+    category: 'task' | 'social' | 'analytics' | 'motivation' | 'streak' | 'celebration';
     priority: number; // Higher = more important
     friendId?: string; // For cheering on specific friend
+    isSuccess?: boolean; // For green styling on success messages
 }
 
 interface MascotTipProps {
@@ -51,9 +49,104 @@ interface MascotTipProps {
     forceTip?: MascotTipData;
 }
 
-// Generate tips based on user state - NEVER shows "All done", always suggests something useful
+// Encouraging messages for when all daily tasks are done - with green styling
+const ALL_DONE_MESSAGES: MascotTipData[] = [
+    {
+        id: 'done_1',
+        icon: 'star',
+        iconColor: looviColors.accent.success,
+        title: 'All done for today! 🌟',
+        subtitle: 'You\'re taking amazing care of yourself. Keep it up!',
+        action: 'analytics',
+        category: 'celebration',
+        priority: 100,
+        isSuccess: true,
+    },
+    {
+        id: 'done_2',
+        icon: 'heart',
+        iconColor: looviColors.accent.success,
+        title: 'Amazing job today! 💪',
+        subtitle: 'Your body thanks you for the love and care.',
+        action: 'analytics',
+        category: 'celebration',
+        priority: 100,
+        isSuccess: true,
+    },
+    {
+        id: 'done_3',
+        icon: 'award',
+        iconColor: looviColors.accent.success,
+        title: 'You crushed it! 🏆',
+        subtitle: 'Every healthy choice builds a stronger you.',
+        action: 'analytics',
+        category: 'celebration',
+        priority: 100,
+        isSuccess: true,
+    },
+    {
+        id: 'done_4',
+        icon: 'sun',
+        iconColor: looviColors.accent.success,
+        title: 'What a great day! ☀️',
+        subtitle: 'You\'re building habits that will change your life.',
+        action: 'analytics',
+        category: 'celebration',
+        priority: 100,
+        isSuccess: true,
+    },
+    {
+        id: 'done_5',
+        icon: 'zap',
+        iconColor: looviColors.accent.success,
+        title: 'Today was a WIN! ⚡',
+        subtitle: 'You showed up for yourself. That\'s what matters.',
+        action: 'analytics',
+        category: 'celebration',
+        priority: 100,
+        isSuccess: true,
+    },
+    {
+        id: 'done_6',
+        icon: 'check-circle',
+        iconColor: looviColors.accent.success,
+        title: 'Mission accomplished! 🎉',
+        subtitle: 'Rest well knowing you did your best today.',
+        action: 'analytics',
+        category: 'celebration',
+        priority: 100,
+        isSuccess: true,
+    },
+    {
+        id: 'done_7',
+        icon: 'thumbs-up',
+        iconColor: '#22C55E',
+        title: 'You\'re on fire! 🔥',
+        subtitle: 'Your dedication is truly inspiring. Keep going!',
+        action: 'analytics',
+        category: 'celebration',
+        priority: 100,
+        isSuccess: true,
+    },
+];
+
+// Get a consistent daily message based on date
+const getDailyMessage = (): MascotTipData => {
+    const today = new Date();
+    const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+    const messageIndex = dayOfYear % ALL_DONE_MESSAGES.length;
+    return ALL_DONE_MESSAGES[messageIndex];
+};
+
+// Generate tips based on user state
 const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): MascotTipData[] => {
     const tips: MascotTipData[] = [];
+    const allTasksDone = props.hasPledgedToday && props.hasFoodLoggedToday && props.hasWellnessToday;
+
+    // If all tasks are done, show ONLY the daily encouraging message
+    if (allTasksDone) {
+        return [getDailyMessage()];
+    }
 
     // Task-based tips (highest priority when incomplete)
     if (!props.hasPledgedToday) {
@@ -69,7 +162,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
         });
     }
 
-    if (!props.hasFoodLoggedToday && props.hasPledgedToday) {
+    if (!props.hasFoodLoggedToday) {
         tips.push({
             id: 'track',
             icon: 'camera',
@@ -82,7 +175,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
         });
     }
 
-    if (!props.hasWellnessToday && props.hasPledgedToday && props.hasFoodLoggedToday) {
+    if (!props.hasWellnessToday) {
         tips.push({
             id: 'journal',
             icon: 'book',
@@ -105,7 +198,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
             subtitle: "You're 65% more likely to succeed with friends",
             action: 'inner_circle',
             category: 'social',
-            priority: 85, // High priority - always suggest if no friends
+            priority: 70,
         });
     }
 
@@ -120,7 +213,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
             subtitle: 'A little encouragement goes a long way',
             action: 'cheer_friend',
             category: 'social',
-            priority: 75,
+            priority: 65,
             friendId: friend.id,
         });
     } else if (props.hasInnerCircleFriends) {
@@ -132,7 +225,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
             subtitle: 'See how your accountability partners are doing',
             action: 'inner_circle',
             category: 'social',
-            priority: 60,
+            priority: 50,
         });
     }
 
@@ -146,7 +239,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
             subtitle: 'Check out your wellness trends in Analytics',
             action: 'analytics',
             category: 'analytics',
-            priority: 55,
+            priority: 45,
         });
     }
 
@@ -160,7 +253,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
             subtitle: "You're on fire! Share your progress with friends",
             action: 'community',
             category: 'streak',
-            priority: 50,
+            priority: 40,
         });
     } else if (props.currentStreak >= 3) {
         tips.push({
@@ -171,7 +264,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
             subtitle: `${props.currentStreak} days - keep the energy going!`,
             action: 'community',
             category: 'streak',
-            priority: 45,
+            priority: 35,
         });
     }
 
@@ -184,56 +277,8 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
         subtitle: 'Connect with others in the Community',
         action: 'community',
         category: 'social',
-        priority: 40,
+        priority: 30,
     });
-
-    // Motivational tips - always have something encouraging
-    const motivationalTips: MascotTipData[] = [
-        {
-            id: 'motivation_1',
-            icon: 'star',
-            iconColor: '#FFD54F',
-            title: "You're doing amazing!",
-            subtitle: 'Every healthy choice is a victory',
-            action: 'analytics',
-            category: 'motivation',
-            priority: 35,
-        },
-        {
-            id: 'motivation_2',
-            icon: 'feather',
-            iconColor: looviColors.accent.success,
-            title: 'Small steps, big changes',
-            subtitle: 'Check your progress and celebrate wins',
-            action: 'analytics',
-            category: 'motivation',
-            priority: 35,
-        },
-        {
-            id: 'motivation_3',
-            icon: 'compass',
-            iconColor: looviColors.accent.primary,
-            title: 'Stay on course!',
-            subtitle: 'See how far you\'ve come',
-            action: 'analytics',
-            category: 'motivation',
-            priority: 35,
-        },
-        {
-            id: 'motivation_4',
-            icon: 'wind',
-            iconColor: '#81D4FA',
-            title: 'Take a mindful moment',
-            subtitle: 'Reflect on your wellness journey',
-            action: 'journal',
-            category: 'motivation',
-            priority: 35,
-        },
-    ];
-
-    // Add one random motivational tip as fallback
-    const randomMotivational = motivationalTips[Math.floor(Math.random() * motivationalTips.length)];
-    tips.push(randomMotivational);
 
     // Sort by priority (highest first) and return
     return tips.sort((a, b) => b.priority - a.priority);
@@ -252,10 +297,11 @@ export const MascotTip: React.FC<MascotTipProps> = ({
 }) => {
     const slideAnim = useRef(new Animated.Value(-100)).current;
     const bounceAnim = useRef(new Animated.Value(0)).current;
+    const fadeAnim = useRef(new Animated.Value(1)).current;
     const [currentTipIndex, setCurrentTipIndex] = useState(0);
 
-    // Generate tips based on current state
-    const tips = generateTips({
+    // Generate tips based on current state - memoized
+    const tips = useMemo(() => generateTips({
         hasPledgedToday,
         hasFoodLoggedToday,
         hasWellnessToday,
@@ -263,9 +309,52 @@ export const MascotTip: React.FC<MascotTipProps> = ({
         currentStreak,
         healthScore,
         friendsNeedingSupport,
-    });
+    }), [hasPledgedToday, hasFoodLoggedToday, hasWellnessToday, hasInnerCircleFriends, currentStreak, healthScore, friendsNeedingSupport]);
+
+    // Reset index when tips change
+    useEffect(() => {
+        if (currentTipIndex >= tips.length) {
+            setCurrentTipIndex(0);
+        }
+    }, [tips.length, currentTipIndex]);
 
     const currentTip = forceTip || tips[currentTipIndex] || tips[0];
+
+    // Navigate to next tip with animation
+    const goToNextTip = useCallback(() => {
+        if (tips.length <= 1) return;
+
+        Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 120,
+            useNativeDriver: true,
+        }).start(() => {
+            setCurrentTipIndex((prev) => (prev + 1) % tips.length);
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 120,
+                useNativeDriver: true,
+            }).start();
+        });
+    }, [tips.length, fadeAnim]);
+
+    // Navigate to previous tip with animation
+    const goToPrevTip = useCallback(() => {
+        if (tips.length <= 1) return;
+
+        Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 120,
+            useNativeDriver: true,
+        }).start(() => {
+            setCurrentTipIndex((prev) => (prev - 1 + tips.length) % tips.length);
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 120,
+                useNativeDriver: true,
+            }).start();
+        });
+    }, [tips.length, fadeAnim]);
 
     // Entrance animation
     useEffect(() => {
@@ -296,28 +385,25 @@ export const MascotTip: React.FC<MascotTipProps> = ({
         return () => bounce.stop();
     }, []);
 
-    // Handle tap to navigate
+    // Handle tap to navigate to action
     const handlePress = () => {
         if (currentTip.action) {
             onTipPress(currentTip.action, currentTip.friendId);
-        } else {
-            // Cycle to next tip
-            setCurrentTipIndex((prev) => (prev + 1) % tips.length);
         }
     };
 
-    // Long press to cycle tips
-    const handleLongPress = () => {
-        setCurrentTipIndex((prev) => (prev + 1) % tips.length);
-    };
+    // Determine bubble background color - use looviColors.accent.success for consistency
+    const successColor = looviColors.accent.success; // #7FB069
+    const bubbleBackgroundColor = currentTip.isSuccess
+        ? `rgba(127, 176, 105, 0.15)` // Green tint using accent.success
+        : 'rgba(255, 255, 255, 0.7)';
+
+    const bubbleBorderColor = currentTip.isSuccess
+        ? 'rgba(127, 176, 105, 0.3)'  // Green border using accent.success
+        : 'rgba(255, 255, 255, 0.5)';
 
     return (
-        <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={handlePress}
-            onLongPress={handleLongPress}
-            style={styles.container}
-        >
+        <View style={styles.container}>
             {/* Mascot peeking from left */}
             <Animated.View
                 style={[
@@ -337,50 +423,110 @@ export const MascotTip: React.FC<MascotTipProps> = ({
                 />
             </Animated.View>
 
-            {/* Speech bubble with glass effect */}
+            {/* Speech bubble */}
             <Animated.View
                 style={[
                     styles.bubbleContainer,
                     { transform: [{ translateX: slideAnim }] },
                 ]}
             >
-                <View style={styles.bubbleArrow} />
-                <View style={styles.bubble}>
-                    <View style={styles.iconContainer}>
-                        <Feather
-                            name={currentTip.icon as any}
-                            size={20}
-                            color={currentTip.iconColor || looviColors.accent.primary}
-                        />
+                <View style={[styles.bubbleArrow, { borderRightColor: bubbleBackgroundColor }]} />
+                <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={handlePress}
+                    style={styles.bubbleTouchable}
+                >
+                    <View style={[styles.bubble, { backgroundColor: bubbleBackgroundColor, borderColor: bubbleBorderColor }]}>
+                        {/* Navigation arrows (left) */}
+                        {tips.length > 1 && (
+                            <TouchableOpacity
+                                style={styles.navArrow}
+                                onPress={goToPrevTip}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 5 }}
+                            >
+                                <Ionicons name="chevron-back" size={18} color={looviColors.text.tertiary} />
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Content with fade animation */}
+                        <Animated.View style={[styles.contentContainer, { opacity: fadeAnim }]}>
+                            {/* Icon */}
+                            <View style={[styles.iconContainer, currentTip.isSuccess && styles.iconContainerSuccess]}>
+                                <Feather
+                                    name={currentTip.icon as any}
+                                    size={20}
+                                    color={currentTip.iconColor || looviColors.accent.primary}
+                                />
+                            </View>
+
+                            {/* Text */}
+                            <View style={styles.tipTextContainer}>
+                                <Text style={[styles.tipTitle, currentTip.isSuccess && styles.tipTitleSuccess]}>
+                                    {currentTip.title}
+                                </Text>
+                                <Text style={styles.tipSubtitle}>{currentTip.subtitle}</Text>
+                            </View>
+                        </Animated.View>
+
+                        {/* Navigation arrows (right) / chevron */}
+                        {tips.length > 1 ? (
+                            <TouchableOpacity
+                                style={styles.navArrow}
+                                onPress={goToNextTip}
+                                hitSlop={{ top: 10, bottom: 10, left: 5, right: 10 }}
+                            >
+                                <Ionicons name="chevron-forward" size={18} color={looviColors.text.tertiary} />
+                            </TouchableOpacity>
+                        ) : (
+                            <Ionicons name="chevron-forward" size={18} color={looviColors.text.tertiary} />
+                        )}
                     </View>
-                    <View style={styles.tipTextContainer}>
-                        <Text style={styles.tipTitle}>{currentTip.title}</Text>
-                        <Text style={styles.tipSubtitle}>{currentTip.subtitle}</Text>
-                    </View>
-                    <Ionicons
-                        name="chevron-forward"
-                        size={18}
-                        color={looviColors.text.tertiary}
-                    />
-                </View>
+
+                    {/* Pagination dots - show remaining TASKS count (pledge, track, journal) */}
+                    {(() => {
+                        // Count actual remaining tasks from props, not tips
+                        const remainingTasks: string[] = [];
+                        if (!hasPledgedToday) remainingTasks.push('pledge');
+                        if (!hasFoodLoggedToday) remainingTasks.push('track');
+                        if (!hasWellnessToday) remainingTasks.push('journal');
+
+                        // Don't show dots if all done or no tasks remain
+                        if (remainingTasks.length === 0) return null;
+
+                        return (
+                            <View style={styles.paginationContainer}>
+                                {remainingTasks.map((taskId, index) => (
+                                    <View
+                                        key={taskId}
+                                        style={[
+                                            styles.paginationDot,
+                                            // Highlight the dot if current tip matches this task
+                                            currentTip.id === taskId && styles.paginationDotActive,
+                                        ]}
+                                    />
+                                ))}
+                            </View>
+                        );
+                    })()}
+                </TouchableOpacity>
             </Animated.View>
-        </TouchableOpacity>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
-        alignItems: 'flex-start', // Align to top so mascot can be lower
-        marginHorizontal: 0, // No horizontal margin - mascot touches edge
+        alignItems: 'flex-start',
+        marginHorizontal: 0,
         marginVertical: spacing.md,
         minHeight: 90,
         paddingRight: spacing.screen.horizontal,
     },
     mascotContainer: {
         position: 'absolute',
-        left: -20, // Left edge touching screen
-        top: 15, // Lowered so bubble appears above
+        left: -20,
+        top: 15,
         zIndex: 10,
     },
     mascotImage: {
@@ -389,8 +535,8 @@ const styles = StyleSheet.create({
     },
     bubbleContainer: {
         flex: 1,
-        marginLeft: 55, // Closer to mascot
-        marginTop: 0, // Bubble at top
+        marginLeft: 55,
+        marginTop: 0,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -405,23 +551,32 @@ const styles = StyleSheet.create({
         borderRightColor: 'rgba(255, 255, 255, 0.7)',
         marginRight: -1,
     },
+    bubbleTouchable: {
+        flex: 1,
+    },
     bubble: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        // Glass morphism effect
         backgroundColor: 'rgba(255, 255, 255, 0.7)',
         borderRadius: borderRadius.lg,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.sm,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.5)',
-        // Soft shadow for depth
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
         shadowRadius: 12,
         elevation: 3,
+    },
+    contentContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    navArrow: {
+        padding: 4,
     },
     iconContainer: {
         width: 36,
@@ -432,6 +587,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: spacing.sm,
     },
+    iconContainerSuccess: {
+        backgroundColor: 'rgba(127, 176, 105, 0.2)', // Using accent.success color
+    },
     tipTextContainer: {
         flex: 1,
     },
@@ -441,10 +599,36 @@ const styles = StyleSheet.create({
         color: looviColors.text.primary,
         marginBottom: 2,
     },
+    tipTitleSuccess: {
+        color: looviColors.accent.success, // Natural green #7FB069
+    },
     tipSubtitle: {
         fontSize: 12,
         color: looviColors.text.secondary,
         lineHeight: 16,
+    },
+    // Pagination dots
+    paginationContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: spacing.xs,
+        gap: 4,
+    },
+    paginationDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    },
+    paginationDotActive: {
+        backgroundColor: looviColors.accent.primary,
+        width: 12,
+    },
+    paginationMore: {
+        fontSize: 9,
+        color: looviColors.text.tertiary,
+        marginLeft: 2,
     },
 });
 

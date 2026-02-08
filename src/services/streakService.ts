@@ -12,13 +12,14 @@
 
 import { getScannedItemsForDate, ScannedItem } from './scannerService';
 import { getCurrentDayLimit, PlanType } from '../utils/planUtils';
+import onboardingService from './onboardingService';
 
 export interface DayStatus {
     date: string;           // YYYY-MM-DD
     hasLogs: boolean;       // Did user log any food?
-    totalSugar: number;     // Sum of sugar from all logged items
-    dailyTarget: number;    // From getCurrentDayLimit()
-    isUnderTarget: boolean; // totalSugar <= dailyTarget
+    totalAddedSugar: number; // Sum of ADDED sugar from all logged items (not natural sugar)
+    dailyTarget: number;    // WHO recommendation based on gender
+    isUnderTarget: boolean; // totalAddedSugar <= dailyTarget
     isStreakDay: boolean;   // hasLogs && isUnderTarget
     itemCount: number;      // Number of food items logged
 }
@@ -29,8 +30,9 @@ export interface StreakResult {
     totalDaysUnderTarget: number;
     lastValidDate: string | null;
     todayStatus: DayStatus;
-    canRecoverStreak: boolean;      // If yesterday has no logs but could be logged
-    missingDates: string[];         // Days that broke streak but could be recovered
+    canRecoverStreak: boolean;      // If within grace period and can still log food
+    missingDates: string[];         // Days without logs within grace period
+    gracePeriodRemaining: number;   // Days left before streak resets (0-2)
 }
 
 /**
@@ -62,47 +64,55 @@ export function getYesterdayDateString(): string {
 }
 
 /**
- * Calculate the daily target for a specific date
+ * WHO daily sugar recommendations based on gender.
+ * Men: ~36g (9 teaspoons) max added sugar per day
+ * Women: ~25g (6 teaspoons) max added sugar per day
+ * Source: World Health Organization / American Heart Association
  */
-export function getDailyTargetForDate(
+export const WHO_SUGAR_LIMITS = {
+    male: 36,
+    female: 25,
+    other: 30, // Average for non-specified
+    default: 25, // Conservative default
+};
+
+/**
+ * Get the daily added sugar limit based on user's gender (WHO recommendation).
+ * This replaces the old plan-based limits since we now focus on health recommendations.
+ */
+export async function getDailyAddedSugarLimit(): Promise<number> {
+    try {
+        const onboardingData = await onboardingService.getOnboardingData();
+        const gender = onboardingData?.gender || 'default';
+        return WHO_SUGAR_LIMITS[gender as keyof typeof WHO_SUGAR_LIMITS] || WHO_SUGAR_LIMITS.default;
+    } catch (error) {
+        console.warn('Could not get gender for sugar limit, using default:', error);
+        return WHO_SUGAR_LIMITS.default;
+    }
+}
+
+/**
+ * Calculate the daily target for a specific date.
+ * Now uses WHO recommendations based on gender, not the old plan system.
+ */
+export async function getDailyTargetForDate(
     dateString: string,
     planType: PlanType,
     planStartDate: Date
-): number {
+): Promise<number> {
     // For dates before plan start, return a high limit (no restriction)
     const targetDate = parseLocalDateString(dateString);
     if (targetDate < planStartDate) {
         return 999;
     }
 
-    // Calculate which week of the plan this date falls in
-    const diffMs = targetDate.getTime() - planStartDate.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const weekNumber = Math.floor(diffDays / 7) + 1;
-
-    // Get the plan details to find the limit for the calculated week
-    const plan = planType === 'cold_turkey'
-        ? { weeklyLimits: [{ dailyGrams: 0 }] }  // Cold turkey is always 0g
-        : {
-            weeklyLimits: [
-                { dailyGrams: 50 },  // Week 1
-                { dailyGrams: 45 },  // Week 2
-                { dailyGrams: 40 },  // Week 3
-                { dailyGrams: 35 },  // Week 4
-                { dailyGrams: 30 },  // Week 5
-                { dailyGrams: 25 },  // Week 6
-                { dailyGrams: 20 },  // Week 7
-                { dailyGrams: 0 },   // Week 8+
-            ]
-        };
-
-    // Get the limit for the specific week (cap at last defined week)
-    const weekIndex = Math.min(weekNumber - 1, plan.weeklyLimits.length - 1);
-    return plan.weeklyLimits[Math.max(0, weekIndex)].dailyGrams;
+    // Use WHO gender-based limits for added sugar
+    return getDailyAddedSugarLimit();
 }
 
 /**
- * Get status for a specific day
+ * Get status for a specific day.
+ * Now uses ADDED SUGAR only (not total sugar including natural sugars from fruit).
  */
 export async function getDayStatus(
     dateString: string,
@@ -111,19 +121,24 @@ export async function getDayStatus(
 ): Promise<DayStatus> {
     const items = await getScannedItemsForDate(dateString);
 
-    // Get the daily limit for this plan (using the specific date)
-    const dailyTarget = getDailyTargetForDate(dateString, planType, planStartDate);
+    // Get the daily limit (WHO gender-based recommendation)
+    const dailyTarget = await getDailyTargetForDate(dateString, planType, planStartDate);
 
-    // Sum up sugar from all food items
-    const totalSugar = items.reduce((sum, item) => sum + (item.sugar || 0), 0);
+    // Sum up ADDED sugar only from all food items (not natural sugars from fruit/dairy)
+    // If addedSugar is not available, fall back to sugar but this is not ideal
+    const totalAddedSugar = items.reduce((sum, item) => {
+        // Prefer addedSugar if available, otherwise use total sugar as fallback
+        const sugarToCount = item.addedSugar !== undefined ? item.addedSugar : (item.sugar || 0);
+        return sum + sugarToCount;
+    }, 0);
 
     const hasLogs = items.length > 0;
-    const isUnderTarget = totalSugar <= dailyTarget;
+    const isUnderTarget = totalAddedSugar <= dailyTarget;
 
     return {
         date: dateString,
         hasLogs,
-        totalSugar: Math.round(totalSugar * 10) / 10, // Round to 1 decimal
+        totalAddedSugar: Math.round(totalAddedSugar * 10) / 10, // Round to 1 decimal
         dailyTarget,
         isUnderTarget,
         isStreakDay: hasLogs && isUnderTarget,
@@ -134,6 +149,11 @@ export async function getDayStatus(
 /**
  * Calculate current streak based on food logs.
  * Works backwards from today to find consecutive streak days.
+ * 
+ * GRACE PERIOD: User has 2 days to log food before streak resets.
+ * - If no food logged today, streak is still valid (day 1 of grace)
+ * - If no food logged yesterday AND today, streak still valid (day 2 of grace)
+ * - If no food logged for 3+ consecutive days, streak resets
  */
 export async function calculateStreak(
     planType: PlanType,
@@ -150,6 +170,10 @@ export async function calculateStreak(
     let lastValidDate: string | null = null;
     let streakBroken = false;
     const missingDates: string[] = [];
+
+    // Track consecutive days without logs (for grace period)
+    let consecutiveMissingDays = 0;
+    const GRACE_PERIOD_DAYS = 2; // 2 days grace before streak resets
 
     // Get today's status first
     const todayStatus = await getDayStatus(todayString, planType, planStartDate);
@@ -171,6 +195,8 @@ export async function calculateStreak(
             : await getDayStatus(dateString, planType, planStartDate);
 
         if (status.isStreakDay) {
+            // Valid streak day - reset missing days counter
+            consecutiveMissingDays = 0;
             totalDaysUnderTarget++;
             runningStreak++;
 
@@ -183,25 +209,34 @@ export async function calculateStreak(
             if (runningStreak > longestStreak) {
                 longestStreak = runningStreak;
             }
-        } else {
-            // Streak broken
-            runningStreak = 0;
+        } else if (!status.hasLogs) {
+            // No food logged this day - check grace period
+            consecutiveMissingDays++;
 
             if (!streakBroken) {
-                streakBroken = true;
-
-                // Track if this is a recoverable day (no logs yet, not too far back)
-                // Only yesterday is recoverable for streak purposes
-                if (!status.hasLogs && i === 1) {
+                // Within grace period - streak continues but day is "pending"
+                if (consecutiveMissingDays <= GRACE_PERIOD_DAYS) {
                     missingDates.push(dateString);
+                    // Don't increment streak for missing days, but don't break it yet
+                } else {
+                    // Grace period exceeded - streak is broken
+                    streakBroken = true;
+                    runningStreak = 0;
                 }
             }
+        } else {
+            // Has logs but exceeded sugar target - immediate streak break
+            streakBroken = true;
+            runningStreak = 0;
+            consecutiveMissingDays = 0;
         }
     }
 
-    // Can recover if the only missing day is yesterday and user logs food under target
-    const canRecoverStreak = missingDates.length > 0 &&
-        missingDates.every(d => d === getYesterdayDateString());
+    // Can recover if within grace period (missing dates exist but under limit)
+    const canRecoverStreak = missingDates.length > 0 && missingDates.length <= GRACE_PERIOD_DAYS;
+
+    // Calculate days remaining in grace period
+    const gracePeriodRemaining = Math.max(0, GRACE_PERIOD_DAYS - missingDates.length);
 
     return {
         currentStreak,
@@ -211,6 +246,7 @@ export async function calculateStreak(
         todayStatus,
         canRecoverStreak,
         missingDates,
+        gracePeriodRemaining,
     };
 }
 

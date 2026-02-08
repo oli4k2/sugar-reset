@@ -75,6 +75,22 @@ export function WellnessModal({
                 setFocus(0);
                 setSleepHours(0);
                 setThoughts('');
+
+                // Auto-sync sleep data from Apple Health when opening fresh
+                const autoSyncSleep = async () => {
+                    try {
+                        const sleepHrs = await healthService.getTodaySleep();
+                        if (sleepHrs > 0) {
+                            const rounded = Math.round(sleepHrs);
+                            setSleepHours(rounded);
+                            console.log('✅ Auto-synced sleep data:', rounded, 'hours');
+                        }
+                    } catch (e) {
+                        // Silently fail - user can still manually sync
+                        console.log('Auto-sync sleep failed:', e);
+                    }
+                };
+                autoSyncSleep();
             }
         }
     }, [visible, existingData]);

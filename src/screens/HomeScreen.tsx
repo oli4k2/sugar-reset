@@ -543,7 +543,9 @@ export default function HomeScreen() {
                                 style={styles.streakRecoveryBanner}
                             >
                                 <View style={styles.streakRecoveryContainer}>
-                                    <Text style={styles.streakRecoveryEmoji}>💪</Text>
+                                    <View style={styles.streakRecoveryIconContainer}>
+                                        <Ionicons name="refresh" size={20} color={looviColors.accent.primary} />
+                                    </View>
                                     <View style={styles.streakRecoveryText}>
                                         <Text style={styles.streakRecoveryTitle}>Recover your streak!</Text>
                                         <Text style={styles.streakRecoverySubtitle}>
@@ -2365,8 +2367,13 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(59, 130, 246, 0.3)',
     },
-    streakRecoveryEmoji: {
-        fontSize: 24,
+    streakRecoveryIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(232, 168, 124, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
         marginRight: spacing.sm,
     },
     streakRecoveryText: {

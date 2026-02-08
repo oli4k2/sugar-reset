@@ -387,6 +387,120 @@ export const notificationService = {
     },
 
     /**
+     * Schedule grace period warning notification
+     * Called when user hasn't logged food for the day
+     * @param gracePeriodRemaining - Days left in grace period (0, 1, or 2)
+     */
+    async scheduleGracePeriodWarning(gracePeriodRemaining: number): Promise<void> {
+        // Cancel any existing grace period notifications
+        await this.cancelGracePeriodWarnings();
+
+        if (gracePeriodRemaining <= 0) {
+            // No grace period left, don't schedule
+            return;
+        }
+
+        // Schedule notification for tomorrow morning at 9am as reminder
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+
+        const messages = {
+            2: {
+                title: '⚠️ Keep your streak alive!',
+                body: "You didn't log food yesterday. Log today to protect your streak!",
+            },
+            1: {
+                title: '🔥 Last chance to save your streak!',
+                body: "One more day without logging will reset your streak. Don't lose it!",
+            },
+        };
+
+        const message = messages[gracePeriodRemaining as 1 | 2] || messages[1];
+
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: message.title,
+                body: message.body,
+                sound: true,
+                data: {
+                    type: 'grace_period_warning',
+                    gracePeriodRemaining,
+                },
+            },
+            trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.DATE,
+                date: tomorrow,
+            },
+            identifier: 'grace-period-warning',
+        });
+
+        console.log(`📅 Scheduled grace period warning for ${tomorrow.toLocaleString()}`);
+    },
+
+    /**
+     * Cancel all grace period warning notifications
+     */
+    async cancelGracePeriodWarnings(): Promise<void> {
+        try {
+            await Notifications.cancelScheduledNotificationAsync('grace-period-warning');
+        } catch (error) {
+            // Notification might not exist, that's fine
+        }
+    },
+
+    /**
+     * Get all scheduled notifications for tracking/debugging
+     * Returns list of all pending local notifications
+     */
+    async getScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
+        return await Notifications.getAllScheduledNotificationsAsync();
+    },
+
+    /**
+     * Get a formatted summary of all scheduled notifications
+     * Useful for displaying in settings or debugging
+     */
+    async getNotificationsSummary(): Promise<{
+        count: number;
+        notifications: {
+            id: string;
+            title: string;
+            body: string;
+            type: string;
+            scheduledFor: string;
+        }[];
+    }> {
+        const scheduled = await this.getScheduledNotifications();
+
+        const notifications = scheduled.map((n) => {
+            const trigger = n.trigger as any;
+            let scheduledFor = 'Unknown';
+
+            if (trigger?.type === 'daily') {
+                scheduledFor = `Daily at ${trigger.hour}:${String(trigger.minute).padStart(2, '0')}`;
+            } else if (trigger?.date) {
+                scheduledFor = new Date(trigger.date).toLocaleString();
+            } else if (trigger?.type === 'date') {
+                scheduledFor = new Date(trigger.value).toLocaleString();
+            }
+
+            return {
+                id: n.identifier,
+                title: n.content.title || 'No title',
+                body: n.content.body || 'No body',
+                type: (n.content.data?.type as string) || 'unknown',
+                scheduledFor,
+            };
+        });
+
+        return {
+            count: scheduled.length,
+            notifications,
+        };
+    },
+
+    /**
      * Send friend request notification
      */
     async sendFriendRequestNotification(

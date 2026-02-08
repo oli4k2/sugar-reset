@@ -652,7 +652,7 @@ export default function SocialScreen() {
                                         <Ionicons name="flame" size={12} color={looviColors.accent.warning} />
                                         <Text style={styles.friendMiniStatText}>{friend.streak || 0} days</Text>
                                     </View>
-                                    {friend.healthScore && (
+                                    {friend.healthScore !== undefined && friend.healthScore !== null && (
                                         <View style={styles.friendMiniStat}>
                                             <Ionicons name="heart" size={12} color={looviColors.accent.primary} />
                                             <Text style={styles.friendMiniStatText}>{friend.healthScore}</Text>

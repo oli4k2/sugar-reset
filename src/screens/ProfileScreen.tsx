@@ -77,6 +77,7 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
     ...(__DEV__ ? [{
         title: 'Developer',
         items: [
+            { id: 'viewNotifications', emoji: '📅', label: 'View Scheduled Notifications' },
             { id: 'clearData', emoji: '🗑️', label: 'Clear All Data' },
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
         ],
@@ -301,6 +302,40 @@ export default function ProfileScreen() {
         );
     };
 
+    const handleViewNotifications = async () => {
+        try {
+            const { notificationService } = await import('../services/notificationService');
+            const summary = await notificationService.getNotificationsSummary();
+
+            if (summary.count === 0) {
+                Alert.alert('Scheduled Notifications', 'No notifications scheduled.');
+                return;
+            }
+
+            const notificationList = summary.notifications
+                .map((n, i) => `${i + 1}. ${n.title}\n   ${n.scheduledFor}\n   Type: ${n.type}`)
+                .join('\n\n');
+
+            Alert.alert(
+                `Scheduled Notifications (${summary.count})`,
+                notificationList,
+                [
+                    { text: 'OK' },
+                    {
+                        text: 'Clear All',
+                        style: 'destructive',
+                        onPress: async () => {
+                            await notificationService.clearAllNotifications();
+                            Alert.alert('Cleared', 'All notifications cleared.');
+                        },
+                    },
+                ]
+            );
+        } catch (error: any) {
+            Alert.alert('Error', 'Failed to load notifications: ' + error.message);
+        }
+    };
+
     const handleLogout = () => {
         Alert.alert(
             'Log Out',
@@ -312,8 +347,11 @@ export default function ProfileScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            // Reset onboarding completion so user lands on landing page
-                            await onboardingService.resetOnboardingCompletion();
+                            // Clear ALL cached data to prevent data from showing for other accounts
+                            // This includes wellness logs, food logs, pledges, and all other local storage
+                            await AsyncStorage.clear();
+                            console.log('✅ Cleared all AsyncStorage data on logout');
+
                             await signOut();
                             navigation.reset({
                                 index: 0,
@@ -585,11 +623,13 @@ export default function ProfileScreen() {
                                                                                     ? () => navigation.navigate('PrivacyPolicy')
                                                                                     : item.id === 'terms'
                                                                                         ? () => navigation.navigate('TermsOfService')
-                                                                                        : item.id === 'clearData'
-                                                                                            ? handleClearAllData
-                                                                                            : item.id === 'cleanupCommunity'
-                                                                                                ? handleCleanupCommunityData
-                                                                                                : undefined
+                                                                                        : item.id === 'viewNotifications'
+                                                                                            ? handleViewNotifications
+                                                                                            : item.id === 'clearData'
+                                                                                                ? handleClearAllData
+                                                                                                : item.id === 'cleanupCommunity'
+                                                                                                    ? handleCleanupCommunityData
+                                                                                                    : undefined
                                             }
                                             disabled={(item.id === 'restore' && isRestoring) || (item.id === 'deleteAccount' && isDeletingAccount)}
                                         >
