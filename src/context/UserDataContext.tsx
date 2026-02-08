@@ -8,11 +8,11 @@
 
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { onboardingService, OnboardingData } from '../services/onboardingService';
+import { onboardingService, OnboardingData, OnboardingCheckpoint } from '../services/onboardingService';
 import { useAuthContext } from './AuthContext';
 import { userService } from '../services/userService';
 import { communityStatsService } from '../services/communityStatsService';
-import { StreakData, DailyCheckIn } from '../types';
+import { StreakData, DailyCheckIn, OnboardingStackParamList } from '../types';
 import { calculateStreak, StreakResult, DayStatus } from '../services/streakService';
 import { PlanType } from '../utils/planUtils';
 
@@ -29,6 +29,8 @@ interface UserDataContextType {
     // Onboarding data
     onboardingData: OnboardingData;
     hasCompletedOnboarding: boolean;
+    onboardingCheckpoint: OnboardingCheckpoint | null;
+    postPaywallAuthRequired: boolean;
 
     // Streak data (legacy format for backward compatibility)
     streakData: StreakData | null;
@@ -66,6 +68,8 @@ interface UserDataContextType {
     // Methods
     updateOnboardingData: (data: Partial<OnboardingData>) => Promise<void>;
     completeOnboarding: () => Promise<void>;
+    setOnboardingCheckpoint: (checkpoint: OnboardingCheckpoint | keyof OnboardingStackParamList) => Promise<void>;
+    setPostPaywallAuthRequired: (required: boolean) => Promise<void>;
     refreshData: () => Promise<void>;
     refreshStreakFromFoodLogs: () => Promise<void>;
     recordCheckIn: (sugarFree: boolean, notes?: string) => Promise<void>;
@@ -109,6 +113,8 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
 
     const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
     const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+    const [onboardingCheckpoint, setOnboardingCheckpointState] = useState<OnboardingCheckpoint | null>(null);
+    const [postPaywallAuthRequired, setPostPaywallAuthRequiredState] = useState(false);
     const [streakData, setStreakData] = useState<StreakData | null>(null);
     const [streakResult, setStreakResult] = useState<StreakResult | null>(null);
     const [todayCheckIn, setTodayCheckIn] = useState<DailyCheckIn | null>(null);
@@ -130,6 +136,12 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
 
             const completed = await onboardingService.hasCompletedOnboarding();
             setHasCompletedOnboarding(completed);
+
+            const checkpoint = await onboardingService.getOnboardingCheckpoint();
+            setOnboardingCheckpointState(checkpoint);
+
+            const needsAuth = await onboardingService.isPostPaywallAuthRequired();
+            setPostPaywallAuthRequiredState(needsAuth);
 
             // If authenticated, try to load from Firebase with timeout
             if (isAuthenticated && userId) {
@@ -216,6 +228,8 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
     const completeOnboarding = useCallback(async () => {
         await onboardingService.completeOnboarding();
         setHasCompletedOnboarding(true);
+        await onboardingService.clearOnboardingCheckpoint();
+        setOnboardingCheckpointState(null);
 
         // Update streak data with start date
         const updated = await onboardingService.getOnboardingData();
@@ -237,6 +251,23 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             }
         }
     }, [isAuthenticated, userId]);
+
+    const setOnboardingCheckpoint = useCallback(async (checkpoint: OnboardingCheckpoint | keyof OnboardingStackParamList) => {
+        await onboardingService.setOnboardingCheckpoint(checkpoint);
+        setOnboardingCheckpointState(typeof checkpoint === 'string' ? { routeName: checkpoint } : checkpoint);
+    }, []);
+
+    const setPostPaywallAuthRequired = useCallback(async (required: boolean) => {
+        await onboardingService.setPostPaywallAuthRequired(required);
+        setPostPaywallAuthRequiredState(required);
+    }, []);
+
+    // Once authenticated, clear the "post-paywall auth required" state.
+    useEffect(() => {
+        if (isAuthenticated && postPaywallAuthRequired) {
+            setPostPaywallAuthRequired(false);
+        }
+    }, [isAuthenticated, postPaywallAuthRequired, setPostPaywallAuthRequired]);
 
     // Refresh all data
     const refreshData = useCallback(async () => {
@@ -476,6 +507,8 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
     const value: UserDataContextType = {
         onboardingData,
         hasCompletedOnboarding,
+        onboardingCheckpoint,
+        postPaywallAuthRequired,
         streakData,
         streakResult,
         todayStatus: streakResult?.todayStatus || null,
@@ -488,6 +521,8 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         isLoading,
         updateOnboardingData,
         completeOnboarding,
+        setOnboardingCheckpoint,
+        setPostPaywallAuthRequired,
         refreshData,
         refreshStreakFromFoodLogs,
         recordCheckIn,

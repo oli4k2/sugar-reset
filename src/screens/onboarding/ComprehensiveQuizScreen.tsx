@@ -108,10 +108,10 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q3.png'),
             title: 'How often do you eat foods with added sugar?',
             options: [
-                { id: 'rarely', emoji: '', label: 'Rarely' },
-                { id: 'few-times-week', emoji: '', label: 'A few times per week' },
-                { id: 'daily', emoji: '', label: 'Daily' },
                 { id: 'multiple-daily', emoji: '', label: 'Multiple times per day' },
+                { id: 'daily', emoji: '', label: 'Daily' },
+                { id: 'few-times-week', emoji: '', label: 'A few times per week' },
+                { id: 'rarely', emoji: '', label: 'Rarely' },
             ],
         },
         {
@@ -121,10 +121,10 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q4.png'),
             title: 'On a typical day, how many separate times do you eat or drink something sugary?',
             options: [
-                { id: '0-1', emoji: '', label: '0-1' },
-                { id: '2-3', emoji: '', label: '2-3' },
-                { id: '4-5', emoji: '', label: '4-5' },
                 { id: '6+', emoji: '', label: '6+' },
+                { id: '4-5', emoji: '', label: '4-5' },
+                { id: '2-3', emoji: '', label: '2-3' },
+                { id: '0-1', emoji: '', label: '0-1' },
             ],
         },
         {
@@ -134,10 +134,10 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q5.png'),
             title: 'How often do you eat sugar without consciously deciding to?',
             options: [
-                { id: '1', emoji: '', label: 'Never' },
-                { id: '2', emoji: '', label: 'Sometimes' },
-                { id: '3', emoji: '', label: 'Often' },
                 { id: '4', emoji: '', label: 'Almost always' },
+                { id: '3', emoji: '', label: 'Often' },
+                { id: '2', emoji: '', label: 'Sometimes' },
+                { id: '1', emoji: '', label: 'Never' },
             ],
         },
         {
@@ -147,9 +147,9 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q6.png'),
             title: 'Which feels closer to the truth?',
             options: [
-                { id: 'choose', emoji: '', label: 'I choose to eat sugar' },
-                { id: 'give-in', emoji: '', label: 'I give in to cravings' },
                 { id: 'already-eating', emoji: '', label: 'I find myself already eating it' },
+                { id: 'give-in', emoji: '', label: 'I give in to cravings' },
+                { id: 'choose', emoji: '', label: 'I choose to eat sugar' },
             ],
         },
         {
@@ -174,10 +174,10 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q8.png'),
             title: 'When you try to reduce sugar, what usually happens?',
             options: [
-                { id: 'succeed', emoji: '', label: 'I succeed' },
-                { id: 'few-days', emoji: '', label: 'I last a few days' },
-                { id: 'old-habits', emoji: '', label: 'I return to old habits' },
                 { id: 'never-tried', emoji: '', label: "I've never tried" },
+                { id: 'old-habits', emoji: '', label: 'I return to old habits' },
+                { id: 'few-days', emoji: '', label: 'I last a few days' },
+                { id: 'succeed', emoji: '', label: 'I succeed' },
             ],
         },
         {
@@ -187,10 +187,10 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q9.png'),
             title: "How often do you crave sugary snacks and drinks when you're not hungry?",
             options: [
-                { id: '1', emoji: '', label: 'Never' },
-                { id: '2', emoji: '', label: 'Sometimes' },
-                { id: '3', emoji: '', label: 'Often' },
                 { id: '4', emoji: '', label: 'Almost always' },
+                { id: '3', emoji: '', label: 'Often' },
+                { id: '2', emoji: '', label: 'Sometimes' },
+                { id: '1', emoji: '', label: 'Never' },
             ],
         },
         {
@@ -200,10 +200,10 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q10.png'),
             title: 'When you crave sugar, how intense is the urge?',
             options: [
-                { id: '1', emoji: '', label: 'Easy to ignore' },
-                { id: '2', emoji: '', label: 'Noticeable' },
-                { id: '3', emoji: '', label: 'Hard to resist' },
                 { id: '4', emoji: '', label: 'Feels automatic' },
+                { id: '3', emoji: '', label: 'Hard to resist' },
+                { id: '2', emoji: '', label: 'Noticeable' },
+                { id: '1', emoji: '', label: 'Easy to ignore' },
             ],
         },
         {
@@ -213,10 +213,10 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q11.png'),
             title: 'How hard is it to avoid sugar in your normal routine?',
             options: [
-                { id: '1', emoji: '', label: 'Easy' },
-                { id: '2', emoji: '', label: 'Somewhat hard' },
-                { id: '3', emoji: '', label: 'Hard' },
                 { id: '4', emoji: '', label: 'Almost impossible' },
+                { id: '3', emoji: '', label: 'Hard' },
+                { id: '2', emoji: '', label: 'Somewhat hard' },
+                { id: '1', emoji: '', label: 'Easy' },
             ],
         },
         {
@@ -226,10 +226,10 @@ const getQuestions = (gender: string | null): Question[] => {
             image: require('../../../assets/images/onboarding/q12.png'),
             title: 'How often are sugary foods or drinks visible around you?',
             options: [
-                { id: '1', emoji: '', label: 'Rarely' },
-                { id: '2', emoji: '', label: 'Sometimes' },
-                { id: '3', emoji: '', label: 'Often' },
                 { id: '4', emoji: '', label: 'Everywhere' },
+                { id: '3', emoji: '', label: 'Often' },
+                { id: '2', emoji: '', label: 'Sometimes' },
+                { id: '1', emoji: '', label: 'Rarely' },
             ],
         },
     ];
@@ -238,7 +238,7 @@ const getQuestions = (gender: string | null): Question[] => {
 };
 
 export default function ComprehensiveQuizScreen({ navigation, route }: ComprehensiveQuizScreenProps) {
-    const { updateOnboardingData } = useUserData();
+    const { updateOnboardingData, onboardingCheckpoint, setOnboardingCheckpoint } = useUserData();
     const skipToUserInfo = !!route.params?.skip;
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [showResult, setShowResult] = useState(false);
@@ -265,8 +265,19 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
 
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const slideAnim = useRef(new Animated.Value(0)).current;
-    const resultFade = useRef(new Animated.Value(0)).current;
-    const resultScale = useRef(new Animated.Value(0.8)).current;
+    const resultFade = useRef(new Animated.Value(1)).current;
+    const resultScale = useRef(new Animated.Value(0.92)).current;
+
+    // Resume from a milestone checkpoint (only set at the end of the quiz flow).
+    useEffect(() => {
+        if (onboardingCheckpoint?.routeName === 'ComprehensiveQuiz' && onboardingCheckpoint?.meta?.quizStage === 'results') {
+            setShowUserInfo(false);
+            setIsCalculating(false);
+            setShowResult(true);
+            resultFade.setValue(1);
+            resultScale.setValue(1);
+        }
+    }, [onboardingCheckpoint, resultFade, resultScale]);
     
     // Swipe gesture tracking
     const isAnimating = useRef(false);
@@ -470,10 +481,10 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
 
     const showResultScreen = () => {
         setShowResult(true);
-        Animated.parallel([
-            Animated.timing(resultFade, { toValue: 1, duration: 400, useNativeDriver: true }),
-            Animated.spring(resultScale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }),
-        ]).start();
+        // Milestone checkpoint: user reached quiz results (end of 12 questions).
+        // If they close and return, they should resume here.
+        setOnboardingCheckpoint({ routeName: 'ComprehensiveQuiz', meta: { quizStage: 'results' } }).catch(() => {});
+        Animated.spring(resultScale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
     };
 
     const handleContinue = () => {

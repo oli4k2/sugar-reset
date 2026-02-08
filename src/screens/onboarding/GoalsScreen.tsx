@@ -48,7 +48,7 @@ const SAVINGS_OPTIONS = [
 ];
 
 export default function GoalsScreen({ navigation }: GoalsScreenProps) {
-    const { onboardingData, updateOnboardingData } = useUserData();
+    const { onboardingData, updateOnboardingData, setOnboardingCheckpoint } = useUserData();
     const [selectedGoals, setSelectedGoals] = useState<string[]>(onboardingData?.goals || []);
     const [wantToSave, setWantToSave] = useState<boolean | null>(null);
     const [selectedSavingsGoal, setSelectedSavingsGoal] = useState<string | null>(null);
@@ -77,6 +77,9 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
                 useNativeDriver: true,
             }),
         ]).start();
+
+        // Milestone checkpoint: user finished the info slides and reached the next flow.
+        setOnboardingCheckpoint('Goals').catch(() => {});
     }, []);
 
     // Animate savings options when user says yes

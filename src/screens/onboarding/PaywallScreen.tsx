@@ -65,7 +65,7 @@ const features = [
 
 export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium } = useRevenueCat();
-    const { hasCompletedOnboarding } = useUserData();
+    const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint } = useUserData();
     const { isAuthenticated } = useAuthContext();
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
@@ -81,15 +81,14 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
         }
     }, [currentOffering]);
 
-    // Navigate away if user is already premium (but only if not loading and RevenueCat is initialized)
-    // IMPORTANT: Only navigate if user has completed onboarding AND is premium
+    // Milestone checkpoint: end of onboarding flow (paywall reached).
     useEffect(() => {
-        // Only skip paywall if:
-        // 1. Not loading
-        // 2. Premium is confirmed true
-        // 3. We have offerings loaded (meaning RevenueCat is working)
-        // 4. User has completed onboarding (to prevent skipping before onboarding is done)
-        // 5. User is authenticated (required to access Main app)
+        setOnboardingCheckpoint('Paywall').catch(() => {});
+    }, [setOnboardingCheckpoint]);
+
+    // Navigate away if user is already premium (but only if not loading and RevenueCat is initialized)
+    // IMPORTANT: Only navigate to Main when user is premium + authenticated + onboarding completed
+    useEffect(() => {
         if (!isLoading && isPremium && currentOffering !== null && hasCompletedOnboarding && isAuthenticated) {
             console.log('✅ User has premium, completed onboarding, and is authenticated → navigating to Main');
             // User has everything needed, navigate to main app
@@ -97,19 +96,6 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 index: 0,
                 routes: [{ name: 'Main' }],
             });
-        } else if (!isLoading && isPremium && hasCompletedOnboarding && !isAuthenticated) {
-            console.log('ℹ️ User has premium but not authenticated → navigating to Auth');
-            // User has premium but needs to log in
-            navigation.getParent()?.reset({
-                index: 0,
-                routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
-            });
-        } else if (!isLoading && isPremium && !hasCompletedOnboarding) {
-            console.log('ℹ️ User has premium but onboarding not complete, staying on paywall');
-        } else if (!isLoading && !isPremium) {
-            console.log('ℹ️ User does not have premium, showing paywall');
-        } else if (isLoading) {
-            console.log('⏳ Loading subscription status...');
         }
     }, [isPremium, isLoading, currentOffering, hasCompletedOnboarding, isAuthenticated, navigation]);
 
@@ -123,9 +109,13 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             setIsPurchasing(true);
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await purchasePackage(selectedPackage);
+
+            // Once the user has acted on the paywall (purchase), onboarding is done.
+            await completeOnboarding();
             
             // Check if user is authenticated after purchase
             if (!isAuthenticated) {
+                await setPostPaywallAuthRequired(true);
                 // Purchase successful but user is anonymous - need to log in to link purchase
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 Alert.alert(
@@ -145,6 +135,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                     ]
                 );
             } else {
+                await setPostPaywallAuthRequired(false);
                 // User is authenticated - navigation will happen automatically via isPremium effect
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
@@ -192,11 +183,25 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     };
 
     const handleSkip = () => {
-        // Still need to create account even when skipping paywall
-        navigation.getParent()?.reset({
-            index: 0,
-            routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
-        });
+        // User chose to continue without subscribing right now.
+        // Onboarding is complete, but Auth is still required if they are anonymous.
+        (async () => {
+            await completeOnboarding();
+
+            if (!isAuthenticated) {
+                await setPostPaywallAuthRequired(true);
+                navigation.getParent()?.reset({
+                    index: 0,
+                    routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
+                });
+            } else {
+                await setPostPaywallAuthRequired(false);
+                navigation.getParent()?.reset({
+                    index: 0,
+                    routes: [{ name: 'Main' }],
+                });
+            }
+        })().catch((e) => console.warn('Failed to skip paywall:', e));
     };
 
     // Get available packages from RevenueCat

@@ -13,6 +13,8 @@ const STORAGE_KEYS = {
     USER_PREFERENCES: '@sugar_reset_preferences',
     CHECK_INS_CACHE: '@sugar_reset_checkins',
     HAS_COMPLETED_ONBOARDING: '@sugar_reset_has_onboarded',
+    ONBOARDING_CHECKPOINT: '@sugar_reset_onboarding_checkpoint',
+    POST_PAYWALL_AUTH_REQUIRED: '@sugar_reset_post_paywall_auth_required',
 };
 
 /**

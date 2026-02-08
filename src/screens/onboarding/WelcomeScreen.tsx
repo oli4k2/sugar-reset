@@ -89,7 +89,10 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     };
 
     const handleLogin = () => {
-        navigation.navigate('Auth');
+        navigation.navigate('Auth' as any, {
+            screen: 'Login',
+            params: { fromOnboardingWelcome: true },
+        });
     };
 
     // DEV: Skip onboarding for testing
@@ -124,7 +127,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
             {showSplash && (
                 <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
                     <Animated.Image
-                        source={require('../../public/craveless_icon.png')}
+                        source={require('../../../assets/images/craveless-logo.png')}
                         style={[
                             styles.splashLogo,
                             {
@@ -157,7 +160,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
                             ]}
                         >
                             <Animated.Image
-                                source={require('../../public/craveless_slogan.png')}
+                                source={require('../../../assets/images/craveless-logo.png')}
                                 style={[
                                     styles.logoSmall,
                                     {
@@ -225,8 +228,8 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     splashLogo: {
-        width: width * 1.2,
-        height: width * 0.7,
+        width: width * 0.7,
+        height: width * 0.4,
     },
 
     // Main Content
@@ -244,8 +247,8 @@ const styles = StyleSheet.create({
         marginTop: spacing['3xl'] * 2,
     },
     logoSmall: {
-        width: width * 1.3,
-        height: width * 0.7,
+        width: width * 0.7,
+        height: width * 0.4,
         marginBottom: spacing.md,
     },
     slogan: {

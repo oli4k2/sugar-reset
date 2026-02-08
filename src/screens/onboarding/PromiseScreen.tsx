@@ -28,7 +28,7 @@ type PromiseScreenProps = {
 };
 
 export default function PromiseScreen({ navigation, route }: PromiseScreenProps) {
-    const { updateOnboardingData, completeOnboarding, onboardingData } = useUserData();
+    const { updateOnboardingData, onboardingData, setOnboardingCheckpoint } = useUserData();
     const nickname = route.params?.nickname || onboardingData?.nickname || 'Friend';
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -64,9 +64,14 @@ export default function PromiseScreen({ navigation, route }: PromiseScreenProps)
     }, []);
 
     const handleMakePromise = async () => {
-        // Mark promise as confirmed and complete onboarding
-        await updateOnboardingData({ promiseConfirmed: true });
-        await completeOnboarding();
+        // Mark promise as confirmed and set the journey start date (without completing onboarding yet)
+        await updateOnboardingData({
+            promiseConfirmed: true,
+            startDate: onboardingData.startDate || new Date().toISOString(),
+        });
+
+        // Save a resume checkpoint so if the app closes, they restart from here (not Auth)
+        await setOnboardingCheckpoint('PersonalizedPlan');
         navigation.navigate('PersonalizedPlan');
     };
 

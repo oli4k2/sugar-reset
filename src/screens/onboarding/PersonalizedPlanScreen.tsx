@@ -5,6 +5,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     Animated,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,7 +13,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { useUserData } from '../../context/UserDataContext';
-import { AppIcon } from '../../components/OnboardingIcon';
 import { OnboardingStackParamList } from '../../types';
 
 type PersonalizedPlanScreenProps = {
@@ -32,7 +32,8 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
     const steps = [
         "Let's start your journey to being Craveless",
         "Your answers have helped us understand you better.",
-        "We have a custom plan ready, so now it's time to invest in yourself."
+        "We have a custom plan ready",
+        "Now, it's time to invest in yourself."
     ];
 
     const stepDuration = 3000; // 3 seconds per step
@@ -41,8 +42,8 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
         // Sequence of text changes
         const runAnimationSequence = async () => {
             for (let i = 0; i < steps.length; i++) {
-                setCurrentStep(i);
-                
+                // Step text set at end of previous iteration while invisible (or initial state for i=0) to avoid flicker
+
                 // Fade in
                 Animated.parallel([
                     Animated.timing(fadeAnim, {
@@ -78,6 +79,8 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                     await new Promise(resolve => setTimeout(resolve, 500));
                     // Reset slide for next entry
                     slideAnim.setValue(20);
+                    // Set next step while invisible so next fade-in shows correct text without flicker
+                    setCurrentStep(i + 1);
                 } else {
                     // Last step stays visible
                     await new Promise(resolve => setTimeout(resolve, stepDuration));
@@ -99,7 +102,7 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
     }, []);
 
     const handleContinue = () => {
-        navigation.navigate('PlanReveal');
+        navigation.navigate('LongScrollablePlan');
     };
 
     // Date formatting for "Free since" (e.g. 12/22)
@@ -110,34 +113,21 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
         <LooviBackground variant="blueDominant">
             <SafeAreaView style={styles.container}>
                 <View style={styles.content}>
-                    {/* Animated Header Text */}
-                    <View style={styles.headerContainer}>
-                        <Animated.Text 
-                            style={[
-                                styles.headerText, 
-                                { 
-                                    opacity: fadeAnim,
-                                    transform: [{ translateY: slideAnim }]
-                                }
-                            ]}
-                        >
-                            {steps[currentStep]}
-                        </Animated.Text>
-                    </View>
-
-                    {/* Streak Card Visual */}
+                    {/* Streak Card Visual - at top */}
                     <View style={styles.cardContainer}>
                         <LinearGradient
-                            colors={['#FF9A9E', '#FECFEF', '#F6416C']} 
+                            colors={[looviColors.coralSoft, looviColors.coralOrange, looviColors.skyBlue]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={styles.streakCard}
                         >
                             <View style={styles.cardHeader}>
-                                <View style={styles.logoContainer}>
-                                    <Text style={styles.logoText}>C</Text>
-                                </View>
-                                <AppIcon emoji="✨" size={24} />
+                                <View style={styles.cardHeaderSpacer} />
+                                <Image
+                                    source={require('../../../assets/images/craveless-sugar-reset-card.png')}
+                                    style={styles.cardBadgeImage}
+                                    resizeMode="contain"
+                                />
                             </View>
 
                             <View style={styles.cardBody}>
@@ -159,6 +149,21 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                         
                         {/* Decorative glow/shadow behind */}
                         <View style={styles.cardShadow} />
+                    </View>
+
+                    {/* Animated Header Text - beneath card */}
+                    <View style={styles.headerContainer}>
+                        <Animated.Text 
+                            style={[
+                                styles.headerText, 
+                                { 
+                                    opacity: fadeAnim,
+                                    transform: [{ translateY: slideAnim }]
+                                }
+                            ]}
+                        >
+                            {steps[currentStep]}
+                        </Animated.Text>
                     </View>
                 </View>
 
@@ -189,11 +194,17 @@ const styles = StyleSheet.create({
         paddingTop: spacing['3xl'],
         alignItems: 'center',
     },
+    cardContainer: {
+        width: '100%',
+        maxWidth: 320,
+        aspectRatio: 0.8, // Portrait card shape
+        position: 'relative',
+        marginBottom: spacing['2xl'] * 0.6, // Space between card and text
+    },
     headerContainer: {
         height: 120, // Fixed height to prevent layout jumps
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: spacing['2xl'],
         width: '100%',
     },
     headerText: {
@@ -202,12 +213,6 @@ const styles = StyleSheet.create({
         color: looviColors.text.primary,
         textAlign: 'center',
         lineHeight: 32,
-    },
-    cardContainer: {
-        width: '100%',
-        maxWidth: 320,
-        aspectRatio: 0.8, // Portrait card shape
-        position: 'relative',
     },
     streakCard: {
         flex: 1,
@@ -224,29 +229,22 @@ const styles = StyleSheet.create({
         left: 20,
         right: -20,
         bottom: -20,
-        backgroundColor: 'rgba(246, 65, 108, 0.2)',
+        backgroundColor: 'rgba(232, 168, 124, 0.25)',
         borderRadius: 24,
         zIndex: 0,
         transform: [{ scale: 0.95 }],
     },
     cardHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         alignItems: 'center',
     },
-    logoContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        borderWidth: 1.5,
-        borderColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
+    cardHeaderSpacer: {
+        flex: 1,
     },
-    logoText: {
-        color: '#FFFFFF',
-        fontWeight: '700',
-        fontSize: 12,
+    cardBadgeImage: {
+        width: 48,
+        height: 48,
     },
     cardBody: {
         flex: 1,
