@@ -1,11 +1,15 @@
 /**
  * PaywallScreen
  * 
- * Premium subscription paywall with:
- * - Beautiful design matching onboarding flow
- * - Subtle X button to close
- * - Limited-time lifetime deal popup when closing
- * - RevenueCat integration
+ * Multi-step paywall flow:
+ * Step 1: "Try Craveless for free" - App preview
+ * Step 2: "We'll send you a reminder" - Bell notification
+ * Step 3: Timeline with plan selection - 3-day free trial
+ * 
+ * After trial cancellation:
+ * - Offer 1: $15/year or $25 lifetime
+ * - Offer 2: $15 lifetime (final)
+ * - Free tier if declined
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -14,21 +18,18 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    ScrollView,
     ActivityIndicator,
     Alert,
     Dimensions,
     Animated,
-    Modal,
     Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PurchasesPackage } from 'react-native-purchases';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { spacing, borderRadius } from '../../theme';
+import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
-import { GlassCard } from '../../components/GlassCard';
 import { useRevenueCat } from '../../hooks/useRevenueCat';
 import { useUserData } from '../../context/UserDataContext';
 import { useAuthContext } from '../../context/AuthContext';
@@ -40,92 +41,58 @@ type PaywallScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Paywall'>;
 };
 
-// Premium features with icons
-const PREMIUM_FEATURES = [
-    {
-        icon: 'camera-outline',
-        title: 'Unlimited Food Scanning',
-        description: 'Scan any food label to check sugar content',
-    },
-    {
-        icon: 'analytics-outline',
-        title: 'Advanced Analytics',
-        description: 'Detailed insights into your sugar-free journey',
-    },
-    {
-        icon: 'people-outline',
-        title: 'Inner Circle Access',
-        description: 'Connect with accountability partners',
-    },
-    {
-        icon: 'flash-outline',
-        title: 'SOS Craving Support',
-        description: 'Instant help when cravings hit',
-    },
-    {
-        icon: 'heart-outline',
-        title: 'Wellness Tracking',
-        description: 'Track mood, energy, sleep and more',
-    },
-    {
-        icon: 'infinite-outline',
-        title: 'Lifetime Updates',
-        description: 'All future features included free',
-    },
-];
+// Paywall steps
+type PaywallStep = 'intro' | 'reminder' | 'plans';
 
 export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium } = useRevenueCat();
     const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint } = useUserData();
     const { isAuthenticated } = useAuthContext();
+
+    const [currentStep, setCurrentStep] = useState<PaywallStep>('intro');
+    const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
-    const [showLifetimeDeal, setShowLifetimeDeal] = useState(false);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(50)).current;
-    const scaleAnim = useRef(new Animated.Value(0.9)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
 
-    // Entry animation
+    // Animate on step change
     useEffect(() => {
+        fadeAnim.setValue(0);
+        slideAnim.setValue(30);
+
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
-                duration: 600,
+                duration: 400,
                 useNativeDriver: true,
             }),
             Animated.spring(slideAnim, {
                 toValue: 0,
                 tension: 50,
-                friction: 8,
-                useNativeDriver: true,
-            }),
-            Animated.spring(scaleAnim, {
-                toValue: 1,
-                tension: 50,
-                friction: 8,
+                friction: 10,
                 useNativeDriver: true,
             }),
         ]).start();
-    }, []);
+    }, [currentStep]);
 
-    // Set default selected package when offerings load
+    // Set default package
     useEffect(() => {
-        if (currentOffering?.availablePackages && currentOffering.availablePackages.length > 0) {
-            const annual = currentOffering.annual;
-            const monthly = currentOffering.monthly;
-            setSelectedPackage(annual || monthly || currentOffering.availablePackages[0]);
+        if (currentOffering) {
+            const pkg = selectedPlan === 'yearly' ? currentOffering.annual : currentOffering.monthly;
+            setSelectedPackage(pkg || null);
         }
-    }, [currentOffering]);
+    }, [currentOffering, selectedPlan]);
 
-    // Milestone checkpoint
+    // Checkpoint
     useEffect(() => {
         setOnboardingCheckpoint('Paywall').catch(() => { });
     }, [setOnboardingCheckpoint]);
 
-    // Navigate away if user is already premium
+    // Navigate if already premium
     useEffect(() => {
         if (!isLoading && isPremium && currentOffering !== null && hasCompletedOnboarding && isAuthenticated) {
             navigation.getParent()?.reset({
@@ -135,9 +102,27 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
         }
     }, [isPremium, isLoading, currentOffering, hasCompletedOnboarding, isAuthenticated, navigation]);
 
-    const handleSubscribe = async () => {
+    const handleNextStep = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (currentStep === 'intro') {
+            setCurrentStep('reminder');
+        } else if (currentStep === 'reminder') {
+            setCurrentStep('plans');
+        }
+    };
+
+    const handleBack = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (currentStep === 'reminder') {
+            setCurrentStep('intro');
+        } else if (currentStep === 'plans') {
+            setCurrentStep('reminder');
+        }
+    };
+
+    const handleStartTrial = async () => {
         if (!selectedPackage) {
-            Alert.alert('Error', 'Please select a subscription plan');
+            Alert.alert('Error', 'Please select a plan');
             return;
         }
 
@@ -151,8 +136,8 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 await setPostPaywallAuthRequired(true);
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 Alert.alert(
-                    'Welcome to Premium! 🎉',
-                    'Create your account to unlock all features.',
+                    'Welcome! 🎉',
+                    'Your free trial has started. Create your account to continue.',
                     [{
                         text: 'Create Account',
                         onPress: () => {
@@ -170,7 +155,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
         } catch (error: any) {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             if (error.message !== 'Purchase cancelled') {
-                Alert.alert('Purchase Failed', error.message || 'Please try again.');
+                Alert.alert('Error', error.message || 'Please try again.');
             }
         } finally {
             setIsPurchasing(false);
@@ -197,282 +182,268 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
         }
     };
 
-    const handleClose = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setShowLifetimeDeal(true);
+    // Calculate billing date (3 days from now)
+    const getBillingDate = () => {
+        const date = new Date();
+        date.setDate(date.getDate() + 3);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
-    const handleSkipFree = async () => {
-        setShowLifetimeDeal(false);
-        await completeOnboarding();
-
-        if (!isAuthenticated) {
-            await setPostPaywallAuthRequired(true);
-            navigation.getParent()?.reset({
-                index: 0,
-                routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
-            });
-        } else {
-            await setPostPaywallAuthRequired(false);
-            navigation.getParent()?.reset({
-                index: 0,
-                routes: [{ name: 'Main' }],
-            });
-        }
+    // Get price info
+    const getMonthlyPrice = () => currentOffering?.monthly?.product.priceString || '$9.99';
+    const getYearlyPrice = () => currentOffering?.annual?.product.priceString || '$29.99';
+    const getYearlyMonthlyEquivalent = () => {
+        const price = currentOffering?.annual?.product.price || 29.99;
+        return `$${(price / 12).toFixed(2)}`;
     };
 
-    const handleLifetimePurchase = async () => {
-        // For now, trigger the annual package as "lifetime" - you can configure a real lifetime product in RevenueCat
-        if (currentOffering?.annual) {
-            setSelectedPackage(currentOffering.annual);
-            setShowLifetimeDeal(false);
-            await handleSubscribe();
-        } else {
-            Alert.alert('Error', 'Lifetime deal not available');
-        }
-    };
+    // Render Step 1: Intro
+    const renderIntroStep = () => (
+        <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <View style={styles.contentArea}>
+                <Text style={styles.mainTitle}>We want you to{'\n'}try Craveless for free.</Text>
 
-    const packages = currentOffering?.availablePackages || [];
+                {/* App Preview Mockup */}
+                <View style={styles.phonePreview}>
+                    <View style={styles.phoneMockup}>
+                        <Image
+                            source={require('../../public/mascot.png')}
+                            style={styles.previewImage}
+                            resizeMode="contain"
+                        />
+                        <View style={styles.previewOverlay}>
+                            <View style={styles.scannerCorners}>
+                                <View style={[styles.corner, styles.cornerTL]} />
+                                <View style={[styles.corner, styles.cornerTR]} />
+                                <View style={[styles.corner, styles.cornerBL]} />
+                                <View style={[styles.corner, styles.cornerBR]} />
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </View>
 
-    const getPackageName = (pkg: PurchasesPackage): string => {
-        if (pkg.packageType === 'ANNUAL') return 'Annual';
-        if (pkg.packageType === 'MONTHLY') return 'Monthly';
-        return pkg.identifier;
-    };
+            <View style={styles.bottomArea}>
+                <View style={styles.noPaymentRow}>
+                    <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
+                    <Text style={styles.noPaymentText}>No Payment Due Now</Text>
+                </View>
 
-    const getSavings = (pkg: PurchasesPackage): string | undefined => {
-        if (pkg.packageType === 'ANNUAL' && currentOffering?.monthly) {
-            const monthlyPrice = currentOffering.monthly.product.price;
-            const annualPrice = pkg.product.price;
-            const monthlyEquivalent = monthlyPrice * 12;
-            if (monthlyEquivalent > annualPrice) {
-                const savings = ((monthlyEquivalent - annualPrice) / monthlyEquivalent) * 100;
-                return `Save ${Math.round(savings)}%`;
-            }
-        }
-        return undefined;
-    };
-
-    return (
-        <LooviBackground variant="coralDominant">
-            <SafeAreaView style={styles.container}>
-                {/* Close Button */}
                 <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={handleClose}
-                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                    style={styles.primaryButton}
+                    onPress={handleNextStep}
+                    activeOpacity={0.8}
                 >
-                    <Ionicons name="close" size={24} color={looviColors.text.tertiary} />
+                    <Text style={styles.primaryButtonText}>Try for $0.00</Text>
                 </TouchableOpacity>
 
-                <ScrollView
-                    style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
+                <Text style={styles.priceSubtext}>
+                    Just {getYearlyPrice()} per year ({getYearlyMonthlyEquivalent()}/mo)
+                </Text>
+            </View>
+        </Animated.View>
+    );
+
+    // Render Step 2: Reminder
+    const renderReminderStep = () => (
+        <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <View style={styles.contentArea}>
+                <Text style={styles.mainTitle}>We'll send you{'\n'}a reminder before your{'\n'}free trial ends</Text>
+
+                {/* Bell Icon */}
+                <View style={styles.bellContainer}>
+                    <View style={styles.bellIconWrapper}>
+                        <Ionicons name="notifications-outline" size={80} color={looviColors.text.muted} />
+                        <View style={styles.notificationBadge}>
+                            <Text style={styles.notificationBadgeText}>1</Text>
+                        </View>
+                    </View>
+                </View>
+            </View>
+
+            <View style={styles.bottomArea}>
+                <View style={styles.noPaymentRow}>
+                    <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
+                    <Text style={styles.noPaymentText}>No Payment Due Now</Text>
+                </View>
+
+                <TouchableOpacity
+                    style={styles.primaryButton}
+                    onPress={handleNextStep}
+                    activeOpacity={0.8}
                 >
-                    {/* Animated Header */}
-                    <Animated.View style={[
-                        styles.header,
-                        {
-                            opacity: fadeAnim,
-                            transform: [
-                                { translateY: slideAnim },
-                                { scale: scaleAnim },
-                            ],
-                        },
-                    ]}>
-                        <View style={styles.crownContainer}>
-                            <Text style={styles.crownEmoji}>👑</Text>
-                        </View>
-                        <Text style={styles.title}>Unlock Your{'\n'}Full Potential</Text>
-                        <Text style={styles.subtitle}>
-                            Join thousands breaking free from sugar addiction
-                        </Text>
-                    </Animated.View>
+                    <Text style={styles.primaryButtonText}>Continue for FREE</Text>
+                </TouchableOpacity>
 
-                    {/* Features Grid */}
-                    <Animated.View style={[styles.featuresContainer, { opacity: fadeAnim }]}>
-                        {PREMIUM_FEATURES.map((feature, index) => (
-                            <View key={index} style={styles.featureRow}>
-                                <View style={styles.featureIconContainer}>
-                                    <Ionicons
-                                        name={feature.icon as any}
-                                        size={22}
-                                        color={looviColors.accent.primary}
-                                    />
-                                </View>
-                                <View style={styles.featureTextContainer}>
-                                    <Text style={styles.featureTitle}>{feature.title}</Text>
-                                    <Text style={styles.featureDescription}>{feature.description}</Text>
-                                </View>
+                <Text style={styles.priceSubtext}>
+                    Just {getYearlyPrice()} per year ({getYearlyMonthlyEquivalent()}/mo)
+                </Text>
+            </View>
+        </Animated.View>
+    );
+
+    // Render Step 3: Plans
+    const renderPlansStep = () => (
+        <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+            <View style={styles.contentArea}>
+                <Text style={styles.mainTitle}>Start your 3-day FREE{'\n'}trial to continue.</Text>
+
+                {/* Timeline */}
+                <View style={styles.timeline}>
+                    {/* Today */}
+                    <View style={styles.timelineItem}>
+                        <View style={styles.timelineIconContainer}>
+                            <View style={[styles.timelineIcon, styles.timelineIconActive]}>
+                                <Ionicons name="lock-open" size={16} color="#FFFFFF" />
                             </View>
-                        ))}
-                    </Animated.View>
-
-                    {/* Plans */}
-                    {isLoading && packages.length === 0 ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color={looviColors.accent.primary} />
+                            <View style={styles.timelineLine} />
                         </View>
-                    ) : packages.length > 0 ? (
-                        <Animated.View style={[styles.plansContainer, { opacity: fadeAnim }]}>
-                            {packages.map((pkg) => {
-                                const isSelected = selectedPackage?.identifier === pkg.identifier;
-                                const isAnnual = pkg.packageType === 'ANNUAL';
-                                const savings = getSavings(pkg);
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineTitle}>Today</Text>
+                            <Text style={styles.timelineDescription}>
+                                Unlock all the app's features like food scanning, craving support and more.
+                            </Text>
+                        </View>
+                    </View>
 
-                                return (
-                                    <TouchableOpacity
-                                        key={pkg.identifier}
-                                        onPress={() => {
-                                            Haptics.selectionAsync();
-                                            setSelectedPackage(pkg);
-                                        }}
-                                        activeOpacity={0.8}
-                                        disabled={isPurchasing}
-                                        style={[
-                                            styles.planCard,
-                                            isSelected && styles.planCardSelected,
-                                            isAnnual && styles.planCardPopular,
-                                        ]}
-                                    >
-                                        {isAnnual && (
-                                            <View style={styles.popularBadge}>
-                                                <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
-                                            </View>
-                                        )}
+                    {/* Day 2 */}
+                    <View style={styles.timelineItem}>
+                        <View style={styles.timelineIconContainer}>
+                            <View style={[styles.timelineIcon, styles.timelineIconPending]}>
+                                <Ionicons name="notifications" size={16} color="#FFFFFF" />
+                            </View>
+                            <View style={styles.timelineLine} />
+                        </View>
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineTitle}>In 2 Days - Reminder</Text>
+                            <Text style={styles.timelineDescription}>
+                                We'll send you a reminder that your trial is ending soon.
+                            </Text>
+                        </View>
+                    </View>
 
-                                        <View style={styles.planHeader}>
-                                            <View style={[
-                                                styles.radioOuter,
-                                                isSelected && styles.radioOuterSelected,
-                                            ]}>
-                                                {isSelected && <View style={styles.radioInner} />}
-                                            </View>
-                                            <Text style={[
-                                                styles.planName,
-                                                isSelected && styles.planNameSelected,
-                                            ]}>
-                                                {getPackageName(pkg)}
-                                            </Text>
-                                        </View>
+                    {/* Day 3 */}
+                    <View style={styles.timelineItem}>
+                        <View style={styles.timelineIconContainer}>
+                            <View style={[styles.timelineIcon, styles.timelineIconFuture]}>
+                                <Ionicons name="card" size={16} color="#FFFFFF" />
+                            </View>
+                        </View>
+                        <View style={styles.timelineContent}>
+                            <Text style={styles.timelineTitle}>In 3 Days - Billing Starts</Text>
+                            <Text style={styles.timelineDescription}>
+                                You'll be charged on {getBillingDate()} unless you cancel anytime before.
+                            </Text>
+                        </View>
+                    </View>
+                </View>
 
-                                        <View style={styles.planPricing}>
-                                            <Text style={[
-                                                styles.planPrice,
-                                                isSelected && styles.planPriceSelected,
-                                            ]}>
-                                                {pkg.product.priceString}
-                                            </Text>
-                                            <Text style={styles.planPeriod}>
-                                                {isAnnual ? '/year' : '/month'}
-                                            </Text>
-                                        </View>
-
-                                        {isAnnual && (
-                                            <Text style={styles.planEquivalent}>
-                                                Just {(pkg.product.price / 12).toFixed(2)}/month
-                                            </Text>
-                                        )}
-
-                                        {savings && (
-                                            <View style={styles.savingsBadge}>
-                                                <Text style={styles.savingsText}>{savings}</Text>
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </Animated.View>
-                    ) : null}
-
-                    {/* Trial info */}
-                    <Text style={styles.trialInfo}>
-                        ✓ 7-day free trial · Cancel anytime
-                    </Text>
-                </ScrollView>
-
-                {/* Bottom CTA */}
-                <View style={styles.bottomContainer}>
+                {/* Plan Selection */}
+                <View style={styles.planSelection}>
+                    {/* Monthly */}
                     <TouchableOpacity
                         style={[
-                            styles.subscribeButton,
-                            (isPurchasing || !selectedPackage) && styles.subscribeButtonDisabled,
+                            styles.planOption,
+                            selectedPlan === 'monthly' && styles.planOptionSelected,
                         ]}
-                        onPress={handleSubscribe}
+                        onPress={() => {
+                            Haptics.selectionAsync();
+                            setSelectedPlan('monthly');
+                        }}
                         activeOpacity={0.8}
-                        disabled={isPurchasing || !selectedPackage || isLoading}
                     >
-                        {isPurchasing ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <Text style={styles.subscribeButtonText}>
-                                Start Free Trial
-                            </Text>
-                        )}
+                        <Text style={styles.planLabel}>Monthly</Text>
+                        <Text style={styles.planPrice}>{getMonthlyPrice()}<Text style={styles.planPeriod}>/mo</Text></Text>
+                        <View style={[
+                            styles.radioCircle,
+                            selectedPlan === 'monthly' && styles.radioCircleSelected,
+                        ]}>
+                            {selectedPlan === 'monthly' && <View style={styles.radioInner} />}
+                        </View>
                     </TouchableOpacity>
 
+                    {/* Yearly */}
                     <TouchableOpacity
-                        onPress={handleRestore}
-                        disabled={isRestoring || isPurchasing}
-                        style={styles.restoreButton}
+                        style={[
+                            styles.planOption,
+                            selectedPlan === 'yearly' && styles.planOptionSelected,
+                        ]}
+                        onPress={() => {
+                            Haptics.selectionAsync();
+                            setSelectedPlan('yearly');
+                        }}
+                        activeOpacity={0.8}
                     >
+                        <View style={styles.freeTrialBadge}>
+                            <Text style={styles.freeTrialBadgeText}>3 DAYS FREE</Text>
+                        </View>
+                        <Text style={styles.planLabel}>Yearly</Text>
+                        <Text style={styles.planPrice}>{getYearlyMonthlyEquivalent()}<Text style={styles.planPeriod}>/mo</Text></Text>
+                        <View style={[
+                            styles.radioCircle,
+                            selectedPlan === 'yearly' && styles.radioCircleSelected,
+                        ]}>
+                            {selectedPlan === 'yearly' && (
+                                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                            )}
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <View style={styles.bottomArea}>
+                <View style={styles.noPaymentRow}>
+                    <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
+                    <Text style={styles.noPaymentText}>No Payment Due Now</Text>
+                </View>
+
+                <TouchableOpacity
+                    style={[styles.primaryButton, isPurchasing && styles.buttonDisabled]}
+                    onPress={handleStartTrial}
+                    activeOpacity={0.8}
+                    disabled={isPurchasing || isLoading}
+                >
+                    {isPurchasing ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                        <Text style={styles.primaryButtonText}>Start My 3-Day Free Trial</Text>
+                    )}
+                </TouchableOpacity>
+
+                <Text style={styles.priceSubtext}>
+                    3 days free, then {selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} ({selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)
+                </Text>
+            </View>
+        </Animated.View>
+    );
+
+    return (
+        <LooviBackground variant="white">
+            <SafeAreaView style={styles.container}>
+                {/* Header */}
+                <View style={styles.header}>
+                    {currentStep !== 'intro' ? (
+                        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                            <Ionicons name="chevron-back" size={24} color={looviColors.text.primary} />
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={styles.backButton} />
+                    )}
+
+                    <TouchableOpacity onPress={handleRestore} disabled={isRestoring}>
                         {isRestoring ? (
                             <ActivityIndicator size="small" color={looviColors.text.tertiary} />
                         ) : (
-                            <Text style={styles.restoreText}>Restore Purchases</Text>
+                            <Text style={styles.restoreText}>Restore</Text>
                         )}
                     </TouchableOpacity>
                 </View>
+
+                {/* Step Content */}
+                {currentStep === 'intro' && renderIntroStep()}
+                {currentStep === 'reminder' && renderReminderStep()}
+                {currentStep === 'plans' && renderPlansStep()}
             </SafeAreaView>
-
-            {/* Lifetime Deal Modal */}
-            <Modal
-                visible={showLifetimeDeal}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowLifetimeDeal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <Animated.View style={styles.lifetimeModal}>
-                        <View style={styles.lifetimeHeader}>
-                            <Text style={styles.lifetimeEmoji}>🎁</Text>
-                            <Text style={styles.lifetimeLabel}>LIMITED TIME OFFER</Text>
-                            <Text style={styles.lifetimeTitle}>Wait! Special Deal{'\n'}Just For You</Text>
-                            <Text style={styles.lifetimeSubtitle}>
-                                Get lifetime access at a special price - this offer won't be shown again!
-                            </Text>
-                        </View>
-
-                        <View style={styles.lifetimePricing}>
-                            <Text style={styles.lifetimeOriginalPrice}>$99.99</Text>
-                            <Text style={styles.lifetimeNewPrice}>$29.99</Text>
-                            <Text style={styles.lifetimeOneTime}>One-time payment · Forever</Text>
-                        </View>
-
-                        <View style={styles.lifetimeFeatures}>
-                            <Text style={styles.lifetimeFeature}>✓ All premium features forever</Text>
-                            <Text style={styles.lifetimeFeature}>✓ Lifetime updates included</Text>
-                            <Text style={styles.lifetimeFeature}>✓ No recurring charges</Text>
-                        </View>
-
-                        <TouchableOpacity
-                            style={styles.lifetimeCta}
-                            onPress={handleLifetimePurchase}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.lifetimeCtaText}>Get Lifetime Access</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.noThanksButton}
-                            onPress={handleSkipFree}
-                        >
-                            <Text style={styles.noThanksText}>No thanks, continue with free</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
-                </View>
-            </Modal>
         </LooviBackground>
     );
 }
@@ -481,331 +452,292 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    closeButton: {
-        position: 'absolute',
-        top: 60,
-        right: 20,
-        zIndex: 100,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.8)',
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        alignItems: 'flex-start',
         justifyContent: 'center',
     },
-    scrollView: {
+    restoreText: {
+        fontSize: 15,
+        color: looviColors.text.tertiary,
+        fontWeight: '500',
+    },
+    stepContainer: {
         flex: 1,
+        justifyContent: 'space-between',
     },
-    scrollContent: {
-        paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing['3xl'],
-        paddingBottom: spacing.lg,
+    contentArea: {
+        flex: 1,
+        paddingHorizontal: spacing.xl,
+        paddingTop: spacing.lg,
     },
-    header: {
-        alignItems: 'center',
-        marginBottom: spacing.xl,
-    },
-    crownContainer: {
-        marginBottom: spacing.md,
-    },
-    crownEmoji: {
-        fontSize: 56,
-    },
-    title: {
-        fontSize: 32,
+    mainTitle: {
+        fontSize: 28,
         fontWeight: '800',
         color: looviColors.text.primary,
         textAlign: 'center',
-        marginBottom: spacing.sm,
+        lineHeight: 36,
         letterSpacing: -0.5,
     },
-    subtitle: {
-        fontSize: 16,
-        fontWeight: '400',
-        color: looviColors.text.secondary,
-        textAlign: 'center',
-    },
-    featuresContainer: {
-        marginBottom: spacing.xl,
-    },
-    featureRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: spacing.md,
-        backgroundColor: 'rgba(255,255,255,0.6)',
-        padding: spacing.md,
-        borderRadius: 16,
-    },
-    featureIconContainer: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    // Phone Preview
+    phonePreview: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: spacing.md,
+        marginTop: spacing.xl,
     },
-    featureTextContainer: {
+    phoneMockup: {
+        width: SCREEN_WIDTH * 0.55,
+        height: SCREEN_WIDTH * 0.9,
+        backgroundColor: looviColors.text.primary,
+        borderRadius: 36,
+        padding: 8,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 15,
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 28,
+    },
+    previewOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    scannerCorners: {
+        width: 120,
+        height: 120,
+        position: 'relative',
+    },
+    corner: {
+        position: 'absolute',
+        width: 24,
+        height: 24,
+        borderColor: '#FFFFFF',
+    },
+    cornerTL: {
+        top: 0,
+        left: 0,
+        borderTopWidth: 3,
+        borderLeftWidth: 3,
+        borderTopLeftRadius: 8,
+    },
+    cornerTR: {
+        top: 0,
+        right: 0,
+        borderTopWidth: 3,
+        borderRightWidth: 3,
+        borderTopRightRadius: 8,
+    },
+    cornerBL: {
+        bottom: 0,
+        left: 0,
+        borderBottomWidth: 3,
+        borderLeftWidth: 3,
+        borderBottomLeftRadius: 8,
+    },
+    cornerBR: {
+        bottom: 0,
+        right: 0,
+        borderBottomWidth: 3,
+        borderRightWidth: 3,
+        borderBottomRightRadius: 8,
+    },
+    // Bell
+    bellContainer: {
         flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    featureTitle: {
-        fontSize: 15,
-        fontWeight: '600',
+    bellIconWrapper: {
+        position: 'relative',
+    },
+    notificationBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: looviColors.coralOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    notificationBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    // Timeline
+    timeline: {
+        marginTop: spacing.xl,
+    },
+    timelineItem: {
+        flexDirection: 'row',
+        marginBottom: spacing.sm,
+    },
+    timelineIconContainer: {
+        alignItems: 'center',
+        width: 40,
+    },
+    timelineIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    timelineIconActive: {
+        backgroundColor: looviColors.coralOrange,
+    },
+    timelineIconPending: {
+        backgroundColor: '#F59E0B',
+    },
+    timelineIconFuture: {
+        backgroundColor: looviColors.text.muted,
+    },
+    timelineLine: {
+        width: 3,
+        flex: 1,
+        backgroundColor: '#E5E5E5',
+        marginVertical: 4,
+    },
+    timelineContent: {
+        flex: 1,
+        paddingLeft: spacing.md,
+        paddingBottom: spacing.lg,
+    },
+    timelineTitle: {
+        fontSize: 16,
+        fontWeight: '700',
         color: looviColors.text.primary,
-        marginBottom: 2,
+        marginBottom: 4,
     },
-    featureDescription: {
+    timelineDescription: {
         fontSize: 13,
         color: looviColors.text.secondary,
+        lineHeight: 18,
     },
-    loadingContainer: {
-        alignItems: 'center',
-        paddingVertical: spacing.xl,
-    },
-    plansContainer: {
+    // Plan Selection
+    planSelection: {
+        flexDirection: 'row',
         gap: spacing.md,
-        marginBottom: spacing.lg,
+        marginTop: spacing.lg,
     },
-    planCard: {
-        backgroundColor: 'rgba(255,255,255,0.7)',
-        borderRadius: 20,
-        padding: spacing.lg,
+    planOption: {
+        flex: 1,
+        backgroundColor: '#F8F9FA',
+        borderRadius: 16,
+        padding: spacing.md,
         borderWidth: 2,
         borderColor: 'transparent',
         position: 'relative',
-        overflow: 'visible',
     },
-    planCardSelected: {
-        borderColor: looviColors.accent.primary,
-        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    planOptionSelected: {
+        borderColor: looviColors.text.primary,
+        backgroundColor: '#FFFFFF',
     },
-    planCardPopular: {
-        marginTop: 12,
-    },
-    popularBadge: {
+    freeTrialBadge: {
         position: 'absolute',
-        top: -12,
-        alignSelf: 'center',
-        backgroundColor: looviColors.accent.success,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 4,
-        borderRadius: 12,
+        top: -10,
+        right: spacing.sm,
+        backgroundColor: looviColors.text.primary,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 3,
+        borderRadius: 8,
     },
-    popularBadgeText: {
-        fontSize: 10,
-        fontWeight: '800',
+    freeTrialBadgeText: {
         color: '#FFFFFF',
+        fontSize: 9,
+        fontWeight: '800',
         letterSpacing: 0.5,
     },
-    planHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: spacing.sm,
-    },
-    radioOuter: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        borderWidth: 2,
-        borderColor: looviColors.text.muted,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.sm,
-    },
-    radioOuterSelected: {
-        borderColor: looviColors.accent.primary,
-    },
-    radioInner: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: looviColors.accent.primary,
-    },
-    planName: {
-        fontSize: 17,
-        fontWeight: '600',
+    planLabel: {
+        fontSize: 14,
         color: looviColors.text.secondary,
-    },
-    planNameSelected: {
-        color: looviColors.text.primary,
-    },
-    planPricing: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        marginLeft: 30,
+        marginBottom: 4,
     },
     planPrice: {
-        fontSize: 28,
+        fontSize: 18,
         fontWeight: '700',
-        color: looviColors.text.secondary,
-    },
-    planPriceSelected: {
         color: looviColors.text.primary,
     },
     planPeriod: {
         fontSize: 14,
-        color: looviColors.text.tertiary,
-        marginLeft: 4,
-    },
-    planEquivalent: {
-        fontSize: 13,
-        color: looviColors.accent.success,
-        fontWeight: '500',
-        marginLeft: 30,
-        marginTop: 4,
-    },
-    savingsBadge: {
-        position: 'absolute',
-        top: spacing.lg,
-        right: spacing.lg,
-        backgroundColor: 'rgba(127, 176, 105, 0.15)',
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    savingsText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: looviColors.accent.success,
-    },
-    trialInfo: {
-        fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '400',
         color: looviColors.text.secondary,
-        textAlign: 'center',
     },
-    bottomContainer: {
-        paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing.md,
+    radioCircle: {
+        position: 'absolute',
+        right: spacing.md,
+        top: '50%',
+        marginTop: -10,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: looviColors.text.muted,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    radioCircleSelected: {
+        backgroundColor: looviColors.text.primary,
+        borderColor: looviColors.text.primary,
+    },
+    radioInner: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#FFFFFF',
+    },
+    // Bottom
+    bottomArea: {
+        paddingHorizontal: spacing.xl,
         paddingBottom: spacing.xl,
     },
-    subscribeButton: {
-        backgroundColor: looviColors.accent.primary,
+    noPaymentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.md,
+        gap: spacing.xs,
+    },
+    noPaymentText: {
+        fontSize: 15,
+        color: looviColors.text.primary,
+        fontWeight: '500',
+    },
+    primaryButton: {
+        backgroundColor: looviColors.text.primary,
         paddingVertical: 18,
         borderRadius: 30,
         alignItems: 'center',
-        shadowColor: looviColors.accent.primary,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
-        shadowRadius: 16,
-        elevation: 8,
         marginBottom: spacing.md,
     },
-    subscribeButtonDisabled: {
+    buttonDisabled: {
         opacity: 0.6,
     },
-    subscribeButtonText: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#FFFFFF',
-    },
-    restoreButton: {
-        alignItems: 'center',
-        paddingVertical: spacing.sm,
-    },
-    restoreText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: looviColors.text.tertiary,
-    },
-    // Lifetime Deal Modal
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: spacing.lg,
-    },
-    lifetimeModal: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 28,
-        padding: spacing.xl,
-        width: '100%',
-        maxWidth: 360,
-        alignItems: 'center',
-    },
-    lifetimeHeader: {
-        alignItems: 'center',
-        marginBottom: spacing.lg,
-    },
-    lifetimeEmoji: {
-        fontSize: 48,
-        marginBottom: spacing.sm,
-    },
-    lifetimeLabel: {
-        fontSize: 11,
-        fontWeight: '800',
-        color: looviColors.coralOrange,
-        letterSpacing: 1,
-        marginBottom: spacing.xs,
-    },
-    lifetimeTitle: {
-        fontSize: 26,
-        fontWeight: '800',
-        color: looviColors.text.primary,
-        textAlign: 'center',
-        marginBottom: spacing.sm,
-    },
-    lifetimeSubtitle: {
-        fontSize: 14,
-        color: looviColors.text.secondary,
-        textAlign: 'center',
-        lineHeight: 20,
-    },
-    lifetimePricing: {
-        alignItems: 'center',
-        marginBottom: spacing.lg,
-    },
-    lifetimeOriginalPrice: {
-        fontSize: 18,
-        color: looviColors.text.muted,
-        textDecorationLine: 'line-through',
-    },
-    lifetimeNewPrice: {
-        fontSize: 48,
-        fontWeight: '800',
-        color: looviColors.accent.success,
-    },
-    lifetimeOneTime: {
-        fontSize: 14,
-        color: looviColors.text.secondary,
-        fontWeight: '500',
-    },
-    lifetimeFeatures: {
-        alignSelf: 'stretch',
-        marginBottom: spacing.lg,
-    },
-    lifetimeFeature: {
-        fontSize: 15,
-        color: looviColors.text.primary,
-        marginBottom: spacing.xs,
-        fontWeight: '500',
-    },
-    lifetimeCta: {
-        backgroundColor: looviColors.accent.success,
-        paddingVertical: 16,
-        paddingHorizontal: spacing['2xl'],
-        borderRadius: 25,
-        width: '100%',
-        alignItems: 'center',
-        marginBottom: spacing.md,
-        shadowColor: looviColors.accent.success,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 5,
-    },
-    lifetimeCtaText: {
+    primaryButtonText: {
         fontSize: 17,
         fontWeight: '700',
         color: '#FFFFFF',
     },
-    noThanksButton: {
-        paddingVertical: spacing.sm,
-    },
-    noThanksText: {
-        fontSize: 14,
+    priceSubtext: {
+        fontSize: 13,
         color: looviColors.text.tertiary,
-        fontWeight: '500',
+        textAlign: 'center',
     },
 });

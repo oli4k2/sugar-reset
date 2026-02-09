@@ -164,7 +164,8 @@ export type BackgroundVariant =
     | 'blueRight'      // Blue on right side
     | 'coralRight'     // Coral on right side
     | 'solidCrimson'   // Solid #B22222 (Deep Crimson) - for high-impact danger slides
-    | 'solidNavy';     // Solid #1A237E (Deep Navy) - for recovery/hope slides
+    | 'solidNavy'      // Solid #1A237E (Deep Navy) - for recovery/hope slides
+    | 'white';         // Clean white background - for minimal screens like paywall
 
 interface LooviBackgroundProps {
     children?: React.ReactNode;
@@ -541,6 +542,12 @@ export default function LooviBackground({
                 // Solid Deep Navy background (#1A237E) for recovery/hope slides
                 return (
                     <View style={[styles.gradient, { backgroundColor: '#1A237E' }]} />
+                );
+
+            case 'white':
+                // Clean white background for minimal screens like paywall
+                return (
+                    <View style={[styles.gradient, { backgroundColor: '#FFFFFF' }]} />
                 );
 
             default:
