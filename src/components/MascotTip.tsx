@@ -15,6 +15,7 @@ import {
     Animated,
     Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
@@ -47,6 +48,9 @@ interface MascotTipProps {
     onTipPress: (action: string, friendId?: string) => void;
     // Optional: force show specific tip
     forceTip?: MascotTipData;
+    // Community tip completion tracking
+    hasCommunityTipDoneToday?: boolean;
+    onCommunityTipDone?: () => void;
 }
 
 // Encouraging messages for when all daily tasks are done - with green styling
@@ -141,12 +145,6 @@ const getDailyMessage = (): MascotTipData => {
 // Generate tips based on user state
 const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): MascotTipData[] => {
     const tips: MascotTipData[] = [];
-    const allTasksDone = props.hasPledgedToday && props.hasFoodLoggedToday && props.hasWellnessToday;
-
-    // If all tasks are done, show ONLY the daily encouraging message
-    if (allTasksDone) {
-        return [getDailyMessage()];
-    }
 
     // Task-based tips (highest priority when incomplete)
     if (!props.hasPledgedToday) {
@@ -268,17 +266,25 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
         });
     }
 
-    // Community tip
-    tips.push({
-        id: 'community',
-        icon: 'message-circle',
-        iconColor: looviColors.accent.primary,
-        title: 'Share your journey!',
-        subtitle: 'Connect with others in the Community',
-        action: 'community',
-        category: 'social',
-        priority: 30,
-    });
+    // Community tip - only show if main tasks are done AND not already pressed today
+    const mainTasksDone = props.hasPledgedToday && props.hasFoodLoggedToday && props.hasWellnessToday;
+    if (mainTasksDone && !props.hasCommunityTipDoneToday) {
+        tips.push({
+            id: 'community',
+            icon: 'message-circle',
+            iconColor: looviColors.accent.primary,
+            title: 'Share your journey!',
+            subtitle: 'Connect with others in the Community',
+            action: 'community',
+            category: 'social',
+            priority: 30,
+        });
+    }
+
+    // If no tips at all, show the daily encouraging message
+    if (tips.length === 0) {
+        return [getDailyMessage()];
+    }
 
     // Sort by priority (highest first) and return
     return tips.sort((a, b) => b.priority - a.priority);
@@ -294,6 +300,8 @@ export const MascotTip: React.FC<MascotTipProps> = ({
     friendsNeedingSupport,
     onTipPress,
     forceTip,
+    hasCommunityTipDoneToday,
+    onCommunityTipDone,
 }) => {
     const slideAnim = useRef(new Animated.Value(-100)).current;
     const bounceAnim = useRef(new Animated.Value(0)).current;
@@ -309,7 +317,8 @@ export const MascotTip: React.FC<MascotTipProps> = ({
         currentStreak,
         healthScore,
         friendsNeedingSupport,
-    }), [hasPledgedToday, hasFoodLoggedToday, hasWellnessToday, hasInnerCircleFriends, currentStreak, healthScore, friendsNeedingSupport]);
+        hasCommunityTipDoneToday,
+    }), [hasPledgedToday, hasFoodLoggedToday, hasWellnessToday, hasInnerCircleFriends, currentStreak, healthScore, friendsNeedingSupport, hasCommunityTipDoneToday]);
 
     // Reset index when tips change
     useEffect(() => {
@@ -388,6 +397,10 @@ export const MascotTip: React.FC<MascotTipProps> = ({
     // Handle tap to navigate to action
     const handlePress = () => {
         if (currentTip.action) {
+            // Mark community tip as done when pressed
+            if (currentTip.id === 'community' && onCommunityTipDone) {
+                onCommunityTipDone();
+            }
             onTipPress(currentTip.action, currentTip.friendId);
         }
     };
@@ -482,32 +495,21 @@ export const MascotTip: React.FC<MascotTipProps> = ({
                         )}
                     </View>
 
-                    {/* Pagination dots - show remaining TASKS count (pledge, track, journal) */}
-                    {(() => {
-                        // Count actual remaining tasks from props, not tips
-                        const remainingTasks: string[] = [];
-                        if (!hasPledgedToday) remainingTasks.push('pledge');
-                        if (!hasFoodLoggedToday) remainingTasks.push('track');
-                        if (!hasWellnessToday) remainingTasks.push('journal');
-
-                        // Don't show dots if all done or no tasks remain
-                        if (remainingTasks.length === 0) return null;
-
-                        return (
-                            <View style={styles.paginationContainer}>
-                                {remainingTasks.map((taskId, index) => (
-                                    <View
-                                        key={taskId}
-                                        style={[
-                                            styles.paginationDot,
-                                            // Highlight the dot if current tip matches this task
-                                            currentTip.id === taskId && styles.paginationDotActive,
-                                        ]}
-                                    />
-                                ))}
-                            </View>
-                        );
-                    })()}
+                    {/* Pagination dots - show ALL swipeable tips */}
+                    {tips.length > 1 && (
+                        <View style={styles.paginationContainer}>
+                            {tips.map((tip, index) => (
+                                <View
+                                    key={tip.id}
+                                    style={[
+                                        styles.paginationDot,
+                                        // Highlight the dot for the currently displayed tip
+                                        currentTip.id === tip.id && styles.paginationDotActive,
+                                    ]}
+                                />
+                            ))}
+                        </View>
+                    )}
                 </TouchableOpacity>
             </Animated.View>
         </View>

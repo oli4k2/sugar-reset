@@ -79,8 +79,23 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       const info = await revenueCatService.getCustomerInfo();
       setCustomerInfo(info);
 
-      // Check premium status
-      const premium = await revenueCatService.isPremium();
+      // Check premium status (RevenueCat subscription)
+      let premium = await revenueCatService.isPremium();
+
+      // Also check if user earned premium through referrals
+      if (!premium && user?.id) {
+        try {
+          const { referralService } = await import('../services/referralService');
+          const hasReferralPremium = await referralService.hasEarnedPremiumThroughReferrals(user.id);
+          if (hasReferralPremium) {
+            console.log('✅ User has premium from referrals');
+            premium = true;
+          }
+        } catch (e) {
+          console.log('Could not check referral premium:', e);
+        }
+      }
+
       setIsPremium(premium);
     } catch (err: any) {
       console.error('Failed to load RevenueCat data:', err);
@@ -88,7 +103,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isInitialized]);
+  }, [isInitialized, user?.id]);
 
   // Load data when initialized
   useEffect(() => {

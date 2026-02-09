@@ -1,10 +1,14 @@
 /**
  * PaywallScreen
  * 
- * Subscription options with RevenueCat integration.
+ * Premium subscription paywall with:
+ * - Beautiful design matching onboarding flow
+ * - Subtle X button to close
+ * - Limited-time lifetime deal popup when closing
+ * - RevenueCat integration
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -13,10 +17,15 @@ import {
     ScrollView,
     ActivityIndicator,
     Alert,
+    Dimensions,
+    Animated,
+    Modal,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PurchasesPackage } from 'react-native-purchases';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
@@ -25,42 +34,44 @@ import { useUserData } from '../../context/UserDataContext';
 import { useAuthContext } from '../../context/AuthContext';
 import * as Haptics from 'expo-haptics';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 type PaywallScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Paywall'>;
 };
 
-interface PlanOption {
-    id: string;
-    name: string;
-    price: string;
-    period: string;
-    savings?: string;
-    popular?: boolean;
-}
-
-const plans: PlanOption[] = [
+// Premium features with icons
+const PREMIUM_FEATURES = [
     {
-        id: 'yearly',
-        name: 'Annual',
-        price: '$29.99',
-        period: '/year',
-        savings: 'Save 75%',
-        popular: true,
+        icon: 'camera-outline',
+        title: 'Unlimited Food Scanning',
+        description: 'Scan any food label to check sugar content',
     },
     {
-        id: 'monthly',
-        name: 'Monthly',
-        price: '$9.99',
-        period: '/month',
+        icon: 'analytics-outline',
+        title: 'Advanced Analytics',
+        description: 'Detailed insights into your sugar-free journey',
     },
-];
-
-const features = [
-    '✓ Unlimited daily tracking',
-    '✓ Science-based insights',
-    '✓ Personalized recommendations',
-    '✓ Progress analytics',
-    '✓ Community support',
+    {
+        icon: 'people-outline',
+        title: 'Inner Circle Access',
+        description: 'Connect with accountability partners',
+    },
+    {
+        icon: 'flash-outline',
+        title: 'SOS Craving Support',
+        description: 'Instant help when cravings hit',
+    },
+    {
+        icon: 'heart-outline',
+        title: 'Wellness Tracking',
+        description: 'Track mood, energy, sleep and more',
+    },
+    {
+        icon: 'infinite-outline',
+        title: 'Lifetime Updates',
+        description: 'All future features included free',
+    },
 ];
 
 export default function PaywallScreen({ navigation }: PaywallScreenProps) {
@@ -70,28 +81,53 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
+    const [showLifetimeDeal, setShowLifetimeDeal] = useState(false);
+
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(50)).current;
+    const scaleAnim = useRef(new Animated.Value(0.9)).current;
+
+    // Entry animation
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 600,
+                useNativeDriver: true,
+            }),
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                tension: 50,
+                friction: 8,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                tension: 50,
+                friction: 8,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
 
     // Set default selected package when offerings load
     useEffect(() => {
         if (currentOffering?.availablePackages && currentOffering.availablePackages.length > 0) {
-            // Prefer annual, then monthly
             const annual = currentOffering.annual;
             const monthly = currentOffering.monthly;
             setSelectedPackage(annual || monthly || currentOffering.availablePackages[0]);
         }
     }, [currentOffering]);
 
-    // Milestone checkpoint: end of onboarding flow (paywall reached).
+    // Milestone checkpoint
     useEffect(() => {
-        setOnboardingCheckpoint('Paywall').catch(() => {});
+        setOnboardingCheckpoint('Paywall').catch(() => { });
     }, [setOnboardingCheckpoint]);
 
-    // Navigate away if user is already premium (but only if not loading and RevenueCat is initialized)
-    // IMPORTANT: Only navigate to Main when user is premium + authenticated + onboarding completed
+    // Navigate away if user is already premium
     useEffect(() => {
         if (!isLoading && isPremium && currentOffering !== null && hasCompletedOnboarding && isAuthenticated) {
-            console.log('✅ User has premium, completed onboarding, and is authenticated → navigating to Main');
-            // User has everything needed, navigate to main app
             navigation.getParent()?.reset({
                 index: 0,
                 routes: [{ name: 'Main' }],
@@ -109,49 +145,33 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             setIsPurchasing(true);
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await purchasePackage(selectedPackage);
-
-            // Once the user has acted on the paywall (purchase), onboarding is done.
             await completeOnboarding();
-            
-            // Check if user is authenticated after purchase
+
             if (!isAuthenticated) {
                 await setPostPaywallAuthRequired(true);
-                // Purchase successful but user is anonymous - need to log in to link purchase
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 Alert.alert(
-                    'Purchase Successful! 🎉',
-                    'Your subscription is active, but you need to create an account to access premium features. Let\'s get you set up!',
-                    [
-                        {
-                            text: 'Create Account',
-                            onPress: () => {
-                                // Navigate to Auth screen
-                                navigation.getParent()?.reset({
-                                    index: 0,
-                                    routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
-                                });
-                            },
+                    'Welcome to Premium! 🎉',
+                    'Create your account to unlock all features.',
+                    [{
+                        text: 'Create Account',
+                        onPress: () => {
+                            navigation.getParent()?.reset({
+                                index: 0,
+                                routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
+                            });
                         },
-                    ]
+                    }]
                 );
             } else {
                 await setPostPaywallAuthRequired(false);
-                // User is authenticated - navigation will happen automatically via isPremium effect
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             }
         } catch (error: any) {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            
-            if (error.message === 'Purchase cancelled') {
-                // User cancelled - don't show error
-                return;
+            if (error.message !== 'Purchase cancelled') {
+                Alert.alert('Purchase Failed', error.message || 'Please try again.');
             }
-            
-            Alert.alert(
-                'Purchase Failed',
-                error.message || 'Unable to complete purchase. Please try again.',
-                [{ text: 'OK' }]
-            );
         } finally {
             setIsPurchasing(false);
         }
@@ -162,66 +182,64 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             setIsRestoring(true);
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await restorePurchases();
-            
-            // Check if restore was successful
+
             if (isPremium) {
-                Alert.alert('Success', 'Your purchases have been restored!');
+                Alert.alert('Success!', 'Your purchases have been restored.');
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } else {
-                Alert.alert('No Purchases Found', 'We couldn\'t find any purchases to restore.');
+                Alert.alert('No Purchases Found', 'We couldn\'t find any previous purchases.');
             }
         } catch (error: any) {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert(
-                'Restore Failed',
-                error.message || 'Unable to restore purchases. Please try again.',
-                [{ text: 'OK' }]
-            );
+            Alert.alert('Restore Failed', error.message || 'Please try again.');
         } finally {
             setIsRestoring(false);
         }
     };
 
-    const handleSkip = () => {
-        // User chose to continue without subscribing right now.
-        // Onboarding is complete, but Auth is still required if they are anonymous.
-        (async () => {
-            await completeOnboarding();
-
-            if (!isAuthenticated) {
-                await setPostPaywallAuthRequired(true);
-                navigation.getParent()?.reset({
-                    index: 0,
-                    routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
-                });
-            } else {
-                await setPostPaywallAuthRequired(false);
-                navigation.getParent()?.reset({
-                    index: 0,
-                    routes: [{ name: 'Main' }],
-                });
-            }
-        })().catch((e) => console.warn('Failed to skip paywall:', e));
+    const handleClose = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowLifetimeDeal(true);
     };
 
-    // Get available packages from RevenueCat
+    const handleSkipFree = async () => {
+        setShowLifetimeDeal(false);
+        await completeOnboarding();
+
+        if (!isAuthenticated) {
+            await setPostPaywallAuthRequired(true);
+            navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
+            });
+        } else {
+            await setPostPaywallAuthRequired(false);
+            navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+            });
+        }
+    };
+
+    const handleLifetimePurchase = async () => {
+        // For now, trigger the annual package as "lifetime" - you can configure a real lifetime product in RevenueCat
+        if (currentOffering?.annual) {
+            setSelectedPackage(currentOffering.annual);
+            setShowLifetimeDeal(false);
+            await handleSubscribe();
+        } else {
+            Alert.alert('Error', 'Lifetime deal not available');
+        }
+    };
+
     const packages = currentOffering?.availablePackages || [];
-    
-    // Helper to get package display name
+
     const getPackageName = (pkg: PurchasesPackage): string => {
         if (pkg.packageType === 'ANNUAL') return 'Annual';
         if (pkg.packageType === 'MONTHLY') return 'Monthly';
-        if (pkg.packageType === 'SIX_MONTH') return '6 Months';
-        if (pkg.packageType === 'THREE_MONTH') return '3 Months';
         return pkg.identifier;
     };
 
-    // Helper to check if package is popular (annual is usually best value)
-    const isPopular = (pkg: PurchasesPackage): boolean => {
-        return pkg.packageType === 'ANNUAL';
-    };
-
-    // Calculate savings for annual vs monthly
     const getSavings = (pkg: PurchasesPackage): string | undefined => {
         if (pkg.packageType === 'ANNUAL' && currentOffering?.monthly) {
             const monthlyPrice = currentOffering.monthly.product.price;
@@ -238,108 +256,148 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     return (
         <LooviBackground variant="coralDominant">
             <SafeAreaView style={styles.container}>
+                {/* Close Button */}
+                <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={handleClose}
+                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                >
+                    <Ionicons name="close" size={24} color={looviColors.text.tertiary} />
+                </TouchableOpacity>
+
                 <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <Text style={styles.emoji}>🌟</Text>
-                        <Text style={styles.title}>Unlock Your Journey</Text>
+                    {/* Animated Header */}
+                    <Animated.View style={[
+                        styles.header,
+                        {
+                            opacity: fadeAnim,
+                            transform: [
+                                { translateY: slideAnim },
+                                { scale: scaleAnim },
+                            ],
+                        },
+                    ]}>
+                        <View style={styles.crownContainer}>
+                            <Text style={styles.crownEmoji}>👑</Text>
+                        </View>
+                        <Text style={styles.title}>Unlock Your{'\n'}Full Potential</Text>
                         <Text style={styles.subtitle}>
-                            Get full access to all premium features
+                            Join thousands breaking free from sugar addiction
                         </Text>
-                    </View>
+                    </Animated.View>
 
-                    {/* Features */}
-                    <GlassCard variant="light" padding="lg" style={styles.featuresCard}>
-                        {features.map((feature, index) => (
-                            <Text key={index} style={styles.featureText}>{feature}</Text>
+                    {/* Features Grid */}
+                    <Animated.View style={[styles.featuresContainer, { opacity: fadeAnim }]}>
+                        {PREMIUM_FEATURES.map((feature, index) => (
+                            <View key={index} style={styles.featureRow}>
+                                <View style={styles.featureIconContainer}>
+                                    <Ionicons
+                                        name={feature.icon as any}
+                                        size={22}
+                                        color={looviColors.accent.primary}
+                                    />
+                                </View>
+                                <View style={styles.featureTextContainer}>
+                                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                                    <Text style={styles.featureDescription}>{feature.description}</Text>
+                                </View>
+                            </View>
                         ))}
-                    </GlassCard>
+                    </Animated.View>
 
                     {/* Plans */}
                     {isLoading && packages.length === 0 ? (
                         <View style={styles.loadingContainer}>
                             <ActivityIndicator size="large" color={looviColors.accent.primary} />
-                            <Text style={styles.loadingText}>Loading subscription options...</Text>
                         </View>
                     ) : packages.length > 0 ? (
-                        <View style={styles.plansContainer}>
+                        <Animated.View style={[styles.plansContainer, { opacity: fadeAnim }]}>
                             {packages.map((pkg) => {
                                 const isSelected = selectedPackage?.identifier === pkg.identifier;
-                                const popular = isPopular(pkg);
+                                const isAnnual = pkg.packageType === 'ANNUAL';
                                 const savings = getSavings(pkg);
-                                
+
                                 return (
                                     <TouchableOpacity
                                         key={pkg.identifier}
-                                        onPress={() => setSelectedPackage(pkg)}
+                                        onPress={() => {
+                                            Haptics.selectionAsync();
+                                            setSelectedPackage(pkg);
+                                        }}
                                         activeOpacity={0.8}
-                                        style={styles.planWrapper}
                                         disabled={isPurchasing}
+                                        style={[
+                                            styles.planCard,
+                                            isSelected && styles.planCardSelected,
+                                            isAnnual && styles.planCardPopular,
+                                        ]}
                                     >
-                                        <GlassCard
-                                            variant="light"
-                                            padding="md"
-                                            style={isSelected ? {
-                                                ...styles.planCard,
-                                                ...styles.planCardSelected,
-                                            } : styles.planCard}
-                                        >
-                                            {popular && (
-                                                <View style={styles.popularBadge}>
-                                                    <Text style={styles.popularText}>Best Value</Text>
-                                                </View>
-                                            )}
-                                            <Text style={styles.planName}>{getPackageName(pkg)}</Text>
-                                            <View style={styles.priceRow}>
-                                                <Text style={styles.planPrice}>{pkg.product.priceString}</Text>
-                                                {pkg.packageType === 'MONTHLY' && (
-                                                    <Text style={styles.planPeriod}>/month</Text>
-                                                )}
-                                                {pkg.packageType === 'ANNUAL' && (
-                                                    <Text style={styles.planPeriod}>/year</Text>
-                                                )}
+                                        {isAnnual && (
+                                            <View style={styles.popularBadge}>
+                                                <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
                                             </View>
-                                            {savings && (
-                                                <Text style={styles.planSavings}>{savings}</Text>
-                                            )}
-                                        </GlassCard>
+                                        )}
+
+                                        <View style={styles.planHeader}>
+                                            <View style={[
+                                                styles.radioOuter,
+                                                isSelected && styles.radioOuterSelected,
+                                            ]}>
+                                                {isSelected && <View style={styles.radioInner} />}
+                                            </View>
+                                            <Text style={[
+                                                styles.planName,
+                                                isSelected && styles.planNameSelected,
+                                            ]}>
+                                                {getPackageName(pkg)}
+                                            </Text>
+                                        </View>
+
+                                        <View style={styles.planPricing}>
+                                            <Text style={[
+                                                styles.planPrice,
+                                                isSelected && styles.planPriceSelected,
+                                            ]}>
+                                                {pkg.product.priceString}
+                                            </Text>
+                                            <Text style={styles.planPeriod}>
+                                                {isAnnual ? '/year' : '/month'}
+                                            </Text>
+                                        </View>
+
+                                        {isAnnual && (
+                                            <Text style={styles.planEquivalent}>
+                                                Just {(pkg.product.price / 12).toFixed(2)}/month
+                                            </Text>
+                                        )}
+
+                                        {savings && (
+                                            <View style={styles.savingsBadge}>
+                                                <Text style={styles.savingsText}>{savings}</Text>
+                                            </View>
+                                        )}
                                     </TouchableOpacity>
                                 );
                             })}
-                        </View>
-                    ) : (
-                        <View style={styles.errorContainer}>
-                            <Text style={styles.errorText}>
-                                Unable to load subscription options. Please check your connection.
-                            </Text>
-                        </View>
-                    )}
+                        </Animated.View>
+                    ) : null}
 
                     {/* Trial info */}
-                    {selectedPackage?.product.introPrice && (
-                        <Text style={styles.trialInfo}>
-                            {selectedPackage.product.introPrice.priceString === '$0.00' 
-                                ? 'Start with a free trial. Cancel anytime.'
-                                : `Special introductory price: ${selectedPackage.product.introPrice.priceString}`}
-                        </Text>
-                    )}
-                    {!selectedPackage?.product.introPrice && (
-                        <Text style={styles.trialInfo}>
-                            Cancel anytime. No commitment.
-                        </Text>
-                    )}
+                    <Text style={styles.trialInfo}>
+                        ✓ 7-day free trial · Cancel anytime
+                    </Text>
                 </ScrollView>
 
-                {/* Bottom */}
+                {/* Bottom CTA */}
                 <View style={styles.bottomContainer}>
                     <TouchableOpacity
                         style={[
                             styles.subscribeButton,
-                            (isPurchasing || !selectedPackage) && styles.subscribeButtonDisabled
+                            (isPurchasing || !selectedPackage) && styles.subscribeButtonDisabled,
                         ]}
                         onPress={handleSubscribe}
                         activeOpacity={0.8}
@@ -349,34 +407,72 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                             <ActivityIndicator size="small" color="#FFFFFF" />
                         ) : (
                             <Text style={styles.subscribeButtonText}>
-                                {selectedPackage?.product.introPrice?.priceString === '$0.00'
-                                    ? 'Start Free Trial'
-                                    : 'Subscribe'}
+                                Start Free Trial
                             </Text>
                         )}
                     </TouchableOpacity>
 
-                    <View style={styles.linksRow}>
-                        <TouchableOpacity 
-                            onPress={handleRestore}
-                            disabled={isRestoring || isPurchasing}
-                        >
-                            {isRestoring ? (
-                                <ActivityIndicator size="small" color={looviColors.text.tertiary} />
-                            ) : (
-                                <Text style={styles.linkText}>Restore Purchases</Text>
-                            )}
-                        </TouchableOpacity>
-                        <Text style={styles.linkDivider}>•</Text>
-                        <TouchableOpacity 
-                            onPress={handleSkip}
-                            disabled={isPurchasing || isRestoring}
-                        >
-                            <Text style={styles.linkText}>Skip for now</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                        onPress={handleRestore}
+                        disabled={isRestoring || isPurchasing}
+                        style={styles.restoreButton}
+                    >
+                        {isRestoring ? (
+                            <ActivityIndicator size="small" color={looviColors.text.tertiary} />
+                        ) : (
+                            <Text style={styles.restoreText}>Restore Purchases</Text>
+                        )}
+                    </TouchableOpacity>
                 </View>
             </SafeAreaView>
+
+            {/* Lifetime Deal Modal */}
+            <Modal
+                visible={showLifetimeDeal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowLifetimeDeal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <Animated.View style={styles.lifetimeModal}>
+                        <View style={styles.lifetimeHeader}>
+                            <Text style={styles.lifetimeEmoji}>🎁</Text>
+                            <Text style={styles.lifetimeLabel}>LIMITED TIME OFFER</Text>
+                            <Text style={styles.lifetimeTitle}>Wait! Special Deal{'\n'}Just For You</Text>
+                            <Text style={styles.lifetimeSubtitle}>
+                                Get lifetime access at a special price - this offer won't be shown again!
+                            </Text>
+                        </View>
+
+                        <View style={styles.lifetimePricing}>
+                            <Text style={styles.lifetimeOriginalPrice}>$99.99</Text>
+                            <Text style={styles.lifetimeNewPrice}>$29.99</Text>
+                            <Text style={styles.lifetimeOneTime}>One-time payment · Forever</Text>
+                        </View>
+
+                        <View style={styles.lifetimeFeatures}>
+                            <Text style={styles.lifetimeFeature}>✓ All premium features forever</Text>
+                            <Text style={styles.lifetimeFeature}>✓ Lifetime updates included</Text>
+                            <Text style={styles.lifetimeFeature}>✓ No recurring charges</Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.lifetimeCta}
+                            onPress={handleLifetimePurchase}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.lifetimeCtaText}>Get Lifetime Access</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.noThanksButton}
+                            onPress={handleSkipFree}
+                        >
+                            <Text style={styles.noThanksText}>No thanks, continue with free</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+            </Modal>
         </LooviBackground>
     );
 }
@@ -385,116 +481,203 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    closeButton: {
+        position: 'absolute',
+        top: 60,
+        right: 20,
+        zIndex: 100,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.8)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
         paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing.xl,
+        paddingTop: spacing['3xl'],
         paddingBottom: spacing.lg,
     },
     header: {
         alignItems: 'center',
         marginBottom: spacing.xl,
     },
-    emoji: {
-        fontSize: 56,
+    crownContainer: {
         marginBottom: spacing.md,
     },
+    crownEmoji: {
+        fontSize: 56,
+    },
     title: {
-        fontSize: 28,
-        fontWeight: '700',
+        fontSize: 32,
+        fontWeight: '800',
         color: looviColors.text.primary,
         textAlign: 'center',
         marginBottom: spacing.sm,
+        letterSpacing: -0.5,
     },
     subtitle: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '400',
         color: looviColors.text.secondary,
         textAlign: 'center',
     },
-    featuresCard: {
+    featuresContainer: {
         marginBottom: spacing.xl,
     },
-    featureText: {
+    featureRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+        backgroundColor: 'rgba(255,255,255,0.6)',
+        padding: spacing.md,
+        borderRadius: 16,
+    },
+    featureIconContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.md,
+    },
+    featureTextContainer: {
+        flex: 1,
+    },
+    featureTitle: {
         fontSize: 15,
-        fontWeight: '400',
+        fontWeight: '600',
+        color: looviColors.text.primary,
+        marginBottom: 2,
+    },
+    featureDescription: {
+        fontSize: 13,
         color: looviColors.text.secondary,
-        marginBottom: spacing.sm,
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        paddingVertical: spacing.xl,
     },
     plansContainer: {
-        flexDirection: 'row',
         gap: spacing.md,
         marginBottom: spacing.lg,
     },
-    planWrapper: {
-        flex: 1,
-        marginTop: 14, // Make room for popular badge
-    },
     planCard: {
-        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.7)',
+        borderRadius: 20,
+        padding: spacing.lg,
+        borderWidth: 2,
+        borderColor: 'transparent',
         position: 'relative',
-        paddingTop: spacing.md,
-        minHeight: 120,
         overflow: 'visible',
-        backgroundColor: 'transparent', // Fix iOS transparent box issue
     },
     planCardSelected: {
         borderColor: looviColors.accent.primary,
-        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+    },
+    planCardPopular: {
+        marginTop: 12,
     },
     popularBadge: {
         position: 'absolute',
-        top: -10,
+        top: -12,
+        alignSelf: 'center',
         backgroundColor: looviColors.accent.success,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 3,
-        borderRadius: 8,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 4,
+        borderRadius: 12,
     },
-    popularText: {
+    popularBadgeText: {
         fontSize: 10,
-        fontWeight: '700',
+        fontWeight: '800',
         color: '#FFFFFF',
-        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    planHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    radioOuter: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 2,
+        borderColor: looviColors.text.muted,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.sm,
+    },
+    radioOuterSelected: {
+        borderColor: looviColors.accent.primary,
+    },
+    radioInner: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: looviColors.accent.primary,
     },
     planName: {
-        fontSize: 14,
+        fontSize: 17,
         fontWeight: '600',
-        color: looviColors.text.tertiary,
-        marginBottom: spacing.xs,
-        marginTop: spacing.sm,
+        color: looviColors.text.secondary,
     },
-    priceRow: {
+    planNameSelected: {
+        color: looviColors.text.primary,
+    },
+    planPricing: {
         flexDirection: 'row',
         alignItems: 'baseline',
+        marginLeft: 30,
     },
     planPrice: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: '700',
+        color: looviColors.text.secondary,
+    },
+    planPriceSelected: {
         color: looviColors.text.primary,
     },
     planPeriod: {
         fontSize: 14,
-        fontWeight: '400',
         color: looviColors.text.tertiary,
+        marginLeft: 4,
     },
-    planSavings: {
-        fontSize: 12,
-        fontWeight: '600',
+    planEquivalent: {
+        fontSize: 13,
         color: looviColors.accent.success,
-        marginTop: spacing.xs,
+        fontWeight: '500',
+        marginLeft: 30,
+        marginTop: 4,
+    },
+    savingsBadge: {
+        position: 'absolute',
+        top: spacing.lg,
+        right: spacing.lg,
+        backgroundColor: 'rgba(127, 176, 105, 0.15)',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    savingsText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: looviColors.accent.success,
     },
     trialInfo: {
-        fontSize: 13,
-        fontWeight: '400',
-        color: looviColors.text.tertiary,
+        fontSize: 14,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
         textAlign: 'center',
     },
     bottomContainer: {
         paddingHorizontal: spacing.screen.horizontal,
         paddingTop: spacing.md,
-        paddingBottom: spacing['2xl'],
+        paddingBottom: spacing.xl,
     },
     subscribeButton: {
         backgroundColor: looviColors.accent.primary,
@@ -502,52 +685,127 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         alignItems: 'center',
         shadowColor: looviColors.accent.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
+        elevation: 8,
+        marginBottom: spacing.md,
+    },
+    subscribeButtonDisabled: {
+        opacity: 0.6,
+    },
+    subscribeButtonText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    restoreButton: {
+        alignItems: 'center',
+        paddingVertical: spacing.sm,
+    },
+    restoreText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: looviColors.text.tertiary,
+    },
+    // Lifetime Deal Modal
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.lg,
+    },
+    lifetimeModal: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 28,
+        padding: spacing.xl,
+        width: '100%',
+        maxWidth: 360,
+        alignItems: 'center',
+    },
+    lifetimeHeader: {
+        alignItems: 'center',
+        marginBottom: spacing.lg,
+    },
+    lifetimeEmoji: {
+        fontSize: 48,
+        marginBottom: spacing.sm,
+    },
+    lifetimeLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: looviColors.coralOrange,
+        letterSpacing: 1,
+        marginBottom: spacing.xs,
+    },
+    lifetimeTitle: {
+        fontSize: 26,
+        fontWeight: '800',
+        color: looviColors.text.primary,
+        textAlign: 'center',
+        marginBottom: spacing.sm,
+    },
+    lifetimeSubtitle: {
+        fontSize: 14,
+        color: looviColors.text.secondary,
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    lifetimePricing: {
+        alignItems: 'center',
+        marginBottom: spacing.lg,
+    },
+    lifetimeOriginalPrice: {
+        fontSize: 18,
+        color: looviColors.text.muted,
+        textDecorationLine: 'line-through',
+    },
+    lifetimeNewPrice: {
+        fontSize: 48,
+        fontWeight: '800',
+        color: looviColors.accent.success,
+    },
+    lifetimeOneTime: {
+        fontSize: 14,
+        color: looviColors.text.secondary,
+        fontWeight: '500',
+    },
+    lifetimeFeatures: {
+        alignSelf: 'stretch',
+        marginBottom: spacing.lg,
+    },
+    lifetimeFeature: {
+        fontSize: 15,
+        color: looviColors.text.primary,
+        marginBottom: spacing.xs,
+        fontWeight: '500',
+    },
+    lifetimeCta: {
+        backgroundColor: looviColors.accent.success,
+        paddingVertical: 16,
+        paddingHorizontal: spacing['2xl'],
+        borderRadius: 25,
+        width: '100%',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+        shadowColor: looviColors.accent.success,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 12,
         elevation: 5,
-        marginBottom: spacing.lg,
     },
-    subscribeButtonText: {
+    lifetimeCtaText: {
         fontSize: 17,
         fontWeight: '700',
         color: '#FFFFFF',
     },
-    linksRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
+    noThanksButton: {
+        paddingVertical: spacing.sm,
     },
-    linkText: {
-        fontSize: 13,
-        fontWeight: '500',
+    noThanksText: {
+        fontSize: 14,
         color: looviColors.text.tertiary,
-    },
-    linkDivider: {
-        marginHorizontal: spacing.md,
-        color: looviColors.text.muted,
-    },
-    loadingContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: spacing.xl,
-        marginBottom: spacing.lg,
-    },
-    loadingText: {
-        fontSize: 14,
-        color: looviColors.text.secondary,
-        marginTop: spacing.md,
-    },
-    errorContainer: {
-        padding: spacing.lg,
-        marginBottom: spacing.lg,
-    },
-    errorText: {
-        fontSize: 14,
-        color: looviColors.accent.error,
-        textAlign: 'center',
-    },
-    subscribeButtonDisabled: {
-        opacity: 0.6,
+        fontWeight: '500',
     },
 });

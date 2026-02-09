@@ -108,6 +108,7 @@ export default function HomeScreen() {
     const [hasWellnessToday, setHasWellnessToday] = useState(false);
     const [todayWellnessData, setTodayWellnessData] = useState<WellnessLog | null>(null);
     const [hasInnerCircleFriends, setHasInnerCircleFriends] = useState(false);
+    const [hasCommunityTipDoneToday, setHasCommunityTipDoneToday] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const fallbackDateRef = useRef(new Date().toISOString()); // Stable fallback
     const navigation = useNavigation<any>(); // Type as any to allow navigation to new modal screens
@@ -533,30 +534,6 @@ export default function HomeScreen() {
                             endDate={new Date(startDate.getTime() + (planType === 'cold_turkey' ? 30 : 42) * 24 * 60 * 60 * 1000)}
                         />
 
-                        {/* Streak Status Banner - REMOVED, replaced by MascotTip below */}
-
-                        {/* Streak Recovery Prompt */}
-                        {canRecoverStreak && (
-                            <TouchableOpacity
-                                activeOpacity={0.85}
-                                onPress={() => setShowFoodScannerModal(true)}
-                                style={styles.streakRecoveryBanner}
-                            >
-                                <View style={styles.streakRecoveryContainer}>
-                                    <View style={styles.streakRecoveryIconContainer}>
-                                        <Ionicons name="refresh" size={20} color={looviColors.accent.primary} />
-                                    </View>
-                                    <View style={styles.streakRecoveryText}>
-                                        <Text style={styles.streakRecoveryTitle}>Recover your streak!</Text>
-                                        <Text style={styles.streakRecoverySubtitle}>
-                                            Log yesterday's food to get back on track
-                                        </Text>
-                                    </View>
-                                    <Feather name="chevron-right" size={20} color={looviColors.accent.primary} />
-                                </View>
-                            </TouchableOpacity>
-                        )}
-
                         {/* Action Buttons: Pledge, Logging, Journal - Daily Journey */}
                         <View style={styles.dailyFlowContainer}>
                             {/* Carousel of Daily Actions */}
@@ -708,6 +685,8 @@ export default function HomeScreen() {
                             hasInnerCircleFriends={hasInnerCircleFriends}
                             currentStreak={streakData?.currentStreak || 0}
                             healthScore={0}
+                            hasCommunityTipDoneToday={hasCommunityTipDoneToday}
+                            onCommunityTipDone={() => setHasCommunityTipDoneToday(true)}
                             onTipPress={(action, friendId) => {
                                 switch (action) {
                                     case 'pledge':
