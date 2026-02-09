@@ -19,15 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
-import { GradientText } from '../../components/GradientText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Responsive font size based on screen width (base size for iPhone standard width of 375)
-const getResponsiveFontSize = (baseSize: number) => {
-    const scale = SCREEN_WIDTH / 375; // 375 is iPhone standard width
-    return Math.round(baseSize * scale);
-};
 
 type SugarestWelcomeScreenProps = {
     navigation: NativeStackNavigationProp<any, 'SugarestWelcome'>;
@@ -72,12 +65,10 @@ export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScr
                     <View style={styles.centeredContent}>
                         {/* Welcome Message */}
                         <View style={styles.welcomeSection}>
-                            <GradientText
-                                text={"Welcome to\nCraveless"}
-                                colors={['#C97B5D', '#D4896A', '#E8A87C']}
-                                fontSize={getResponsiveFontSize(34)}
-                                fontWeight="800"
-                                style={styles.welcomeTitle}
+                            <Image
+                                source={require('../../../assets/images/craveless-sugar-reset-header.png')}
+                                style={styles.welcomeHeaderImage}
+                                resizeMode="contain"
                             />
                             <Text style={styles.welcomeSubtitle}>
                                 Join thousands of others breaking the cycle of sugar addiction through science and community support.
@@ -149,10 +140,11 @@ const styles = StyleSheet.create({
     welcomeSection: {
         alignItems: 'center',
     },
-    welcomeTitle: {
-        textAlign: 'center',
-        lineHeight: getResponsiveFontSize(42),
-        letterSpacing: -0.5,
+    welcomeHeaderImage: {
+        width: SCREEN_WIDTH * 0.85,
+        maxWidth: 320,
+        height: undefined,
+        aspectRatio: 2.8,
         marginBottom: spacing.lg,
     },
     welcomeSubtitle: {

@@ -19,6 +19,7 @@ export { default as FeatureShowcaseScreen } from './FeatureShowcaseScreen';
 export { default as GoalsScreen } from './GoalsScreen';
 export { default as PromiseScreen } from './PromiseScreen';
 export { default as PersonalizedPlanScreen } from './PersonalizedPlanScreen';
+export { default as LongScrollablePlanScreen } from './LongScrollablePlanScreen';
 export { default as PlanRevealScreen } from './PlanRevealScreen';
 export { default as PaywallScreen } from './PaywallScreen';
 

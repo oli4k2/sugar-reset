@@ -163,6 +163,7 @@ export type OnboardingStackParamList = {
     Goals: undefined;
     Promise: { nickname?: string };
     PersonalizedPlan: undefined;
+    LongScrollablePlan: undefined;
     PlanReveal: undefined;
     Paywall: undefined;
 

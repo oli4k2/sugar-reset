@@ -15,9 +15,13 @@ import {
     Platform,
     ScrollView,
     ActivityIndicator,
+    Dimensions,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { CommonActions } from '@react-navigation/native';
+import { AuthStackParamList } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -30,13 +34,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useAuthContext } from '../../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type LoginScreenProps = {
-    navigation: NativeStackNavigationProp<any, 'Login'>;
-};
+type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 type AuthStep = 'options' | 'email' | 'email-sent' | 'paste-link';
 
-export default function LoginScreen({ navigation }: LoginScreenProps) {
+export default function LoginScreen({ navigation, route }: LoginScreenProps) {
     const { 
         signInWithGoogle, 
         signInWithApple, 
@@ -168,7 +170,25 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     };
 
     const handleSignUp = () => {
-        navigation.navigate('SignUp');
+        if (route.params?.fromOnboardingWelcome) {
+            const rootNav = navigation.getParent();
+            rootNav?.dispatch(
+                CommonActions.reset({
+                    index: 0,
+                    routes: [
+                        {
+                            name: 'Onboarding',
+                            state: {
+                                routes: [{ name: 'QuizIntro' }],
+                                index: 0,
+                            },
+                        },
+                    ],
+                })
+            );
+        } else {
+            navigation.navigate('SignUp');
+        }
     };
 
     const isAppleSignInAvailable = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 13;
@@ -184,7 +204,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 >
                     <ScrollView
                         style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={[styles.scrollContent, { marginTop: -Dimensions.get('window').height * 0.05 }]}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
                     >
@@ -197,9 +217,11 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
                         {/* Header */}
                         <View style={styles.header}>
-                            <Text style={styles.emoji}>
-                                {step === 'email-sent' ? '📬' : '👋'}
-                            </Text>
+                            <Image
+                                source={require('../../../assets/images/craveless-logo-auth.png')}
+                                style={styles.logo}
+                                resizeMode="contain"
+                            />
                             <Text style={styles.title}>
                                 {step === 'email-sent' ? 'Check your email!' : 'Welcome back'}
                             </Text>
@@ -214,41 +236,43 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                             <>
                                 {/* Sign-In Options */}
                                 <View style={styles.buttonsContainer}>
-                                    {Platform.OS === 'ios' && isAppleSignInAvailable && (
+                                    <View style={styles.socialButtonsRow}>
+                                        {Platform.OS === 'ios' && isAppleSignInAvailable && (
+                                            <TouchableOpacity
+                                                style={[styles.socialButton, styles.socialButtonInRow, styles.appleButton]}
+                                                onPress={handleAppleSignIn}
+                                                disabled={isLoading}
+                                                activeOpacity={0.8}
+                                            >
+                                                {appleLoading ? (
+                                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                                ) : (
+                                                    <>
+                                                        <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                                                        <Text style={styles.socialButtonText}>Apple</Text>
+                                                    </>
+                                                )}
+                                            </TouchableOpacity>
+                                        )}
+
                                         <TouchableOpacity
-                                            style={[styles.socialButton, styles.appleButton]}
-                                            onPress={handleAppleSignIn}
+                                            style={[styles.socialButton, styles.socialButtonInRow, styles.googleButton]}
+                                            onPress={handleGoogleSignIn}
                                             disabled={isLoading}
                                             activeOpacity={0.8}
                                         >
-                                            {appleLoading ? (
-                                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                            {googleLoading ? (
+                                                <ActivityIndicator size="small" color={looviColors.text.primary} />
                                             ) : (
                                                 <>
-                                                    <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
-                                                    <Text style={styles.socialButtonText}>Continue with Apple</Text>
+                                                    <Ionicons name="logo-google" size={20} color="#EA4335" />
+                                                    <Text style={[styles.socialButtonText, styles.googleButtonText]}>
+                                                        Google
+                                                    </Text>
                                                 </>
                                             )}
                                         </TouchableOpacity>
-                                    )}
-
-                                    <TouchableOpacity
-                                        style={[styles.socialButton, styles.googleButton]}
-                                        onPress={handleGoogleSignIn}
-                                        disabled={isLoading}
-                                        activeOpacity={0.8}
-                                    >
-                                        {googleLoading ? (
-                                            <ActivityIndicator size="small" color={looviColors.text.primary} />
-                                        ) : (
-                                            <>
-                                                <Ionicons name="logo-google" size={22} color="#EA4335" />
-                                                <Text style={[styles.socialButtonText, styles.googleButtonText]}>
-                                                    Continue with Google
-                                                </Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
+                                    </View>
 
                                     {/* Divider */}
                                     <View style={styles.dividerContainer}>
@@ -484,10 +508,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing['2xl'],
-        paddingBottom: spacing['2xl'],
         flexGrow: 1,
+        justifyContent: 'center',
+        paddingHorizontal: spacing.screen.horizontal,
+        paddingVertical: spacing['2xl'],
     },
     backButton: {
         width: 44,
@@ -500,17 +524,18 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing['2xl'],
-    },
-    emoji: {
-        fontSize: 64,
         marginBottom: spacing.lg,
     },
+    logo: {
+        width: 120,
+        height: 120,
+        marginBottom: 4,
+    },
     title: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '700',
         color: looviColors.text.primary,
-        marginBottom: spacing.sm,
+        marginBottom: spacing.xs,
         textAlign: 'center',
     },
     subtitle: {
@@ -518,10 +543,15 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         color: looviColors.text.secondary,
         textAlign: 'center',
-        paddingHorizontal: spacing.lg,
+        paddingHorizontal: spacing.xl,
     },
     buttonsContainer: {
         marginBottom: spacing.xl,
+    },
+    socialButtonsRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginBottom: 0,
     },
     socialButton: {
         flexDirection: 'row',
@@ -531,6 +561,11 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         borderRadius: borderRadius.xl,
         marginBottom: spacing.md,
+    },
+    socialButtonInRow: {
+        flex: 1,
+        marginBottom: 0,
+        paddingVertical: 14,
     },
     appleButton: {
         backgroundColor: '#000000',
@@ -559,7 +594,7 @@ const styles = StyleSheet.create({
     dividerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: spacing.lg,
+        marginVertical: spacing.sm,
     },
     dividerLine: {
         flex: 1,

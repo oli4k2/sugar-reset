@@ -37,6 +37,7 @@ import {
     PaywallScreen,
     SymptomsScreen,
     PersonalizedPlanScreen,
+    LongScrollablePlanScreen,
     PlanRevealScreen,
 } from '../screens/onboarding';
 
@@ -209,7 +210,12 @@ function LoadingScreen() {
 // Root Navigation - Shows appropriate flow based on auth state
 export default function RootNavigator() {
     const { isLoading: authLoading, isAuthenticated, isUnverified } = useAuthContext();
-    const { hasCompletedOnboarding, isLoading: userDataLoading } = useUserData();
+    const {
+        hasCompletedOnboarding,
+        onboardingCheckpoint,
+        postPaywallAuthRequired,
+        isLoading: userDataLoading,
+    } = useUserData();
     const { isPremium, isLoading: revenueCatLoading } = useRevenueCat();
 
     // Handle email magic link deep links
@@ -217,7 +223,7 @@ export default function RootNavigator() {
 
     // IMPORTANT: All hooks must be called before any conditional returns
     const navigationRef = useRef<NavigationContainerRef<any>>(null);
-    const lastNavigationState = useRef<{ hasCompletedOnboarding: boolean; isAuthenticated: boolean; isPremium: boolean } | null>(null);
+    const lastNavigationState = useRef<{ hasCompletedOnboarding: boolean; isAuthenticated: boolean; isPremium: boolean; postPaywallAuthRequired: boolean } | null>(null);
 
     const isLoading = authLoading || userDataLoading || revenueCatLoading;
 
@@ -235,16 +241,16 @@ export default function RootNavigator() {
             revenueCatLoading,
         });
 
-        if (hasCompletedOnboarding && !isAuthenticated) {
-            // Onboarding complete but user needs to authenticate
-            initialRouteName = 'Auth';
-            console.log('ℹ️ Navigation: Onboarding complete but not authenticated → Auth');
-        } else if (isAuthenticated && hasCompletedOnboarding) {
+        if (isAuthenticated && hasCompletedOnboarding) {
             // User is authenticated and completed onboarding - let them into the app
             initialRouteName = 'Main';
             console.log('✅ Navigation: User authenticated and onboarding complete → Main', {
                 isPremium,
             });
+        } else if (postPaywallAuthRequired && !isAuthenticated) {
+            // User reached/passed paywall and must create an account
+            initialRouteName = 'Auth';
+            console.log('ℹ️ Navigation: Post-paywall auth required → Auth');
         } else {
             console.log('ℹ️ Navigation: Showing onboarding flow', {
                 isAuthenticated,
@@ -262,13 +268,14 @@ export default function RootNavigator() {
         if (isLoading || isUnverified) return;
         if (!navigationRef.current) return;
 
-        const currentState = { hasCompletedOnboarding, isAuthenticated, isPremium };
+        const currentState = { hasCompletedOnboarding, isAuthenticated, isPremium, postPaywallAuthRequired };
 
         // Skip if state hasn't changed
         if (lastNavigationState.current &&
             lastNavigationState.current.hasCompletedOnboarding === currentState.hasCompletedOnboarding &&
             lastNavigationState.current.isAuthenticated === currentState.isAuthenticated &&
-            lastNavigationState.current.isPremium === currentState.isPremium) {
+            lastNavigationState.current.isPremium === currentState.isPremium &&
+            lastNavigationState.current.postPaywallAuthRequired === currentState.postPaywallAuthRequired) {
             return;
         }
 
@@ -280,10 +287,7 @@ export default function RootNavigator() {
         // If authenticated and completed onboarding, go to Main (regardless of premium)
         // Premium users get full access, non-premium can access paywall from Main
         if (isAuthenticated && hasCompletedOnboarding) {
-            if (currentRouteName !== 'Main' && 
-                currentRouteName !== 'Paywall' && 
-                currentRouteName !== 'PersonalizedPlan' && 
-                currentRouteName !== 'PlanReveal') {
+            if (currentRouteName !== 'Main') {
                 console.log('🔄 Navigating to Main (authenticated and onboarding complete)', {
                     isPremium,
                 });
@@ -293,14 +297,10 @@ export default function RootNavigator() {
                 });
             }
         }
-        // If onboarding complete but not authenticated, navigate to Auth
-        // But only if we're not already on Auth or Paywall (let Paywall handle its own navigation)
-        else if (hasCompletedOnboarding && !isAuthenticated) {
-            if (currentRouteName !== 'Auth' && 
-                currentRouteName !== 'Paywall' && 
-                currentRouteName !== 'PersonalizedPlan' && 
-                currentRouteName !== 'PlanReveal') {
-                console.log('🔄 Navigating to Auth (onboarding complete, not authenticated)');
+        // If post-paywall auth is required (separate from onboarding checkpoints), navigate to Auth
+        else if (postPaywallAuthRequired && !isAuthenticated) {
+            if (currentRouteName !== 'Auth') {
+                console.log('🔄 Navigating to Auth (post-paywall auth required)');
                 navigationRef.current.reset({
                     index: 0,
                     routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
@@ -308,7 +308,7 @@ export default function RootNavigator() {
             }
         }
         // Otherwise, stay where we are - don't force navigation
-    }, [hasCompletedOnboarding, isAuthenticated, isPremium, isLoading, isUnverified]);
+    }, [hasCompletedOnboarding, isAuthenticated, isPremium, postPaywallAuthRequired, isLoading, isUnverified]);
 
     // Early returns AFTER all hooks
     if (isLoading) {
@@ -341,6 +341,7 @@ export default function RootNavigator() {
                                 headerShown: false,
                                 animation: 'fade',
                             }}
+                            initialRouteName={onboardingCheckpoint?.routeName ?? 'Welcome'}
                         >
                             {/* Phase 1: Quiz */}
                             <OnboardingStack.Screen name="Welcome" component={WelcomeScreen} />
@@ -359,6 +360,7 @@ export default function RootNavigator() {
                             <OnboardingStack.Screen name="Goals" component={GoalsScreen} />
                             <OnboardingStack.Screen name="Promise" component={PromiseScreen} />
                             <OnboardingStack.Screen name="PersonalizedPlan" component={PersonalizedPlanScreen} />
+                            <OnboardingStack.Screen name="LongScrollablePlan" component={LongScrollablePlanScreen} />
                             <OnboardingStack.Screen name="PlanReveal" component={PlanRevealScreen} />
                             <OnboardingStack.Screen name="Paywall" component={PaywallScreen} />
                         </OnboardingStack.Navigator>

@@ -9,7 +9,7 @@
     "newArchEnabled": true,
     "scheme": "craveless",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/images/craveless-logo-auth.png",
       "resizeMode": "contain",
       "backgroundColor": "#0D0F12"
     },
