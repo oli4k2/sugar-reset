@@ -36,33 +36,16 @@ const GOALS = [
     { id: 'mood', emoji: '😊', label: 'Stable mood' },
 ];
 
-const SAVINGS_OPTIONS = [
-    { id: 'vacation', emoji: '✈️', label: 'A vacation or trip' },
-    { id: 'gadget', emoji: '📱', label: 'New tech or gadgets' },
-    { id: 'experience', emoji: '🎭', label: 'Experiences & events' },
-    { id: 'savings', emoji: '🏦', label: 'Emergency fund' },
-    { id: 'fitness', emoji: '💪', label: 'Gym or fitness gear' },
-    { id: 'hobby', emoji: '🎨', label: 'A hobby or passion' },
-    { id: 'gift', emoji: '🎁', label: 'Gifts for loved ones' },
-    { id: 'other', emoji: '✨', label: 'Something else' },
-];
+
 
 export default function GoalsScreen({ navigation }: GoalsScreenProps) {
     const { onboardingData, updateOnboardingData, setOnboardingCheckpoint } = useUserData();
     const [selectedGoals, setSelectedGoals] = useState<string[]>(onboardingData?.goals || []);
-    const [wantToSave, setWantToSave] = useState<boolean | null>(null);
-    const [selectedSavingsGoal, setSelectedSavingsGoal] = useState<string | null>(null);
-
-    const moneyGoalSelected = selectedGoals.includes('money');
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
-    const savingsSlide = useRef(new Animated.Value(20)).current;
-    const savingsFade = useRef(new Animated.Value(0)).current;
 
-    // Calculate potential savings
-    const dailySpending = onboardingData?.dailySpendingCents || 300;
-    const monthlyTotal = Math.round((dailySpending * 30) / 100);
+
 
     useEffect(() => {
         Animated.parallel([
@@ -82,32 +65,6 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
         setOnboardingCheckpoint('Goals').catch(() => { });
     }, []);
 
-    // Animate savings options when user says yes
-    useEffect(() => {
-        if (wantToSave === true) {
-            Animated.parallel([
-                Animated.timing(savingsFade, {
-                    toValue: 1,
-                    duration: 400,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(savingsSlide, {
-                    toValue: 0,
-                    duration: 400,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        }
-    }, [wantToSave]);
-
-    // If user unselects "Save money", hide/reset savings flow
-    useEffect(() => {
-        if (!moneyGoalSelected) {
-            setWantToSave(null);
-            setSelectedSavingsGoal(null);
-        }
-    }, [moneyGoalSelected]);
-
     const toggleGoal = (goalId: string) => {
         setSelectedGoals(prev => {
             if (prev.includes(goalId)) {
@@ -124,27 +81,12 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
             plan: 'cold_turkey', // All users default to cold turkey
         });
 
-        // Save savings goal if selected
-        if (moneyGoalSelected && wantToSave === true && selectedSavingsGoal) {
-            const goal = SAVINGS_OPTIONS.find(g => g.id === selectedSavingsGoal);
-            await updateOnboardingData({
-                savingsGoal: goal?.label || selectedSavingsGoal,
-                savingsGoalAmount: monthlyTotal * 6, // 6-month goal
-            });
-        }
-
         navigation.navigate('Promise');
     };
 
-    // Can proceed if goals selected AND:
-    // - "Save money" not selected, OR
     // - user answered "Not now", OR
     // - user answered "Yes" and picked a savings goal
-    const canProceed =
-        selectedGoals.length > 0 &&
-        (!moneyGoalSelected ||
-            wantToSave === false ||
-            (wantToSave === true && selectedSavingsGoal !== null));
+    const canProceed = selectedGoals.length > 0;
 
     return (
         <LooviBackground variant="blueBottom">
@@ -200,75 +142,6 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
                                 );
                             })}
                         </View>
-
-                        {/* Savings Question - Only show if "Save money" goal selected */}
-                        {moneyGoalSelected && (
-                            <View style={styles.savingsSection}>
-                                <Text style={styles.savingsTitle}>💰 Want to save money for something special?</Text>
-                                <Text style={styles.savingsSubtitle}>
-                                    You could save up to ${monthlyTotal}/month
-                                </Text>
-
-                                <View style={styles.yesNoContainer}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.yesNoButton,
-                                            wantToSave === true && styles.yesNoButtonSelected,
-                                        ]}
-                                        onPress={() => setWantToSave(true)}
-                                    >
-                                        <Text style={[
-                                            styles.yesNoText,
-                                            wantToSave === true && styles.yesNoTextSelected,
-                                        ]}>Yes!</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.yesNoButton,
-                                            wantToSave === false && styles.yesNoButtonSelected,
-                                        ]}
-                                        onPress={() => setWantToSave(false)}
-                                    >
-                                        <Text style={[
-                                            styles.yesNoText,
-                                            wantToSave === false && styles.yesNoTextSelected,
-                                        ]}>Not now</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Savings Options - Animate in when Yes */}
-                                {wantToSave === true && (
-                                    <Animated.View
-                                        style={{
-                                            opacity: savingsFade,
-                                            transform: [{ translateY: savingsSlide }],
-                                        }}
-                                    >
-                                        <Text style={styles.savingsOptionsTitle}>What would you save for?</Text>
-                                        <View style={styles.savingsOptionsContainer}>
-                                            {SAVINGS_OPTIONS.map((option) => (
-                                                <TouchableOpacity
-                                                    key={option.id}
-                                                    style={[
-                                                        styles.savingsOption,
-                                                        selectedSavingsGoal === option.id && styles.savingsOptionSelected,
-                                                    ]}
-                                                    onPress={() => setSelectedSavingsGoal(option.id)}
-                                                >
-                                                    <Text style={styles.savingsOptionEmoji}>{option.emoji}</Text>
-                                                    <Text style={[
-                                                        styles.savingsOptionLabel,
-                                                        selectedSavingsGoal === option.id && styles.savingsOptionLabelSelected,
-                                                    ]}>
-                                                        {option.label}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </View>
-                                    </Animated.View>
-                                )}
-                            </View>
-                        )}
                     </Animated.View>
                 </ScrollView>
 
@@ -287,7 +160,7 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
-        </LooviBackground>
+        </LooviBackground >
     );
 }
 
