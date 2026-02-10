@@ -36,7 +36,6 @@ import {
     PromiseScreen,
     PersonalizedPlanScreen,
     LongScrollablePlanScreen,
-    PlanRevealScreen,
     PaywallScreen,
 } from '../screens/onboarding';
 
@@ -359,7 +358,6 @@ export default function RootNavigator() {
                             <OnboardingStack.Screen name="Promise" component={PromiseScreen} />
                             <OnboardingStack.Screen name="PersonalizedPlan" component={PersonalizedPlanScreen} />
                             <OnboardingStack.Screen name="LongScrollablePlan" component={LongScrollablePlanScreen} />
-                            <OnboardingStack.Screen name="PlanReveal" component={PlanRevealScreen} />
                             <OnboardingStack.Screen name="Paywall" component={PaywallScreen} />
                         </OnboardingStack.Navigator>
                     )}

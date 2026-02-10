@@ -196,7 +196,7 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
             : ['energy', 'mood', 'sleep'];
 
     const handleContinue = () => {
-        navigation.navigate('PlanReveal');
+        navigation.navigate('Paywall');
     };
 
     const GoalPill = ({ label }: { label: string }) => (
