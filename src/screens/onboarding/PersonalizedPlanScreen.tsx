@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { useUserData } from '../../context/UserDataContext';
@@ -21,11 +22,13 @@ type PersonalizedPlanScreenProps = {
 
 export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanScreenProps) {
     const { onboardingData } = useUserData();
-    const [currentStep, setCurrentStep] = useState(0);
+    const [displayedText, setDisplayedText] = useState('');
+    const [showButton, setShowButton] = useState(false);
 
     // Animation values
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
+    const buttonFadeAnim = useRef(new Animated.Value(0)).current;
     const cardSlideAnim = useRef(new Animated.Value(-100)).current; // Start slightly above
     const cardOpacityAnim = useRef(new Animated.Value(0)).current; // Start invisible
 
@@ -36,31 +39,44 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
         "Now, it's time to invest in yourself."
     ];
 
-    const stepDuration = 3000; // 3 seconds per step
-
     useEffect(() => {
         // Sequence of text changes
         const runAnimationSequence = async () => {
             for (let i = 0; i < steps.length; i++) {
-                // Step text set at end of previous iteration while invisible (or initial state for i=0) to avoid flicker
+                const fullText = steps[i];
+                setDisplayedText(''); // Clear text for new step
 
-                // Fade in
+                // Fade in container
                 Animated.parallel([
                     Animated.timing(fadeAnim, {
                         toValue: 1,
-                        duration: 500,
+                        duration: 400,
                         useNativeDriver: true,
                     }),
                     Animated.timing(slideAnim, {
                         toValue: 0,
-                        duration: 500,
+                        duration: 400,
                         useNativeDriver: true,
                     })
                 ]).start();
 
+                // Typewriter effect
+                for (let charIndex = 0; charIndex <= fullText.length; charIndex++) {
+                    setDisplayedText(fullText.substring(0, charIndex));
+
+                    // Add vibration on each letter for tactile feel
+                    if (charIndex > 0) {
+                        Haptics.selectionAsync();
+                    }
+
+                    // Dynamic typing speed
+                    const typingSpeed = fullText.length > 40 ? 25 : 40;
+                    await new Promise(resolve => setTimeout(resolve, typingSpeed));
+                }
+
                 // Trigger card animation on step 2 ("We have a custom plan ready")
                 if (i === 2) {
-                    await new Promise(resolve => setTimeout(resolve, 400)); // Small delay after text appears
+                    await new Promise(resolve => setTimeout(resolve, 300));
                     Animated.parallel([
                         Animated.timing(cardOpacityAnim, {
                             toValue: 1,
@@ -77,7 +93,8 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
 
                 // Wait for step duration (minus fade out time if not last step)
                 if (i < steps.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, stepDuration - 500));
+                    // Constant pause after typing finished
+                    await new Promise(resolve => setTimeout(resolve, 1500));
 
                     // Fade out
                     Animated.parallel([
@@ -96,11 +113,17 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                     await new Promise(resolve => setTimeout(resolve, 500));
                     // Reset slide for next entry
                     slideAnim.setValue(20);
-                    // Set next step while invisible so next fade-in shows correct text without flicker
-                    setCurrentStep(i + 1);
                 } else {
                     // Last step stays visible
-                    await new Promise(resolve => setTimeout(resolve, stepDuration));
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // Show button after all animations finish
+                    setShowButton(true);
+                    Animated.timing(buttonFadeAnim, {
+                        toValue: 1,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }).start();
                 }
             }
         };
@@ -181,21 +204,23 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                                 }
                             ]}
                         >
-                            {steps[currentStep]}
+                            {displayedText}
                         </Animated.Text>
                     </View>
                 </View>
 
-                {/* Become Craveless Button - Always Visible */}
-                <View style={styles.bottomContainer}>
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={handleContinue}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.buttonText}>Become Craveless</Text>
-                    </TouchableOpacity>
-                </View>
+                {/* Become Craveless Button - Fade in at end */}
+                {showButton && (
+                    <Animated.View style={[styles.bottomContainer, { opacity: buttonFadeAnim }]}>
+                        <TouchableOpacity
+                            style={styles.button}
+                            onPress={handleContinue}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.buttonText}>Become Craveless</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
+                )}
             </SafeAreaView>
         </LooviBackground>
     );
