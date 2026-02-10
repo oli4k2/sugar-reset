@@ -35,6 +35,8 @@ import { useUserData } from '../../context/UserDataContext';
 import { useAuthContext } from '../../context/AuthContext';
 import * as Haptics from 'expo-haptics';
 
+import CancellationOfferScreen from '../../components/CancellationOfferScreen';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type PaywallScreenProps = {
@@ -54,6 +56,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
+    const [showCancellationOffer, setShowCancellationOffer] = useState(false);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -117,6 +120,77 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             setCurrentStep('intro');
         } else if (currentStep === 'plans') {
             setCurrentStep('reminder');
+        } else if (currentStep === 'intro') {
+            setShowCancellationOffer(true);
+        }
+    };
+
+    const handleAcceptYearly = async () => {
+        setShowCancellationOffer(false);
+        if (currentOffering?.annual) {
+            setSelectedPackage(currentOffering.annual);
+            await handleStartTrial();
+        } else {
+            Alert.alert('Error', 'Yearly plan not available');
+        }
+    };
+
+    const handleAcceptLifetime = async () => {
+        setShowCancellationOffer(false);
+        // For now using annual as placeholder for lifetime
+        // Ideally you would have a specific lifetime package configured
+        if (currentOffering?.lifetime) {
+            setSelectedPackage(currentOffering.lifetime);
+            setIsPurchasing(true);
+            try {
+                await purchasePackage(currentOffering.lifetime);
+                await completeSuccessFlow();
+            } catch (e: any) {
+                console.warn(e);
+                Alert.alert('Error', e.message);
+            } finally {
+                setIsPurchasing(false);
+            }
+        } else if (currentOffering?.annual) {
+            // Fallback to annual if no lifetime configured (for testing)
+            setSelectedPackage(currentOffering.annual);
+            await handleStartTrial();
+        }
+    };
+
+    const handleContinueFree = async () => {
+        setShowCancellationOffer(false);
+        await completeOnboarding();
+
+        if (!isAuthenticated) {
+            await setPostPaywallAuthRequired(true);
+            navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
+            });
+        } else {
+            await setPostPaywallAuthRequired(false);
+            navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+            });
+        }
+    };
+
+    const completeSuccessFlow = async () => {
+        await completeOnboarding();
+        if (!isAuthenticated) {
+            await setPostPaywallAuthRequired(true);
+            navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
+            });
+        } else {
+            await setPostPaywallAuthRequired(false);
+            navigation.getParent()?.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+            });
         }
     };
 
@@ -429,21 +503,34 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                     ) : (
                         <View style={styles.backButton} />
                     )}
-
-                    <TouchableOpacity onPress={handleRestore} disabled={isRestoring}>
-                        {isRestoring ? (
-                            <ActivityIndicator size="small" color={looviColors.text.tertiary} />
-                        ) : (
-                            <Text style={styles.restoreText}>Restore</Text>
-                        )}
-                    </TouchableOpacity>
                 </View>
 
                 {/* Step Content */}
                 {currentStep === 'intro' && renderIntroStep()}
                 {currentStep === 'reminder' && renderReminderStep()}
                 {currentStep === 'plans' && renderPlansStep()}
+
+                {/* Restore Link */}
+                <TouchableOpacity
+                    onPress={handleRestore}
+                    disabled={isRestoring}
+                    style={styles.restoreButtonBottom}
+                >
+                    {isRestoring ? (
+                        <ActivityIndicator size="small" color={looviColors.text.tertiary} />
+                    ) : (
+                        <Text style={styles.restoreTextBottom}>Restore Purchases</Text>
+                    )}
+                </TouchableOpacity>
             </SafeAreaView>
+
+            <CancellationOfferScreen
+                visible={showCancellationOffer}
+                onClose={() => setShowCancellationOffer(false)}
+                onAcceptYearly={handleAcceptYearly}
+                onAcceptLifetime={handleAcceptLifetime}
+                onContinueFree={handleContinueFree}
+            />
         </LooviBackground>
     );
 }
@@ -464,6 +551,15 @@ const styles = StyleSheet.create({
         height: 40,
         alignItems: 'flex-start',
         justifyContent: 'center',
+    },
+    restoreButtonBottom: {
+        alignItems: 'center',
+        paddingBottom: spacing.lg,
+    },
+    restoreTextBottom: {
+        fontSize: 13,
+        color: looviColors.text.tertiary,
+        textDecorationLine: 'underline',
     },
     restoreText: {
         fontSize: 15,

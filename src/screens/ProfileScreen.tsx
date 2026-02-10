@@ -78,6 +78,8 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
         title: 'Developer',
         items: [
             { id: 'viewNotifications', emoji: '📅', label: 'View Scheduled Notifications' },
+            { id: 'testPaywall', emoji: '💳', label: 'Test Paywall Flow' },
+            { id: 'resetOnboarding', emoji: '🔄', label: 'Reset Onboarding' },
             { id: 'clearData', emoji: '🗑️', label: 'Clear All Data' },
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
         ],
@@ -95,7 +97,7 @@ export default function ProfileScreen() {
     const { onboardingData, streakData, updateOnboardingData, latestHealthScore, todayCheckIn } = useUserData();
     const { user, isAuthenticated, firebaseUser, refreshUser } = useAuthContext();
     const { signOut } = useAuth();
-    const { restorePurchases, isPremium } = useRevenueCat();
+    const { restorePurchases, isPremium, customerInfo } = useRevenueCat();
     const navigation = useNavigation<any>();
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
@@ -579,6 +581,40 @@ export default function ProfileScreen() {
                             </View>
                         </View>
 
+                        {/* Subscription Status */}
+                        <View style={styles.menuSection}>
+                            <Text style={styles.sectionTitle}>Subscription</Text>
+                            {isPremium ? (
+                                <View style={styles.premiumCard}>
+                                    <View style={styles.premiumContent}>
+                                        <Text style={styles.premiumTitle}>Premium Active</Text>
+                                        <Text style={styles.premiumSubtitle}>
+                                            {customerInfo?.entitlements.active['premium']?.periodType === 'TRIAL' && customerInfo?.entitlements.active['premium']?.expirationDate
+                                                ? `Trial ends: ${new Date(customerInfo.entitlements.active['premium'].expirationDate || '').toLocaleDateString()}`
+                                                : 'You have full access to all features'}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.premiumBadge}>
+                                        <Text style={styles.premiumBadgeText}>PRO</Text>
+                                    </View>
+                                </View>
+                            ) : (
+                                <TouchableOpacity
+                                    style={styles.upgradeCard}
+                                    onPress={() => navigation.navigate('Paywall')}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={styles.upgradeContent}>
+                                        <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
+                                        <Text style={styles.upgradeSubtitle}>Unlock all features & analytics</Text>
+                                    </View>
+                                    <View style={styles.upgradeButton}>
+                                        <Text style={styles.upgradeButtonText}>Upgrade</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
                         {/* Reasons Section */}
 
 
@@ -596,41 +632,51 @@ export default function ProfileScreen() {
                                                 item.id === 'deleteAccount' && styles.deleteMenuItem,
                                             ]}
                                             activeOpacity={0.6}
-                                            onPress={
-                                                item.id === 'profile'
-                                                    ? handleEditProfile
-                                                    : item.id === 'restore'
-                                                        ? handleRestorePurchases
-                                                        : item.id === 'deleteAccount'
-                                                            ? handleDeleteAccount
-                                                            : item.id === 'notifications'
-                                                                ? () => setShowNotificationSettings(true)
-                                                                : item.id === 'journal'
-                                                                    ? () => navigation.navigate('Journal')
-                                                                    : item.id === 'help'
-                                                                        ? () => navigation.navigate('Help')
-                                                                        : item.id === 'rate'
-                                                                            ? async () => {
-                                                                                if (await StoreReview.hasAction()) {
-                                                                                    StoreReview.requestReview();
-                                                                                } else {
-                                                                                    Alert.alert('Rate App', 'You can rate us on the App Store!');
-                                                                                }
-                                                                            }
-                                                                            : item.id === 'feedback'
-                                                                                ? () => Linking.openURL('mailto:hello@scriptcollective.com')
-                                                                                : item.id === 'privacy'
-                                                                                    ? () => navigation.navigate('PrivacyPolicy')
-                                                                                    : item.id === 'terms'
-                                                                                        ? () => navigation.navigate('TermsOfService')
-                                                                                        : item.id === 'viewNotifications'
-                                                                                            ? handleViewNotifications
-                                                                                            : item.id === 'clearData'
-                                                                                                ? handleClearAllData
-                                                                                                : item.id === 'cleanupCommunity'
-                                                                                                    ? handleCleanupCommunityData
-                                                                                                    : undefined
-                                            }
+                                            onPress={() => {
+                                                switch (item.id) {
+                                                    case 'profile': handleEditProfile(); break;
+                                                    case 'restore': handleRestorePurchases(); break;
+                                                    case 'deleteAccount': handleDeleteAccount(); break;
+                                                    case 'notifications': setShowNotificationSettings(true); break;
+                                                    case 'help': Linking.openURL('mailto:support@sugar-reset.com'); break;
+                                                    case 'feedback': Linking.openURL('mailto:feedback@sugar-reset.com'); break;
+                                                    case 'rate': StoreReview.requestReview(); break;
+                                                    // case 'viewNotifications': setShowNotificationDebug(true); break;
+                                                    case 'testPaywall': navigation.navigate('Paywall'); break;
+                                                    case 'resetOnboarding':
+                                                        Alert.alert(
+                                                            'Reset Onboarding',
+                                                            'This will reset your onboarding progress but keep you logged in. App will restart.',
+                                                            [
+                                                                { text: 'Cancel', style: 'cancel' },
+                                                                {
+                                                                    text: 'Reset',
+                                                                    style: 'destructive',
+                                                                    onPress: async () => {
+                                                                        try {
+                                                                            // Clear local flags
+                                                                            await AsyncStorage.removeItem('has_seen_onboarding');
+                                                                            await AsyncStorage.removeItem('onboarding_data');
+
+                                                                            // Navigate to Onboarding
+                                                                            navigation.getParent()?.reset({
+                                                                                index: 0,
+                                                                                routes: [{ name: 'Onboarding' }],
+                                                                            });
+                                                                        } catch (e) {
+                                                                            Alert.alert('Error', 'Failed to reset onboarding');
+                                                                        }
+                                                                    }
+                                                                }
+                                                            ]
+                                                        );
+                                                        break;
+                                                    case 'clearData': handleClearAllData(); break;
+                                                    case 'cleanupCommunity': handleCleanupCommunityData(); break;
+                                                    case 'privacy': navigation.navigate('PrivacyPolicy'); break;
+                                                    case 'terms': navigation.navigate('TermsOfService'); break;
+                                                }
+                                            }}
                                             disabled={(item.id === 'restore' && isRestoring) || (item.id === 'deleteAccount' && isDeletingAccount)}
                                         >
                                             <AppIcon emoji={item.emoji} size={20} />
@@ -1272,5 +1318,80 @@ const styles = StyleSheet.create({
     },
     deleteMenuArrow: {
         color: '#FF3B30',
+    },
+    premiumCard: {
+        borderRadius: 20,
+        backgroundColor: looviColors.accent.primary,
+        padding: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: looviColors.accent.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    premiumContent: {
+        flex: 1,
+    },
+    premiumTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        marginBottom: 2,
+    },
+    premiumSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.9)',
+        fontWeight: '500',
+    },
+    premiumBadge: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    premiumBadgeText: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#FFFFFF',
+    },
+    upgradeCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    upgradeContent: {
+        flex: 1,
+    },
+    upgradeTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+        marginBottom: 2,
+    },
+    upgradeSubtitle: {
+        fontSize: 13,
+        color: looviColors.text.secondary,
+    },
+    upgradeButton: {
+        backgroundColor: looviColors.accent.primary,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    upgradeButtonText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#FFFFFF',
     },
 });
