@@ -10,7 +10,7 @@ interface PlanBuildingAnimationProps {
 }
 
 export const PlanBuildingAnimation = ({ onComplete, answers }: PlanBuildingAnimationProps) => {
-    const [subline, setSubline] = useState('Analysing responses');
+    const [subline, setSubline] = useState('Identifying relationships');
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -22,7 +22,6 @@ export const PlanBuildingAnimation = ({ onComplete, answers }: PlanBuildingAnima
         }).start();
 
         const sequence = [
-            { text: 'Analysing responses', duration: 1200 },
             { text: 'Identifying relationships', duration: 1200 },
             { text: 'Detecting behavioral patterns', duration: 1600 },
             { text: 'Building your profile', duration: 2000 },
@@ -57,10 +56,10 @@ export const PlanBuildingAnimation = ({ onComplete, answers }: PlanBuildingAnima
     return (
         <View style={styles.fullScreenOverlay}>
             <View style={styles.background} />
-            
+
             <Animated.View style={[styles.contentContainer, { opacity: fadeAnim }]}>
-                <Text style={styles.headline}>We'll have your results in a moment!</Text>
-                
+                <Text style={styles.headline}>Analyzing your responses…</Text>
+
                 <View style={styles.loaderContainer}>
                     <ActivityRing />
                 </View>

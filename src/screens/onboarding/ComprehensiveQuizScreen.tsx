@@ -17,6 +17,7 @@ import {
     Dimensions,
     Keyboard,
     Image,
+    Easing,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -346,6 +347,21 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const handleMultiSelect = (optionId: string, fieldId: string) => {
         setAnswers(prev => {
             const current = prev[fieldId] || [];
+
+            // Logic for 'sugarSituations' exclusive 'no-pattern' option
+            if (fieldId === 'sugarSituations') {
+                if (optionId === 'no-pattern') {
+                    // If selecting 'no-pattern', it should be the only one
+                    return { ...prev, [fieldId]: current.includes('no-pattern') ? [] : ['no-pattern'] };
+                } else {
+                    // If selecting any other option, remove 'no-pattern'
+                    const newSelection = current.includes(optionId)
+                        ? current.filter((id: string) => id !== optionId)
+                        : [...current.filter((id: string) => id !== 'no-pattern'), optionId];
+                    return { ...prev, [fieldId]: newSelection };
+                }
+            }
+
             if (current.includes(optionId)) {
                 return { ...prev, [fieldId]: current.filter((id: string) => id !== optionId) };
             }
@@ -1073,30 +1089,85 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             scrollPadding: isSmallScreen ? spacing.xl : spacing['2xl'],
         };
 
-        // Get color based on score (1 = best, 5 = worst)
+        // Get color based on score (1 = best, 5 = worst) - Monochromatic Scale
         const getScoreColor = (filledSegments: number): string => {
             switch (filledSegments) {
                 case 1:
-                    return '#F5E6D3'; // Whitish-yellow-orange (soft, best)
+                    return '#E6C5A9'; // Darker beige/sand for better visibility
+                case 2:
+                    return looviColors.coralSoft; // Soft coral (#EEC4A0)
                 case 3:
                     return '#F0B88A'; // Medium orange
                 case 4:
-                    return '#E8A87C'; // Orange-coral (current accent)
+                    return looviColors.coralOrange; // Standard coral (#E8A87C)
                 case 5:
-                    return '#D77B5A'; // Red-orange (imposing, worst)
+                    return looviColors.coralDark; // Dark coral (#D4896A)
                 default:
-                    return '#E8A87C'; // Default to accent color
+                    return looviColors.coralOrange;
+            }
+        };
+
+        // Get label based on score
+        const getScoreLabel = (filledSegments: number): string => {
+            switch (filledSegments) {
+                case 1: return 'Minimal';
+                case 2: return 'Low';
+                case 3: return 'Moderate';
+                case 4: return 'High';
+                case 5: return 'Severe';
+                default: return '';
             }
         };
 
         // Helper component for a single bar with segments
-        const CategoryBar = ({ label, filledSegments }: { label: string; filledSegments: number }) => {
+        const CategoryBar = ({ label, filledSegments, delay }: { label: string; filledSegments: number; delay: number }) => {
             const segments = Array.from({ length: 5 }, (_, i) => i < filledSegments);
             const segmentColor = getScoreColor(filledSegments);
+            const scoreLabel = getScoreLabel(filledSegments);
+
+            // Animation for bar entry
+            const barOpacity = useRef(new Animated.Value(0)).current;
+            const barTranslateX = useRef(new Animated.Value(-20)).current;
+
+            useEffect(() => {
+                Animated.sequence([
+                    Animated.delay(delay),
+                    Animated.parallel([
+                        Animated.timing(barOpacity, {
+                            toValue: 1,
+                            duration: 600,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(barTranslateX, {
+                            toValue: 0,
+                            duration: 600,
+                            easing: Easing.out(Easing.cubic),
+                            useNativeDriver: true,
+                        }),
+                    ])
+                ]).start();
+            }, []);
+
             return (
                 <View style={styles.categoryBarContainer}>
-                    <Text style={[styles.categoryBarLabel, isSmallScreen && { fontSize: 13 }]}>{label}</Text>
-                    <View style={styles.categoryBarSegments}>
+                    <View style={styles.categoryHeader}>
+                        <Text style={[styles.categoryBarLabel, isSmallScreen && { fontSize: 13 }]}>{label}</Text>
+                        <Text style={[
+                            styles.categoryScoreLabel,
+                            { color: '#C97B5D' }, // Always use dark readable coral for text
+                            isSmallScreen && { fontSize: 13 }
+                        ]}>
+                            {scoreLabel}
+                        </Text>
+                    </View>
+
+                    <Animated.View style={[
+                        styles.categoryBarSegments,
+                        {
+                            opacity: barOpacity,
+                            transform: [{ translateX: barTranslateX }]
+                        }
+                    ]}>
                         {segments.map((filled, index) => (
                             <View
                                 key={index}
@@ -1109,7 +1180,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 ]}
                             />
                         ))}
-                    </View>
+                    </Animated.View>
                 </View>
             );
         };
@@ -1162,11 +1233,11 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                     gap: adaptiveSpacing.barGap,
                                 }
                             ]}>
-                                <CategoryBar label="Exposure" filledSegments={categoryScores.exposure} />
-                                <CategoryBar label="Autopilot" filledSegments={categoryScores.autopilot} />
-                                <CategoryBar label="Control" filledSegments={categoryScores.control} />
-                                <CategoryBar label="Mental Pull" filledSegments={categoryScores.mentalPull} />
-                                <CategoryBar label="Environment" filledSegments={categoryScores.environment} />
+                                <CategoryBar label="Exposure" filledSegments={categoryScores.exposure} delay={0} />
+                                <CategoryBar label="Autopilot" filledSegments={categoryScores.autopilot} delay={100} />
+                                <CategoryBar label="Control" filledSegments={categoryScores.control} delay={200} />
+                                <CategoryBar label="Mental Pull" filledSegments={categoryScores.mentalPull} delay={300} />
+                                <CategoryBar label="Environment" filledSegments={categoryScores.environment} delay={400} />
                             </View>
 
                             {/* Asterisk disclaimer */}
@@ -1263,6 +1334,9 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                         )}
                                     </View>
                                     <Text style={styles.questionTitle}>{question?.title || ''}</Text>
+                                    {(question.type === 'multi' || question.type === 'triggers') && (
+                                        <Text style={styles.multiSelectHint}>Select all that apply</Text>
+                                    )}
                                     {question?.subtitle && (
                                         <Text style={styles.questionSubtitle}>{question.subtitle}</Text>
                                     )}
@@ -1287,7 +1361,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.continueButtonText}>
-                                    {currentQuestion < QUESTIONS.length - 1 ? 'Continue' : 'See Results'}
+                                    {currentQuestion < QUESTIONS.length - 1 ? 'Continue' : 'Analyse'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -1302,7 +1376,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 activeOpacity={0.8}
                             >
                                 <Text style={styles.continueButtonText}>
-                                    Continue to analysis
+                                    Analyse
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -1404,6 +1478,15 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         color: looviColors.text.secondary,
         textAlign: 'center',
+    },
+    multiSelectHint: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: looviColors.accent.primary,
+        textAlign: 'center',
+        marginTop: -spacing.xs,
+        marginBottom: spacing.sm,
+        fontStyle: 'italic',
     },
     optionsContainer: {
         gap: spacing.md,
@@ -1633,21 +1716,32 @@ const styles = StyleSheet.create({
         marginBottom: spacing.lg,
     },
     categoryBarContainer: {
-        gap: spacing.sm,
+        // gap removed for tighter spacing
+    },
+    categoryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     categoryBarLabel: {
         fontSize: 14,
         fontWeight: '600',
         color: looviColors.text.primary,
-        marginBottom: spacing.xs,
+        marginBottom: 5, // Slightly increased for balanced spacing
+    },
+    categoryScoreLabel: {
+        fontSize: 14,
+        fontWeight: '700',
+        textAlign: 'right',
+        marginBottom: 5,
     },
     categoryBarSegments: {
         flexDirection: 'row',
-        gap: spacing.xs,
+        gap: 6, // Increased gap for better separation
     },
     categoryBarSegment: {
         flex: 1,
-        height: 32,
+        height: 24, // Reduced height for slimmer bars
         backgroundColor: 'rgba(0, 0, 0, 0.1)',
         borderRadius: borderRadius.md,
     },
