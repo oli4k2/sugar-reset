@@ -1032,6 +1032,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                         resizeMode="contain"
                                     />
                                 </View>
+                                <Text style={styles.questionPreHeader}>BEFORE WE CONTINUE...</Text>
                                 <Text style={styles.questionTitle}>What can we call you?</Text>
                             </View>
 
@@ -1465,6 +1466,16 @@ const styles = StyleSheet.create({
     questionImageExtraLarge: {
         width: 105,
         height: 105,
+    },
+    questionPreHeader: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: looviColors.text.tertiary,
+        textAlign: 'center',
+        marginTop: spacing['2xl'],
+        marginBottom: spacing.xs,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
     questionTitle: {
         fontSize: 24,

@@ -79,7 +79,7 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
         ]).start();
 
         // Milestone checkpoint: user finished the info slides and reached the next flow.
-        setOnboardingCheckpoint('Goals').catch(() => {});
+        setOnboardingCheckpoint('Goals').catch(() => { });
     }, []);
 
     // Animate savings options when user says yes
@@ -283,7 +283,7 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
                         disabled={!canProceed}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.continueButtonText}>Continue</Text>
+                        <Text style={styles.continueButtonText}>Track these goals</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>

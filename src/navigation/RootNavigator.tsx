@@ -27,18 +27,17 @@ import {
     WelcomeScreen,
     QuizIntroScreen,
     ComprehensiveQuizScreen,
+    SymptomsScreen,
     SugarScienceScreen,
-    SugarestWelcomeScreen,
     SuccessStoriesScreen,
     SugarResetGraphScreen,
     FeatureShowcaseScreen,
     GoalsScreen,
     PromiseScreen,
-    PaywallScreen,
-    SymptomsScreen,
     PersonalizedPlanScreen,
     LongScrollablePlanScreen,
     PlanRevealScreen,
+    PaywallScreen,
 } from '../screens/onboarding';
 
 // Auth Screens
@@ -351,7 +350,6 @@ export default function RootNavigator() {
 
                             {/* Phase 2: Education & Social Proof */}
                             <OnboardingStack.Screen name="SugarDangers" component={SugarScienceScreen} />
-                            <OnboardingStack.Screen name="SugarestWelcome" component={SugarestWelcomeScreen} />
                             <OnboardingStack.Screen name="FeatureShowcase" component={FeatureShowcaseScreen} />
                             <OnboardingStack.Screen name="SuccessStories" component={SuccessStoriesScreen} />
                             <OnboardingStack.Screen name="SugarResetGraph" component={SugarResetGraphScreen} />

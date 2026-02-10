@@ -82,12 +82,12 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
         if (currentIndex < scienceSlides.length - 1) {
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
         } else {
-            navigation.navigate('SugarestWelcome');
+            navigation.navigate('FeatureShowcase');
         }
     };
 
     const handleSkip = () => {
-        navigation.navigate('SugarestWelcome');
+        navigation.navigate('FeatureShowcase');
     };
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
@@ -139,7 +139,7 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
     const lastSlideIndex = scienceSlides.length - 1;
     const transitionStart = (lastSlideIndex - 1) * SCREEN_WIDTH + SCREEN_WIDTH * 0.5;
     const transitionEnd = lastSlideIndex * SCREEN_WIDTH;
-    
+
     const backgroundColor = scrollX.interpolate({
         inputRange: [
             (lastSlideIndex - 1) * SCREEN_WIDTH,
@@ -153,79 +153,79 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
     return (
         <View style={StyleSheet.absoluteFill}>
             {/* Animated background that transitions smoothly based on scroll */}
-            <Animated.View 
+            <Animated.View
                 style={[
                     StyleSheet.absoluteFill,
                     { backgroundColor }
                 ]}
             />
             <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-            <SafeAreaView style={styles.container}>
-                {/* Header with title */}
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Learn About Sugar</Text>
-                    <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-                        <Text style={styles.skipText}>Skip</Text>
-                    </TouchableOpacity>
-                </View>
+                <SafeAreaView style={styles.container}>
+                    {/* Header with title */}
+                    <View style={styles.header}>
+                        <Text style={styles.headerTitle}>Learn About Sugar</Text>
+                        <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
+                            <Text style={styles.skipText}>Skip</Text>
+                        </TouchableOpacity>
+                    </View>
 
-                {/* Slides */}
-                <FlatList
-                    ref={flatListRef}
-                    data={scienceSlides}
-                    renderItem={renderSlide}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    keyExtractor={(item) => item.id}
-                    onViewableItemsChanged={onViewableItemsChanged}
-                    viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
-                    onScroll={Animated.event(
-                        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                        { useNativeDriver: false }
-                    )}
-                />
+                    {/* Slides */}
+                    <FlatList
+                        ref={flatListRef}
+                        data={scienceSlides}
+                        renderItem={renderSlide}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        keyExtractor={(item) => item.id}
+                        onViewableItemsChanged={onViewableItemsChanged}
+                        viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
+                        onScroll={Animated.event(
+                            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                            { useNativeDriver: false }
+                        )}
+                    />
 
-                {/* Pagination */}
-                <View style={styles.pagination}>
-                    {scienceSlides.map((_, index) => {
-                        const inputRange = [
-                            (index - 1) * SCREEN_WIDTH,
-                            index * SCREEN_WIDTH,
-                            (index + 1) * SCREEN_WIDTH,
-                        ];
-                        const dotWidth = scrollX.interpolate({
-                            inputRange,
-                            outputRange: [8, 24, 8],
-                            extrapolate: 'clamp',
-                        });
-                        const opacity = scrollX.interpolate({
-                            inputRange,
-                            outputRange: [0.3, 1, 0.3],
-                            extrapolate: 'clamp',
-                        });
-                        return (
-                            <Animated.View
-                                key={index}
-                                style={[styles.dot, { width: dotWidth, opacity }]}
-                            />
-                        );
-                    })}
-                </View>
+                    {/* Pagination */}
+                    <View style={styles.pagination}>
+                        {scienceSlides.map((_, index) => {
+                            const inputRange = [
+                                (index - 1) * SCREEN_WIDTH,
+                                index * SCREEN_WIDTH,
+                                (index + 1) * SCREEN_WIDTH,
+                            ];
+                            const dotWidth = scrollX.interpolate({
+                                inputRange,
+                                outputRange: [8, 24, 8],
+                                extrapolate: 'clamp',
+                            });
+                            const opacity = scrollX.interpolate({
+                                inputRange,
+                                outputRange: [0.3, 1, 0.3],
+                                extrapolate: 'clamp',
+                            });
+                            return (
+                                <Animated.View
+                                    key={index}
+                                    style={[styles.dot, { width: dotWidth, opacity }]}
+                                />
+                            );
+                        })}
+                    </View>
 
-                {/* Bottom */}
-                <View style={styles.bottomContainer}>
-                    <TouchableOpacity
-                        style={styles.nextButton}
-                        onPress={handleNext}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.nextButtonText}>
-                            {isLastSlide ? "Let's start Craveless!" : 'Next'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
+                    {/* Bottom */}
+                    <View style={styles.bottomContainer}>
+                        <TouchableOpacity
+                            style={styles.nextButton}
+                            onPress={handleNext}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.nextButtonText}>
+                                {isLastSlide ? "Let's start Craveless!" : 'Next'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
             </View>
         </View>
     );

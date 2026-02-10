@@ -10,7 +10,6 @@ export { default as SymptomsScreen } from './SymptomsScreen';
 
 // Education & Social Proof
 export { default as SugarScienceScreen } from './SugarScienceScreen';
-export { default as SugarestWelcomeScreen } from './SugarestWelcomeScreen';
 export { default as SuccessStoriesScreen } from './SuccessStoriesScreen';
 export { default as SugarResetGraphScreen } from './SugarResetGraphScreen';
 export { default as FeatureShowcaseScreen } from './FeatureShowcaseScreen';

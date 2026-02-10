@@ -22,15 +22,15 @@ type PersonalizedPlanScreenProps = {
 export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanScreenProps) {
     const { onboardingData } = useUserData();
     const [currentStep, setCurrentStep] = useState(0);
-    const [showButton, setShowButton] = useState(false);
-    
+
     // Animation values
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
-    const buttonFadeAnim = useRef(new Animated.Value(0)).current;
+    const cardSlideAnim = useRef(new Animated.Value(-100)).current; // Start slightly above
+    const cardOpacityAnim = useRef(new Animated.Value(0)).current; // Start invisible
 
     const steps = [
-        "Let's start your journey to being Craveless",
+        `Hey ${onboardingData.nickname || 'there'},`,
         "Your answers have helped us understand you better.",
         "We have a custom plan ready",
         "Now, it's time to invest in yourself."
@@ -58,10 +58,27 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                     })
                 ]).start();
 
+                // Trigger card animation on step 2 ("We have a custom plan ready")
+                if (i === 2) {
+                    await new Promise(resolve => setTimeout(resolve, 400)); // Small delay after text appears
+                    Animated.parallel([
+                        Animated.timing(cardOpacityAnim, {
+                            toValue: 1,
+                            duration: 1200,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(cardSlideAnim, {
+                            toValue: 0,
+                            duration: 1200,
+                            useNativeDriver: true,
+                        })
+                    ]).start();
+                }
+
                 // Wait for step duration (minus fade out time if not last step)
                 if (i < steps.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, stepDuration - 500));
-                    
+
                     // Fade out
                     Animated.parallel([
                         Animated.timing(fadeAnim, {
@@ -75,7 +92,7 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                             useNativeDriver: true,
                         })
                     ]).start();
-                    
+
                     await new Promise(resolve => setTimeout(resolve, 500));
                     // Reset slide for next entry
                     slideAnim.setValue(20);
@@ -84,12 +101,6 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                 } else {
                     // Last step stays visible
                     await new Promise(resolve => setTimeout(resolve, stepDuration));
-                    setShowButton(true);
-                    Animated.timing(buttonFadeAnim, {
-                        toValue: 1,
-                        duration: 800,
-                        useNativeDriver: true,
-                    }).start();
                 }
             }
         };
@@ -114,7 +125,15 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
             <SafeAreaView style={styles.container}>
                 <View style={styles.content}>
                     {/* Streak Card Visual - at top */}
-                    <View style={styles.cardContainer}>
+                    <Animated.View
+                        style={[
+                            styles.cardContainer,
+                            {
+                                opacity: cardOpacityAnim,
+                                transform: [{ translateY: cardSlideAnim }]
+                            }
+                        ]}
+                    >
                         <LinearGradient
                             colors={[looviColors.coralSoft, looviColors.coralOrange, looviColors.skyBlue]}
                             start={{ x: 0, y: 0 }}
@@ -146,17 +165,17 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                                 </View>
                             </View>
                         </LinearGradient>
-                        
+
                         {/* Decorative glow/shadow behind */}
                         <View style={styles.cardShadow} />
-                    </View>
+                    </Animated.View>
 
                     {/* Animated Header Text - beneath card */}
                     <View style={styles.headerContainer}>
-                        <Animated.Text 
+                        <Animated.Text
                             style={[
-                                styles.headerText, 
-                                { 
+                                styles.headerText,
+                                {
                                     opacity: fadeAnim,
                                     transform: [{ translateY: slideAnim }]
                                 }
@@ -167,18 +186,16 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                     </View>
                 </View>
 
-                {/* Continue Button */}
-                {showButton && (
-                    <Animated.View style={[styles.bottomContainer, { opacity: buttonFadeAnim }]}>
-                        <TouchableOpacity
-                            style={styles.button}
-                            onPress={handleContinue}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.buttonText}>Show my plan</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
-                )}
+                {/* Become Craveless Button - Always Visible */}
+                <View style={styles.bottomContainer}>
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={handleContinue}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.buttonText}>Become Craveless</Text>
+                    </TouchableOpacity>
+                </View>
             </SafeAreaView>
         </LooviBackground>
     );
@@ -197,7 +214,7 @@ const styles = StyleSheet.create({
     cardContainer: {
         width: '100%',
         maxWidth: 320,
-        aspectRatio: 0.8, // Portrait card shape
+        aspectRatio: 0.9, // Slightly less tall
         position: 'relative',
         marginBottom: spacing['2xl'] * 0.6, // Space between card and text
     },

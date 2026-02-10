@@ -13,26 +13,28 @@ import {
     PanResponder,
     Dimensions,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle, Line } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing } from '../theme';
 import { looviColors } from '../components/LooviBackground';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SIGNATURE_WIDTH = SCREEN_WIDTH - (spacing.screen.horizontal * 2);
-const SIGNATURE_HEIGHT = 200;
+const CANVAS_HEIGHT = 300;
 
 interface SignatureFieldProps {
     onSignatureChange?: (hasSignature: boolean) => void;
     onBegin?: () => void;
     onEnd?: () => void;
+    label?: string;
 }
 
-export default function SignatureField({ onSignatureChange, onBegin, onEnd }: SignatureFieldProps) {
-    const [paths, setPaths] = useState<Array<{ path: string; key: string }>>([]);
-    const [currentPath, setCurrentPath] = useState<string>('');
+export default function SignatureField({ onSignatureChange, onBegin, onEnd, label = 'Sign your promise' }: SignatureFieldProps) {
+    const [paths, setPaths] = useState<Array<{ points: Array<{ x: number; y: number; width: number }>; key: string }>>([]);
+    const [currentPoints, setCurrentPoints] = useState<Array<{ x: number; y: number; width: number }>>([]);
     const pathKeyRef = useRef(0);
-    const currentPathRef = useRef<string>('');
+    const currentPointsRef = useRef<Array<{ x: number; y: number; width: number }>>([]);
+    const lastPointRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
     const panResponder = useRef(
         PanResponder.create({
@@ -41,90 +43,92 @@ export default function SignatureField({ onSignatureChange, onBegin, onEnd }: Si
             onPanResponderTerminationRequest: () => false,
             onShouldBlockNativeResponder: () => true,
             onPanResponderGrant: (evt) => {
-                // #region agent log
-                fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:42',message:'onPanResponderGrant called',data:{hasOnBegin:!!onBegin},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-                // #endregion
                 onBegin?.();
-                // #region agent log
-                fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:44',message:'onBegin called',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-                // #endregion
                 const { locationX, locationY } = evt.nativeEvent;
-                // Clamp coordinates to signature area bounds
                 const x = Math.max(0, Math.min(locationX, SIGNATURE_WIDTH));
-                const y = Math.max(0, Math.min(locationY, SIGNATURE_HEIGHT));
-                const newPath = `M${x},${y}`;
-                currentPathRef.current = newPath;
-                setCurrentPath(newPath);
-                // #region agent log
-                fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:49',message:'currentPath set',data:{newPath,pathLength:newPath.length,refPath:currentPathRef.current},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H8',runId:'post-fix'})}).catch(()=>{});
-                // #endregion
+                const y = Math.max(0, Math.min(locationY, CANVAS_HEIGHT));
+
+                const newPoint = { x, y, width: 3.5 };
+                currentPointsRef.current = [newPoint];
+                setCurrentPoints([newPoint]);
+                lastPointRef.current = { x, y, time: Date.now() };
             },
             onPanResponderMove: (evt) => {
                 const { locationX, locationY } = evt.nativeEvent;
-                // Clamp coordinates to signature area bounds
                 const x = Math.max(0, Math.min(locationX, SIGNATURE_WIDTH));
-                const y = Math.max(0, Math.min(locationY, SIGNATURE_HEIGHT));
-                const updatedPath = currentPathRef.current ? `${currentPathRef.current} L${x},${y}` : `M${x},${y}`;
-                currentPathRef.current = updatedPath;
-                setCurrentPath(updatedPath);
+                const y = Math.max(0, Math.min(locationY, CANVAS_HEIGHT));
+
+                let width = 4.5;
+                if (lastPointRef.current) {
+                    const now = Date.now();
+                    const timeDelta = Math.max(now - lastPointRef.current.time, 1);
+                    const distance = Math.sqrt(
+                        Math.pow(x - lastPointRef.current.x, 2) +
+                        Math.pow(y - lastPointRef.current.y, 2)
+                    );
+                    const velocity = distance / timeDelta;
+
+                    // Slower = thicker (like pressing harder), faster = thinner
+                    // Very dramatic range for realistic handwriting effect
+                    const targetWidth = Math.max(1, Math.min(7, 7 - velocity * 3.0));
+
+                    // Smooth the width change to prevent jittery lines
+                    const prevWidth = currentPointsRef.current.length > 0
+                        ? currentPointsRef.current[currentPointsRef.current.length - 1].width
+                        : 4.5;
+                    width = prevWidth * 0.6 + targetWidth * 0.4;
+
+                    lastPointRef.current = { x, y, time: now };
+                }
+
+                const newPoint = { x, y, width };
+                currentPointsRef.current = [...currentPointsRef.current, newPoint];
+                setCurrentPoints([...currentPointsRef.current]);
             },
             onPanResponderRelease: () => {
-                const pathToSave = currentPathRef.current;
-                // #region agent log
-                fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:61',message:'onPanResponderRelease called',data:{currentPathLength:currentPath.length,refPathLength:pathToSave.length,hasOnEnd:!!onEnd},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H6',runId:'post-fix'})}).catch(()=>{});
-                // #endregion
                 onEnd?.();
-                // #region agent log
-                fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:63',message:'onEnd called',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1',runId:'post-fix'})}).catch(()=>{});
-                // #endregion
-                if (pathToSave && pathToSave.length > 2) {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:64',message:'Path check passed, adding to paths',data:{pathToSave:pathToSave.substring(0,50),pathLength:pathToSave.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H7',runId:'post-fix'})}).catch(()=>{});
-                    // #endregion
+                const pointsToSave = currentPointsRef.current;
+
+                if (pointsToSave && pointsToSave.length > 1) {
                     const newPath = {
-                        path: pathToSave,
+                        points: pointsToSave,
                         key: `path-${pathKeyRef.current++}`,
                     };
                     setPaths((prev) => [...prev, newPath]);
-                    currentPathRef.current = '';
-                    setCurrentPath('');
-                    // #region agent log
-                    fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:70',message:'Calling onSignatureChange(true)',data:{hasCallback:!!onSignatureChange},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H8',runId:'post-fix'})}).catch(()=>{});
-                    // #endregion
+                    currentPointsRef.current = [];
+                    setCurrentPoints([]);
+                    lastPointRef.current = null;
                     onSignatureChange?.(true);
                 } else {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:72',message:'Path check FAILED, discarding',data:{pathToSave:pathToSave.substring(0,50),pathLength:pathToSave.length,hasPath:!!pathToSave},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H6,H9',runId:'post-fix'})}).catch(()=>{});
-                    // #endregion
-                    currentPathRef.current = '';
-                    setCurrentPath('');
+                    currentPointsRef.current = [];
+                    setCurrentPoints([]);
+                    lastPointRef.current = null;
                 }
             },
             onPanResponderTerminate: () => {
                 onEnd?.();
-                currentPathRef.current = '';
-                setCurrentPath('');
+                currentPointsRef.current = [];
+                setCurrentPoints([]);
+                lastPointRef.current = null;
             },
         })
     ).current;
 
     const handleReset = () => {
-        // #region agent log
-        fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SignatureField.tsx:82',message:'handleReset called',data:{pathsCount:paths.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5,H7',runId:'post-fix'})}).catch(()=>{});
-        // #endregion
         setPaths([]);
-        currentPathRef.current = '';
-        setCurrentPath('');
+        currentPointsRef.current = [];
+        setCurrentPoints([]);
         pathKeyRef.current = 0;
+        lastPointRef.current = null;
         onSignatureChange?.(false);
     };
 
-    const hasSignature = paths.length > 0 || currentPath.length > 0;
+    const hasSignature = paths.length > 0 || currentPoints.length > 0;
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.label}>Sign your promise</Text>
+                <Text style={styles.label}>{label}</Text>
                 {hasSignature && (
                     <TouchableOpacity
                         style={styles.resetButton}
@@ -135,36 +139,103 @@ export default function SignatureField({ onSignatureChange, onBegin, onEnd }: Si
                     </TouchableOpacity>
                 )}
             </View>
-            <View style={styles.signatureContainer} {...panResponder.panHandlers}>
+            <View style={[styles.signatureContainer, { backgroundColor: '#ffffff' }]} {...panResponder.panHandlers}>
                 <Svg
                     width={SIGNATURE_WIDTH}
-                    height={SIGNATURE_HEIGHT}
+                    height={CANVAS_HEIGHT}
                     style={styles.svg}
+                    pointerEvents="none"
                 >
-                    {paths.map((pathData) => (
-                        <Path
-                            key={pathData.key}
-                            d={pathData.path}
-                            stroke={looviColors.text.primary}
-                            strokeWidth={2}
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    ))}
-                    {currentPath && (
-                        <Path
-                            d={currentPath}
-                            stroke={looviColors.text.primary}
-                            strokeWidth={2}
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
+                    {/* Render completed paths */}
+                    {paths.map((pathData) => {
+                        if (pathData.points.length === 0) return null;
+
+                        return (
+                            <React.Fragment key={pathData.key}>
+                                {/* Render each segment with its width */}
+                                {pathData.points.map((point, index) => {
+                                    if (index === 0) {
+                                        // First point - just a circle
+                                        return (
+                                            <Circle
+                                                key={`${pathData.key}-${index}`}
+                                                cx={point.x}
+                                                cy={point.y}
+                                                r={point.width / 2}
+                                                fill="#1a1a2e"
+                                            />
+                                        );
+                                    }
+
+                                    const prevPoint = pathData.points[index - 1];
+                                    return (
+                                        <React.Fragment key={`${pathData.key}-${index}`}>
+                                            {/* Line segment */}
+                                            <Line
+                                                x1={prevPoint.x}
+                                                y1={prevPoint.y}
+                                                x2={point.x}
+                                                y2={point.y}
+                                                stroke="#1a1a2e"
+                                                strokeWidth={(prevPoint.width + point.width) / 2}
+                                                strokeLinecap="round"
+                                            />
+                                            {/* Point circle for smooth joins */}
+                                            <Circle
+                                                cx={point.x}
+                                                cy={point.y}
+                                                r={point.width / 2}
+                                                fill="#1a1a2e"
+                                            />
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </React.Fragment>
+                        );
+                    })}
+
+                    {/* Render current drawing path */}
+                    {currentPoints.length > 0 && (
+                        <React.Fragment>
+                            {currentPoints.map((point, index) => {
+                                if (index === 0) {
+                                    return (
+                                        <Circle
+                                            key={`current-${index}`}
+                                            cx={point.x}
+                                            cy={point.y}
+                                            r={point.width / 2}
+                                            fill="#1a1a2e"
+                                        />
+                                    );
+                                }
+
+                                const prevPoint = currentPoints[index - 1];
+                                return (
+                                    <React.Fragment key={`current-${index}`}>
+                                        <Line
+                                            x1={prevPoint.x}
+                                            y1={prevPoint.y}
+                                            x2={point.x}
+                                            y2={point.y}
+                                            stroke="#1a1a2e"
+                                            strokeWidth={(prevPoint.width + point.width) / 2}
+                                            strokeLinecap="round"
+                                        />
+                                        <Circle
+                                            cx={point.x}
+                                            cy={point.y}
+                                            r={point.width / 2}
+                                            fill="#1a1a2e"
+                                        />
+                                    </React.Fragment>
+                                );
+                            })}
+                        </React.Fragment>
                     )}
                 </Svg>
                 {!hasSignature && (
-                    <View style={styles.placeholder}>
+                    <View style={styles.placeholder} pointerEvents="none">
                         <Text style={styles.placeholderText}>
                             Draw your signature here
                         </Text>
@@ -205,13 +276,22 @@ const styles = StyleSheet.create({
     // Removed resetButtonText since we use an icon now
     signatureContainer: {
         width: SIGNATURE_WIDTH,
-        height: SIGNATURE_HEIGHT,
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+        height: CANVAS_HEIGHT,
+        backgroundColor: '#ffffff',
+        opacity: 1, // Force opacity
         borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 0, 0, 0.1)',
+        borderWidth: 0,
         overflow: 'hidden',
         position: 'relative',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
+        zIndex: 10,
     },
     svg: {
         position: 'absolute',
