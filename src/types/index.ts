@@ -119,6 +119,7 @@ export type RootStackParamList = {
     DistractionTask: { taskId: string };
     PostDetail: { post: Post };
     VerificationPending: undefined;
+    Paywall: undefined;
 };
 
 // Community Posts

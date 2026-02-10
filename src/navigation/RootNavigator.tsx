@@ -498,6 +498,14 @@ export default function RootNavigator() {
                         headerShown: false,
                     }}
                 />
+                <RootStack.Screen
+                    name="Paywall"
+                    component={PaywallScreen}
+                    options={{
+                        presentation: 'fullScreenModal',
+                        animation: 'slide_from_bottom',
+                    }}
+                />
             </RootStack.Navigator>
         </NavigationContainer>
     );
