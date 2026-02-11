@@ -42,6 +42,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppIcon } from '../components/OnboardingIcon';
 import * as Haptics from 'expo-haptics';
 import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
+import CancellationOfferScreen from '../components/CancellationOfferScreen';
 
 interface MenuItem {
     id: string;
@@ -78,7 +79,10 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
         title: 'Developer',
         items: [
             { id: 'viewNotifications', emoji: '📅', label: 'View Scheduled Notifications' },
+            { id: 'scheduleTestNotifications', emoji: '🔔', label: 'Schedule Test Notifications' },
             { id: 'testPaywall', emoji: '💳', label: 'Test Paywall Flow' },
+            { id: 'testCancellationOffer', emoji: '🎁', label: 'Test Cancellation Offers' },
+            { id: 'testTrialNotification', emoji: '⏰', label: 'Test Trial Notification' },
             { id: 'resetOnboarding', emoji: '🔄', label: 'Reset Onboarding' },
             { id: 'clearData', emoji: '🗑️', label: 'Clear All Data' },
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
@@ -97,8 +101,9 @@ export default function ProfileScreen() {
     const { onboardingData, streakData, updateOnboardingData, latestHealthScore, todayCheckIn } = useUserData();
     const { user, isAuthenticated, firebaseUser, refreshUser } = useAuthContext();
     const { signOut } = useAuth();
-    const { restorePurchases, isPremium, customerInfo } = useRevenueCat();
+    const { restorePurchases, isPremium, customerInfo, currentOffering, purchasePackage } = useRevenueCat();
     const navigation = useNavigation<any>();
+    const [showCancellationOffer, setShowCancellationOffer] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -310,12 +315,25 @@ export default function ProfileScreen() {
             const summary = await notificationService.getNotificationsSummary();
 
             if (summary.count === 0) {
-                Alert.alert('Scheduled Notifications', 'No notifications scheduled.');
+                Alert.alert(
+                    'Scheduled Notifications', 
+                    'No notifications scheduled.\n\nTo test:\n• Use "Test Trial Notification" to schedule a test reminder',
+                    [{ text: 'OK' }]
+                );
                 return;
             }
 
+            // Format notification details more clearly
             const notificationList = summary.notifications
-                .map((n, i) => `${i + 1}. ${n.title}\n   ${n.scheduledFor}\n   Type: ${n.type}`)
+                .map((n, i) => {
+                    const details = [
+                        `${i + 1}. ${n.title}`,
+                        `   Scheduled: ${n.scheduledFor}`,
+                        `   Type: ${n.type}`,
+                        `   ID: ${n.id}`
+                    ];
+                    return details.join('\n');
+                })
                 .join('\n\n');
 
             Alert.alert(
@@ -335,6 +353,57 @@ export default function ProfileScreen() {
             );
         } catch (error: any) {
             Alert.alert('Error', 'Failed to load notifications: ' + error.message);
+        }
+    };
+
+    const handleScheduleTestNotifications = async () => {
+        try {
+            const { notificationService } = await import('../services/notificationService');
+            const Notifications = await import('expo-notifications');
+            
+            // Check permissions first
+            const { status } = await Notifications.default.getPermissionsAsync();
+            
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permissions Required',
+                    'Notification permissions are not granted. Please enable notifications in your device settings.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+
+            // Schedule all daily reminders
+            await notificationService.scheduleDailyReminder(20, 0);
+            await notificationService.scheduleAllDailyReminders();
+            
+            // Also schedule a test notification for 1 minute from now
+            const testDate = new Date();
+            testDate.setMinutes(testDate.getMinutes() + 1);
+            
+            await Notifications.default.scheduleNotificationAsync({
+                content: {
+                    title: '🧪 Test Notification',
+                    body: 'This is a test notification scheduled for 1 minute from now.',
+                    sound: true,
+                    data: {
+                        type: 'test',
+                    },
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: testDate,
+                },
+                identifier: 'test-notification',
+            });
+
+            Alert.alert(
+                'Notifications Scheduled',
+                `✅ All daily reminders scheduled!\n\n• Daily check-in: 20:00\n• Food logging: 15:00\n• Wellness check-in: 21:00\n• Test notification: ${testDate.toLocaleTimeString()}\n\nUse "View Scheduled Notifications" to verify.`,
+                [{ text: 'OK' }]
+            );
+        } catch (error: any) {
+            Alert.alert('Error', 'Failed to schedule notifications: ' + error.message);
         }
     };
 
@@ -641,8 +710,34 @@ export default function ProfileScreen() {
                                                     case 'help': Linking.openURL('mailto:support@sugar-reset.com'); break;
                                                     case 'feedback': Linking.openURL('mailto:feedback@sugar-reset.com'); break;
                                                     case 'rate': StoreReview.requestReview(); break;
-                                                    // case 'viewNotifications': setShowNotificationDebug(true); break;
+                                                    case 'viewNotifications': handleViewNotifications(); break;
+                                                    case 'scheduleTestNotifications': handleScheduleTestNotifications(); break;
                                                     case 'testPaywall': navigation.navigate('Paywall'); break;
+                                                    case 'testCancellationOffer': {
+                                                        setShowCancellationOffer(true);
+                                                        break;
+                                                    }
+                                                    case 'testTrialNotification': {
+                                                        // Schedule a test trial notification (2 days from now)
+                                                        const testExpirationDate = new Date();
+                                                        testExpirationDate.setDate(testExpirationDate.getDate() + 2);
+                                                        testExpirationDate.setHours(10, 0, 0, 0);
+                                                        
+                                                        import('../services/notificationService').then(({ notificationService }) => {
+                                                            notificationService.scheduleTrialExpirationReminder(testExpirationDate)
+                                                                .then(() => {
+                                                                    Alert.alert(
+                                                                        'Test Notification Scheduled',
+                                                                        `Trial expiration reminder scheduled for:\n${testExpirationDate.toLocaleString()}\n\nThis simulates a trial ending in 2 days.`,
+                                                                        [{ text: 'OK' }]
+                                                                    );
+                                                                })
+                                                                .catch((error) => {
+                                                                    Alert.alert('Error', 'Failed to schedule test notification: ' + error.message);
+                                                                });
+                                                        });
+                                                        break;
+                                                    }
                                                     case 'resetOnboarding':
                                                         Alert.alert(
                                                             'Reset Onboarding',
@@ -842,6 +937,48 @@ export default function ProfileScreen() {
                         visible={showNotificationSettings}
                         onClose={() => setShowNotificationSettings(false)}
                     />
+
+                    {/* Cancellation Offer Modal (Developer Testing) */}
+                    {__DEV__ && (
+                        <CancellationOfferScreen
+                            visible={showCancellationOffer}
+                            onClose={() => setShowCancellationOffer(false)}
+                            onAcceptYearly={async () => {
+                                if (currentOffering?.annual) {
+                                    try {
+                                        await purchasePackage(currentOffering.annual);
+                                        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                        Alert.alert('Success', 'Yearly subscription accepted!');
+                                        setShowCancellationOffer(false);
+                                    } catch (error: any) {
+                                        if (error.message !== 'Purchase cancelled') {
+                                            Alert.alert('Error', error.message || 'Purchase failed');
+                                        }
+                                    }
+                                }
+                            }}
+                            onAcceptLifetime={async () => {
+                                if (currentOffering?.lifetime) {
+                                    try {
+                                        await purchasePackage(currentOffering.lifetime);
+                                        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                        Alert.alert('Success', 'Lifetime subscription accepted!');
+                                        setShowCancellationOffer(false);
+                                    } catch (error: any) {
+                                        if (error.message !== 'Purchase cancelled') {
+                                            Alert.alert('Error', error.message || 'Purchase failed');
+                                        }
+                                    }
+                                } else {
+                                    Alert.alert('Not Available', 'Lifetime package not configured in RevenueCat. Check RevenueCat Dashboard → Offerings.');
+                                }
+                            }}
+                            onContinueFree={() => {
+                                Alert.alert('Free Tier', 'Continuing with free tier');
+                                setShowCancellationOffer(false);
+                            }}
+                        />
+                    )}
                 </SafeAreaView>
             </LooviBackground >
         </>

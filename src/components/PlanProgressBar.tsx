@@ -6,7 +6,8 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { GlassCard } from './GlassCard';
@@ -50,12 +51,15 @@ interface PlanProgressBarProps {
     planDuration: number;
     /** Plan end date */
     endDate?: Date;
+    /** Callback when info button is pressed */
+    onInfoPress?: () => void;
 }
 
 export function PlanProgressBar({
     daysSinceStart,
     planDuration,
     endDate,
+    onInfoPress,
 }: PlanProgressBarProps) {
     // Calculate progress percentage (capped at 100%)
     const progressPercent = Math.min(100, Math.round((daysSinceStart / planDuration) * 100));
@@ -72,8 +76,15 @@ export function PlanProgressBar({
 
     return (
         <GlassCard variant="light" style={styles.container}>
-            {/* Header Label */}
-            <Text style={styles.headerLabel}>Habit Formation Progress</Text>
+            {/* Header Label with Info Button */}
+            <View style={styles.headerRow}>
+                <Text style={styles.headerLabel}>Habit Formation Progress</Text>
+                {onInfoPress && (
+                    <TouchableOpacity onPress={onInfoPress} activeOpacity={0.7}>
+                        <Ionicons name="information-circle" size={18} color={looviColors.text.tertiary} />
+                    </TouchableOpacity>
+                )}
+            </View>
 
             {/* Phase Title - Above Progress Bar */}
             <Text style={styles.phaseTitle}>{currentPhase.name}</Text>
@@ -110,13 +121,18 @@ const styles = StyleSheet.create({
         paddingTop: spacing.xs,
         paddingBottom: spacing.sm,
     },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
     headerLabel: {
         fontSize: 11,
         fontWeight: '600',
         color: looviColors.text.tertiary,
         textTransform: 'uppercase',
         letterSpacing: 1,
-        marginBottom: spacing.xs,
     },
     phaseTitle: {
         fontSize: 13,

@@ -164,6 +164,13 @@ export default function TrackingScreen() {
 
             await AsyncStorage.setItem(WELLNESS_LOGS_KEY, JSON.stringify(logs));
 
+            // Cancel wellness check-in reminder if user completed it today
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (log.date === todayStr) {
+                const { notificationService } = await import('../services/notificationService');
+                await notificationService.cancelWellnessCheckInReminder();
+            }
+
             // If thoughts were provided, also create a journal entry so it appears in Journal section
             if (log.thoughts && log.thoughts.trim()) {
                 // Determine mood based on the mood rating (1-5 scale)

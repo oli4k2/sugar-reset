@@ -203,7 +203,31 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
         try {
             setIsPurchasing(true);
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await purchasePackage(selectedPackage);
+
+            // Check if purchasePackage is available
+            if (!purchasePackage) {
+                console.error('purchasePackage function is not available');
+                Alert.alert('Error', 'Subscription service is not available. Please try again later.');
+                setIsPurchasing(false);
+                return;
+            }
+
+            const customerInfo = await purchasePackage(selectedPackage);
+
+            // Schedule trial expiration reminder (2 days before trial ends)
+            if (customerInfo?.entitlements?.active?.['premium']?.periodType === 'TRIAL' &&
+                customerInfo.entitlements.active['premium'].expirationDate) {
+                try {
+                    const expirationDate = new Date(customerInfo.entitlements.active['premium'].expirationDate);
+                    const { notificationService } = await import('../../services/notificationService');
+                    await notificationService.scheduleTrialExpirationReminder(expirationDate);
+                    console.log('✅ Scheduled trial expiration reminder for', expirationDate.toLocaleDateString());
+                } catch (notifError) {
+                    console.warn('Could not schedule trial reminder:', notifError);
+                    // Don't fail the purchase if notification scheduling fails
+                }
+            }
+
             await completeOnboarding();
 
             if (!isAuthenticated) {
@@ -281,9 +305,9 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 <View style={styles.phonePreview}>
                     <View style={styles.phoneMockup}>
                         <Image
-                            source={require('../../public/mascot.png')}
+                            source={{ uri: 'https://images.pexels.com/photos/2097090/pexels-photo-2097090.jpeg?auto=compress&cs=tinysrgb&w=800' }}
                             style={styles.previewImage}
-                            resizeMode="contain"
+                            resizeMode="cover"
                         />
                         <View style={styles.previewOverlay}>
                             <View style={styles.scannerCorners}>

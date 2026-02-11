@@ -18,13 +18,58 @@ import { friendService } from './friendService';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+        // Check if this is a conditional notification that should only show if action not completed
+        const notificationType = notification.request.content.data?.type;
+        
+        if (notificationType === 'food_logging_reminder') {
+            // Check if user has already logged food today
+            try {
+                const { hasLoggedFoodToday } = await import('../services/streakService');
+                const hasLogged = await hasLoggedFoodToday();
+                if (hasLogged) {
+                    // User already logged food, don't show notification
+                    return {
+                        shouldShowAlert: false,
+                        shouldPlaySound: false,
+                        shouldSetBadge: false,
+                    };
+                }
+            } catch (error) {
+                console.error('Error checking food log status:', error);
+            }
+        } else if (notificationType === 'wellness_checkin_reminder') {
+            // Check if user has already done wellness check-in today
+            try {
+                const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                const todayStr = new Date().toISOString().split('T')[0];
+                const stored = await AsyncStorage.getItem('wellness_logs');
+                if (stored) {
+                    const logs = JSON.parse(stored);
+                    const todayLog = logs.find((log: any) => log.date === todayStr);
+                    if (todayLog) {
+                        // User already did wellness check-in, don't show notification
+                        return {
+                            shouldShowAlert: false,
+                            shouldPlaySound: false,
+                            shouldSetBadge: false,
+                        };
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking wellness check-in status:', error);
+            }
+        }
+        
+        // Default: show notification
+        return {
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
+        };
+    },
 });
 
 export interface NotificationPayload {
@@ -366,10 +411,11 @@ export const notificationService = {
 
     /**
      * Schedule a local daily check-in reminder
+     * Note: This does NOT cancel other notifications - only schedules/updates this one
      */
     async scheduleDailyReminder(hour: number = 20, minute: number = 0): Promise<void> {
-        // Cancel existing reminders first
-        await Notifications.cancelAllScheduledNotificationsAsync();
+        // Cancel only this specific reminder if it exists
+        await Notifications.cancelScheduledNotificationAsync('daily-checkin-reminder');
 
         // Schedule daily reminder at specified time
         await Notifications.scheduleNotificationAsync({
@@ -377,13 +423,139 @@ export const notificationService = {
                 title: '📝 Daily Check-in',
                 body: "How are you doing today? Log your progress!",
                 sound: true,
+                data: {
+                    type: 'daily_checkin',
+                },
             },
             trigger: {
                 type: Notifications.SchedulableTriggerInputTypes.DAILY,
                 hour,
                 minute,
             },
+            identifier: 'daily-checkin-reminder',
         });
+    },
+
+    /**
+     * Schedule all daily reminders (food logging, wellness check-in, etc.)
+     * Call this when notifications are enabled or app starts
+     */
+    async scheduleAllDailyReminders(): Promise<void> {
+        try {
+            // Check permissions first
+            const { status } = await Notifications.getPermissionsAsync();
+            if (status !== 'granted') {
+                console.warn('⚠️ Notification permissions not granted, cannot schedule reminders');
+                return;
+            }
+
+            // Schedule food logging reminder at 15:00 (3 PM)
+            await this.scheduleFoodLoggingReminder();
+            
+            // Schedule wellness check-in reminder at 21:00 (9 PM)
+            await this.scheduleWellnessCheckInReminder();
+            
+            console.log('✅ All daily reminders scheduled');
+        } catch (error) {
+            console.error('❌ Failed to schedule daily reminders:', error);
+            throw error; // Re-throw so caller knows it failed
+        }
+    },
+
+    /**
+     * Schedule daily food logging reminder at 15:00 (3 PM)
+     * Only shows if user hasn't logged food yet today
+     * This uses a daily trigger that checks condition when fired
+     */
+    async scheduleFoodLoggingReminder(): Promise<void> {
+        try {
+            // Cancel any existing food logging reminders
+            await Notifications.cancelScheduledNotificationAsync('food-logging-reminder');
+
+            // Schedule daily reminder at 15:00 (3 PM)
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '🍎 Time to log your food!',
+                    body: 'Haven\'t logged any food today? Track your meals to keep your streak going!',
+                    sound: true,
+                    data: {
+                        type: 'food_logging_reminder',
+                    },
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DAILY,
+                    hour: 15,
+                    minute: 0,
+                },
+                identifier: 'food-logging-reminder',
+            });
+
+            console.log('📅 Scheduled food logging reminder for 15:00 daily');
+        } catch (error) {
+            console.error('❌ Failed to schedule food logging reminder:', error);
+        }
+    },
+
+    /**
+     * Schedule daily wellness check-in reminder at 21:00 (9 PM)
+     * Only shows if user hasn't done wellness check-in yet today
+     */
+    async scheduleWellnessCheckInReminder(): Promise<void> {
+        try {
+            // Check permissions
+            const { status } = await Notifications.getPermissionsAsync();
+            if (status !== 'granted') {
+                console.warn('⚠️ Notification permissions not granted, cannot schedule wellness check-in reminder');
+                return;
+            }
+
+            // Cancel any existing wellness check-in reminders
+            await Notifications.cancelScheduledNotificationAsync('wellness-checkin-reminder');
+
+            // Schedule daily reminder at 21:00 (9 PM)
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '💚 Don\'t forget your wellness check-in!',
+                    body: 'How are you feeling today? Complete your wellness check-in to track your progress.',
+                    sound: true,
+                    data: {
+                        type: 'wellness_checkin_reminder',
+                    },
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DAILY,
+                    hour: 21,
+                    minute: 0,
+                },
+                identifier: 'wellness-checkin-reminder',
+            });
+
+            console.log('📅 Scheduled wellness check-in reminder for 21:00 daily');
+        } catch (error) {
+            console.error('❌ Failed to schedule wellness check-in reminder:', error);
+        }
+    },
+
+    /**
+     * Cancel food logging reminder
+     */
+    async cancelFoodLoggingReminder(): Promise<void> {
+        try {
+            await Notifications.cancelScheduledNotificationAsync('food-logging-reminder');
+        } catch (error) {
+            // Notification might not exist, that's fine
+        }
+    },
+
+    /**
+     * Cancel wellness check-in reminder
+     */
+    async cancelWellnessCheckInReminder(): Promise<void> {
+        try {
+            await Notifications.cancelScheduledNotificationAsync('wellness-checkin-reminder');
+        } catch (error) {
+            // Notification might not exist, that's fine
+        }
     },
 
     /**
@@ -436,6 +608,61 @@ export const notificationService = {
         });
 
         console.log(`📅 Scheduled grace period warning for ${tomorrow.toLocaleString()}`);
+    },
+
+    /**
+     * Schedule trial expiration reminder notification
+     * Sends notification 2 days before trial expires
+     * @param expirationDate - Date when trial expires
+     */
+    async scheduleTrialExpirationReminder(expirationDate: Date): Promise<void> {
+        try {
+            // Calculate reminder date (2 days before expiration)
+            const reminderDate = new Date(expirationDate);
+            reminderDate.setDate(reminderDate.getDate() - 2);
+            reminderDate.setHours(10, 0, 0, 0); // 10 AM reminder
+
+            // Don't schedule if reminder date is in the past
+            if (reminderDate <= new Date()) {
+                console.log('⚠️ Trial expiration reminder date is in the past, skipping');
+                return;
+            }
+
+            // Cancel any existing trial expiration reminders
+            await this.cancelTrialExpirationReminders();
+
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '⏰ Your trial ends soon!',
+                    body: 'Your 3-day free trial ends in 2 days. Subscribe to keep your premium features!',
+                    sound: true,
+                    data: {
+                        type: 'trial_expiration_reminder',
+                        expirationDate: expirationDate.toISOString(),
+                    },
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: reminderDate,
+                },
+                identifier: 'trial-expiration-reminder',
+            });
+
+            console.log(`📅 Scheduled trial expiration reminder for ${reminderDate.toLocaleString()}`);
+        } catch (error) {
+            console.error('❌ Failed to schedule trial expiration reminder:', error);
+        }
+    },
+
+    /**
+     * Cancel all trial expiration reminder notifications
+     */
+    async cancelTrialExpirationReminders(): Promise<void> {
+        try {
+            await Notifications.cancelScheduledNotificationAsync('trial-expiration-reminder');
+        } catch (error) {
+            console.error('Failed to cancel trial expiration reminders:', error);
+        }
     },
 
     /**

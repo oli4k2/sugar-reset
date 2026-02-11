@@ -21,7 +21,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
-import { useUserData } from '../../context/UserDataContext';
 
 type WelcomeScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Welcome'>;
@@ -93,32 +92,6 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
             screen: 'Login',
             params: { fromOnboardingWelcome: true },
         });
-    };
-
-    // DEV: Skip onboarding for testing
-    const { updateOnboardingData, completeOnboarding } = useUserData();
-    const handleDevSkip = async () => {
-        try {
-            console.log('DEV SKIP: Starting...');
-            await updateOnboardingData({
-                plan: 'cold_turkey',
-                goals: ['health', 'energy'],
-                nickname: 'Tester',
-                dailySugarGrams: 50,
-                startDate: new Date().toISOString(),
-            });
-            console.log('DEV SKIP: Data updated, completing...');
-            await completeOnboarding();
-            console.log('DEV SKIP: Complete! Navigating...');
-            // Navigate to main app
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Main' as any }],
-            });
-        } catch (error) {
-            console.error('DEV SKIP Error:', error);
-            Alert.alert('Dev Skip Error', String(error));
-        }
     };
 
     return (
@@ -199,18 +172,6 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
                                     Already have an account? Log In
                                 </Text>
                             </TouchableOpacity>
-
-                            {/* DEV: Skip button for testing */}
-                            {__DEV__ && (
-                                <TouchableOpacity
-                                    style={styles.devSkipButton}
-                                    onPress={handleDevSkip}
-                                    activeOpacity={0.5}
-                                    hitSlop={{ top: 20, bottom: 20, left: 40, right: 40 }}
-                                >
-                                    <Text style={styles.devSkipText}>⚡ DEV SKIP ⚡</Text>
-                                </TouchableOpacity>
-                            )}
                         </View>
                     </Animated.View>
                 </SafeAreaView>
@@ -289,15 +250,5 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '500',
         color: looviColors.text.tertiary,
-    },
-    devSkipButton: {
-        paddingVertical: spacing.sm,
-        alignItems: 'center',
-        marginTop: spacing.md,
-    },
-    devSkipText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#F59E0B',
     },
 });

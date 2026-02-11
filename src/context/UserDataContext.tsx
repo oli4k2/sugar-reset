@@ -8,6 +8,7 @@
 
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onboardingService, OnboardingData, OnboardingCheckpoint } from '../services/onboardingService';
 import { useAuthContext } from './AuthContext';
 import { userService } from '../services/userService';
@@ -108,6 +109,28 @@ interface UserDataProviderProps {
 }
 
 export function UserDataProvider({ children }: UserDataProviderProps) {
+    // Schedule daily reminders when app starts (if notifications are enabled)
+    useEffect(() => {
+        const scheduleRemindersOnStart = async () => {
+            try {
+                const stored = await AsyncStorage.getItem('notification_settings');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    const notificationsEnabled = parsed.allEnabled ?? (parsed.pledge ?? parsed.journal ?? parsed.streak ?? parsed.community ?? false);
+                    
+                    if (notificationsEnabled) {
+                        const { notificationService } = await import('../services/notificationService');
+                        await notificationService.scheduleAllDailyReminders();
+                        console.log('✅ Scheduled daily reminders on app start');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to schedule reminders on start:', error);
+            }
+        };
+        
+        scheduleRemindersOnStart();
+    }, []);
     const { user, isAuthenticated } = useAuthContext();
     const userId = user?.id; // Extract stable value
 
@@ -333,6 +356,11 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             } else {
                 // User has logged food or not in grace period - cancel any pending warnings
                 await notificationService.cancelGracePeriodWarnings();
+            }
+
+            // Cancel food logging reminder if user has logged food today
+            if (result.todayStatus?.hasLogs) {
+                await notificationService.cancelFoodLoggingReminder();
             }
         } catch (error) {
             console.error('Error calculating streak from food logs:', error);

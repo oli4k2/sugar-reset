@@ -58,12 +58,27 @@ const createMockOffering = (): PurchasesOffering => {
     offeringIdentifier: 'default',
   } as PurchasesPackage;
 
+  const lifetimePackage: PurchasesPackage = {
+    identifier: 'lifetime',
+    packageType: 'LIFETIME',
+    product: {
+      identifier: 'premium_lifetime',
+      description: 'Premium Lifetime Access',
+      title: 'Premium Lifetime',
+      price: 99.99,
+      priceString: '$99.99',
+      currencyCode: 'USD',
+      introPrice: null,
+    },
+    offeringIdentifier: 'default',
+  } as PurchasesPackage;
+
   return {
     identifier: 'default',
     serverDescription: 'Premium Subscription',
     metadata: {},
-    availablePackages: [monthlyPackage, yearlyPackage],
-    lifetime: null,
+    availablePackages: [monthlyPackage, yearlyPackage, lifetimePackage],
+    lifetime: lifetimePackage,
     annual: yearlyPackage,
     sixMonth: null,
     threeMonth: null,

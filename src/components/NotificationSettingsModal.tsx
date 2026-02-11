@@ -78,8 +78,9 @@ export function NotificationSettingsModal({ visible, onClose }: NotificationSett
                     const token = await notificationService.registerForPushNotifications(user.id);
 
                     if (token) {
-                        // Schedule daily reminder at 8 PM
+                        // Schedule all daily reminders
                         await notificationService.scheduleDailyReminder(20, 0);
+                        await notificationService.scheduleAllDailyReminders();
                         console.log('✅ Notifications enabled with token:', token);
                     } else {
                         // Permission denied or not on device

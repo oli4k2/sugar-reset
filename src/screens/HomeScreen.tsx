@@ -62,6 +62,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import { MascotTip } from '../components/MascotTip';
 import { friendService } from '../services/friendService';
+import StreakInfoModal from '../components/StreakInfoModal';
 
 function formatDuration(ms: number) {
     const seconds = Math.floor((ms / 1000) % 60);
@@ -109,6 +110,7 @@ export default function HomeScreen() {
     const [todayWellnessData, setTodayWellnessData] = useState<WellnessLog | null>(null);
     const [hasInnerCircleFriends, setHasInnerCircleFriends] = useState(false);
     const [hasCommunityTipDoneToday, setHasCommunityTipDoneToday] = useState(false);
+    const [showStreakInfoModal, setShowStreakInfoModal] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const fallbackDateRef = useRef(new Date().toISOString()); // Stable fallback
     const navigation = useNavigation<any>(); // Type as any to allow navigation to new modal screens
@@ -349,6 +351,13 @@ export default function HomeScreen() {
 
             await AsyncStorage.setItem('wellness_logs', JSON.stringify(logs));
 
+            // Cancel wellness check-in reminder if user completed it today
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (log.date === todayStr) {
+                const { notificationService } = await import('../services/notificationService');
+                await notificationService.cancelWellnessCheckInReminder();
+            }
+
             // Also save journal entry if thoughts are provided
             if (log.thoughts && log.thoughts.trim()) {
                 const moodMap: Record<number, 'great' | 'good' | 'okay' | 'struggling' | 'difficult'> = {
@@ -503,21 +512,30 @@ export default function HomeScreen() {
                         {/* Growth Animation Section */}
                         <View style={styles.timerSection}>
                             {/* Streak Badge - Above Animation */}
-                            <View style={styles.streakBadge}>
+                            <TouchableOpacity 
+                                style={styles.streakBadge}
+                                onPress={() => setShowStreakInfoModal(true)}
+                                activeOpacity={0.7}
+                            >
                                 <View style={styles.streakRow}>
                                     <AppIcon emoji="🔥" size={16} />
                                     <Text style={styles.streakText}> Sugar-free streak</Text>
+                                    <Ionicons name="information-circle" size={16} color="#D97706" style={{ marginLeft: 4 }} />
                                 </View>
-                            </View>
+                            </TouchableOpacity>
 
                             {/* Growth Animation instead of number */}
-                            <View style={styles.animationWrapper}>
+                            <TouchableOpacity 
+                                style={styles.animationWrapper}
+                                onPress={() => setShowStreakInfoModal(true)}
+                                activeOpacity={0.7}
+                            >
                                 <Image
                                     source={require('../public/sprout.png')}
                                     style={{ width: 150, height: 150, marginBottom: spacing.sm, marginTop: spacing['2xl'] }}
                                     resizeMode="contain"
                                 />
-                            </View>
+                            </TouchableOpacity>
 
                             {/* Live Timer - floating below animation with days */}
                             <View style={styles.floatingTimer}>
@@ -532,6 +550,7 @@ export default function HomeScreen() {
                             daysSinceStart={daysSugarFree}
                             planDuration={planType === 'cold_turkey' ? 30 : 42}
                             endDate={new Date(startDate.getTime() + (planType === 'cold_turkey' ? 30 : 42) * 24 * 60 * 60 * 1000)}
+                            onInfoPress={() => setShowStreakInfoModal(true)}
                         />
 
                         {/* Action Buttons: Pledge, Logging, Journal - Daily Journey */}
@@ -1100,6 +1119,12 @@ export default function HomeScreen() {
                         onSave={handleWellnessSave}
                         selectedDate={new Date().toISOString().split('T')[0]}
                         existingData={todayWellnessData}
+                    />
+
+                    {/* Streak Info Modal */}
+                    <StreakInfoModal
+                        visible={showStreakInfoModal}
+                        onClose={() => setShowStreakInfoModal(false)}
                     />
                 </SafeAreaView>
             </LooviBackground >

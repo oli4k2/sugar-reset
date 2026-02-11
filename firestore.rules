@@ -178,6 +178,35 @@ service cloud.firestore {
     }
     
     // ================================
+    // REFERRALS
+    // ================================
+    
+    match /referrals/{userId} {
+      // Users can read their own referral data
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      // Users can create their own referral data
+      allow create: if isAuthenticated() && isOwner(userId) &&
+        request.resource.data.referralCode is string &&
+        request.resource.data.referralCount == 0 &&
+        request.resource.data.referredUsers == [];
+      
+      // Users can update their own referral data (for incrementing counts, etc.)
+      // But they cannot change their referralCode or referredBy
+      allow update: if isAuthenticated() && isOwner(userId) &&
+        request.resource.data.referralCode == resource.data.referralCode &&
+        (!('referredBy' in request.resource.data) || request.resource.data.referredBy == resource.data.referredBy);
+      
+      // Users cannot delete their referral data
+      allow delete: if false;
+      
+      // Allow querying by referralCode (for finding referrers)
+      // This is needed for the findUserByReferralCode function
+      // Note: Firestore rules don't directly control queries, but we ensure
+      // that only authenticated users can read referral data
+    }
+    
+    // ================================
     // ADMINS (Content Moderation)
     // ================================
     
