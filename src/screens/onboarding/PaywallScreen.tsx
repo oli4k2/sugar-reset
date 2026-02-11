@@ -23,6 +23,7 @@ import { GlassCard } from '../../components/GlassCard';
 import { useRevenueCat } from '../../hooks/useRevenueCat';
 import { useUserData } from '../../context/UserDataContext';
 import { useAuthContext } from '../../context/AuthContext';
+import { usePostHog } from 'posthog-react-native';
 import * as Haptics from 'expo-haptics';
 
 type PaywallScreenProps = {
@@ -67,9 +68,18 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium } = useRevenueCat();
     const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint } = useUserData();
     const { isAuthenticated } = useAuthContext();
+    const posthog = usePostHog();
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [isRestoring, setIsRestoring] = useState(false);
+
+    // Track paywall viewed
+    useEffect(() => {
+        posthog?.capture('paywall_viewed', {
+            is_authenticated: isAuthenticated,
+            is_premium: isPremium
+        });
+    }, []);
 
     // Set default selected package when offerings load
     useEffect(() => {
@@ -83,7 +93,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
 
     // Milestone checkpoint: end of onboarding flow (paywall reached).
     useEffect(() => {
-        setOnboardingCheckpoint('Paywall').catch(() => {});
+        setOnboardingCheckpoint('Paywall').catch(() => { });
     }, [setOnboardingCheckpoint]);
 
     // Navigate away if user is already premium (but only if not loading and RevenueCat is initialized)
@@ -107,12 +117,27 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
 
         try {
             setIsPurchasing(true);
+
+            // Track purchase attempt
+            posthog?.capture('purchase_initiated', {
+                package_id: selectedPackage.identifier,
+                package_type: selectedPackage.packageType,
+                price: selectedPackage.product.price,
+                currency: selectedPackage.product.currencyCode
+            });
+
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await purchasePackage(selectedPackage);
 
+            // Track purchase success
+            posthog?.capture('purchase_successful', {
+                package_id: selectedPackage.identifier,
+                package_type: selectedPackage.packageType
+            });
+
             // Once the user has acted on the paywall (purchase), onboarding is done.
             await completeOnboarding();
-            
+
             // Check if user is authenticated after purchase
             if (!isAuthenticated) {
                 await setPostPaywallAuthRequired(true);
@@ -141,12 +166,22 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             }
         } catch (error: any) {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            
+
             if (error.message === 'Purchase cancelled') {
+                // Track purchase cancellation
+                posthog?.capture('purchase_cancelled', {
+                    package_id: selectedPackage?.identifier
+                });
                 // User cancelled - don't show error
                 return;
             }
-            
+
+            // Track purchase failure
+            posthog?.capture('purchase_failed', {
+                package_id: selectedPackage?.identifier,
+                error: error.message
+            });
+
             Alert.alert(
                 'Purchase Failed',
                 error.message || 'Unable to complete purchase. Please try again.',
@@ -162,15 +197,21 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             setIsRestoring(true);
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await restorePurchases();
-            
+
             // Check if restore was successful
             if (isPremium) {
+                // Track restore success
+                posthog?.capture('restore_successful');
                 Alert.alert('Success', 'Your purchases have been restored!');
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } else {
+                // Track restore failure (no purchases)
+                posthog?.capture('restore_failed', { reason: 'no_purchases_found' });
                 Alert.alert('No Purchases Found', 'We couldn\'t find any purchases to restore.');
             }
         } catch (error: any) {
+            // Track restore error
+            posthog?.capture('restore_failed', { error: error.message });
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert(
                 'Restore Failed',
@@ -189,12 +230,16 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             await completeOnboarding();
 
             if (!isAuthenticated) {
+                // Track skip to auth
+                posthog?.capture('paywall_skipped', { destination: 'auth' });
                 await setPostPaywallAuthRequired(true);
                 navigation.getParent()?.reset({
                     index: 0,
                     routes: [{ name: 'Auth', params: { screen: 'SignUp' } }],
                 });
             } else {
+                // Track skip to main
+                posthog?.capture('paywall_skipped', { destination: 'main' });
                 await setPostPaywallAuthRequired(false);
                 navigation.getParent()?.reset({
                     index: 0,
@@ -206,7 +251,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
 
     // Get available packages from RevenueCat
     const packages = currentOffering?.availablePackages || [];
-    
+
     // Helper to get package display name
     const getPackageName = (pkg: PurchasesPackage): string => {
         if (pkg.packageType === 'ANNUAL') return 'Annual';
@@ -271,11 +316,17 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                                 const isSelected = selectedPackage?.identifier === pkg.identifier;
                                 const popular = isPopular(pkg);
                                 const savings = getSavings(pkg);
-                                
+
                                 return (
                                     <TouchableOpacity
                                         key={pkg.identifier}
-                                        onPress={() => setSelectedPackage(pkg)}
+                                        onPress={() => {
+                                            setSelectedPackage(pkg);
+                                            posthog?.capture('paywall_plan_selected', {
+                                                package_id: pkg.identifier,
+                                                package_type: pkg.packageType
+                                            });
+                                        }}
                                         activeOpacity={0.8}
                                         style={styles.planWrapper}
                                         disabled={isPurchasing}
@@ -322,7 +373,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                     {/* Trial info */}
                     {selectedPackage?.product.introPrice && (
                         <Text style={styles.trialInfo}>
-                            {selectedPackage.product.introPrice.priceString === '$0.00' 
+                            {selectedPackage.product.introPrice.priceString === '$0.00'
                                 ? 'Start with a free trial. Cancel anytime.'
                                 : `Special introductory price: ${selectedPackage.product.introPrice.priceString}`}
                         </Text>
@@ -357,7 +408,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                     </TouchableOpacity>
 
                     <View style={styles.linksRow}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={handleRestore}
                             disabled={isRestoring || isPurchasing}
                         >
@@ -368,7 +419,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                             )}
                         </TouchableOpacity>
                         <Text style={styles.linkDivider}>•</Text>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             onPress={handleSkip}
                             disabled={isPurchasing || isRestoring}
                         >

@@ -8,6 +8,7 @@ import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, View, StyleSheet, Platform, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { usePostHog } from 'posthog-react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
@@ -216,9 +217,18 @@ export default function RootNavigator() {
         isLoading: userDataLoading,
     } = useUserData();
     const { isPremium, isLoading: revenueCatLoading } = useRevenueCat();
+    const posthog = usePostHog();
 
     // Handle email magic link deep links
     const { isProcessing: isProcessingEmailLink } = useEmailLinkHandler();
+
+    // Screen tracking for PostHog
+    const onNavigationStateChange = () => {
+        const currentRoute = navigationRef.current?.getCurrentRoute();
+        if (currentRoute && posthog) {
+            posthog.screen(currentRoute.name, (currentRoute.params as any) || {});
+        }
+    };
 
     // IMPORTANT: All hooks must be called before any conditional returns
     const navigationRef = useRef<NavigationContainerRef<any>>(null);
@@ -316,7 +326,7 @@ export default function RootNavigator() {
 
     if (isUnverified) {
         return (
-            <NavigationContainer>
+            <NavigationContainer onStateChange={onNavigationStateChange} onReady={onNavigationStateChange}>
                 <RootStack.Navigator screenOptions={{ headerShown: false }}>
                     <RootStack.Screen name="VerificationPending" component={VerificationPendingScreen} />
                 </RootStack.Navigator>
@@ -325,7 +335,11 @@ export default function RootNavigator() {
     }
 
     return (
-        <NavigationContainer ref={navigationRef}>
+        <NavigationContainer
+            ref={navigationRef}
+            onStateChange={onNavigationStateChange}
+            onReady={onNavigationStateChange}
+        >
             <RootStack.Navigator
                 screenOptions={{
                     headerShown: false,

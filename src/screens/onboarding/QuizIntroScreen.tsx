@@ -14,6 +14,7 @@ import {
     Animated,
     Dimensions,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing, typography } from '../../theme';
@@ -26,6 +27,7 @@ type QuizIntroScreenProps = {
 };
 
 export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
+    const posthog = usePostHog();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -46,6 +48,7 @@ export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
     }, []);
 
     const handleStart = () => {
+        posthog?.capture('onboarding_quiz_start_clicked');
         navigation.navigate('ComprehensiveQuiz');
     };
 

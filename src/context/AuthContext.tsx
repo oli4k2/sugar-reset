@@ -10,6 +10,7 @@ import { auth, isFirebaseReady } from '../config/firebase';
 import { User } from '../types';
 import { userService } from '../services/userService';
 import { notificationService } from '../services/notificationService';
+import { usePostHog } from 'posthog-react-native';
 
 interface AuthContextType {
     user: User | null;
@@ -45,6 +46,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const posthog = usePostHog();
+
+    useEffect(() => {
+        if (firebaseUser && posthog) {
+            posthog.identify(firebaseUser.uid, {
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+            });
+        } else if (!firebaseUser && posthog) {
+            posthog.reset();
+        }
+    }, [firebaseUser, posthog]);
 
     useEffect(() => {
         console.log('🔄 Setting up auth state listener...');
@@ -85,7 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 providerId: fbUser?.providerData?.[0]?.providerId,
                 providers: fbUser?.providerData?.map(p => p?.providerId),
             });
-            
+
             setFirebaseUser(fbUser);
 
             if (fbUser) {

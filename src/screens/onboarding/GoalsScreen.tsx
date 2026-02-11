@@ -20,6 +20,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { useUserData } from '../../context/UserDataContext';
+import { usePostHog } from 'posthog-react-native';
 
 type GoalsScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Goals'>;
@@ -40,6 +41,7 @@ const GOALS = [
 
 export default function GoalsScreen({ navigation }: GoalsScreenProps) {
     const { onboardingData, updateOnboardingData, setOnboardingCheckpoint } = useUserData();
+    const posthog = usePostHog();
     const [selectedGoals, setSelectedGoals] = useState<string[]>(onboardingData?.goals || []);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -75,6 +77,12 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
     };
 
     const handleContinue = async () => {
+        // Track goals
+        posthog?.capture('onboarding_goals_completed', {
+            goals_count: selectedGoals.length,
+            selected_goals: selectedGoals
+        });
+
         // Save goals and set default plan to cold_turkey
         await updateOnboardingData({
             goals: selectedGoals,

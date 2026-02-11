@@ -29,6 +29,7 @@ import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { useUserData } from '../../context/UserDataContext';
+import { usePostHog } from 'posthog-react-native';
 import { PlanBuildingAnimation } from '../../components/PlanBuildingAnimation';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -240,11 +241,17 @@ const getQuestions = (gender: string | null): Question[] => {
 
 export default function ComprehensiveQuizScreen({ navigation, route }: ComprehensiveQuizScreenProps) {
     const { updateOnboardingData, onboardingCheckpoint, setOnboardingCheckpoint } = useUserData();
+    const posthog = usePostHog();
     const skipToUserInfo = !!route.params?.skip;
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [showResult, setShowResult] = useState(false);
     const [showUserInfo, setShowUserInfo] = useState(skipToUserInfo);
     const [isCalculating, setIsCalculating] = useState(false);
+
+    // Track quiz start
+    useEffect(() => {
+        posthog?.capture('onboarding_quiz_started');
+    }, []);
 
     // Answers state
     const [answers, setAnswers] = useState<Record<string, any>>({
@@ -338,6 +345,14 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
 
     const handleSingleSelect = (optionId: string) => {
         setAnswers(prev => ({ ...prev, [question.id]: optionId }));
+
+        // Track response
+        posthog?.capture('onboarding_quiz_question_answered', {
+            question_id: question.id,
+            question_index: currentQuestion,
+            answer: optionId
+        });
+
         // For question 12 (last question), don't auto-advance - show CTA button instead
         if (currentQuestion < QUESTIONS.length - 1) {
             setTimeout(() => goNext(), 300);
@@ -366,6 +381,12 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                 return { ...prev, [fieldId]: current.filter((id: string) => id !== optionId) };
             }
             return { ...prev, [fieldId]: [...current, optionId] };
+        });
+
+        // Track multi-select (this might be noisy if clicked multiple times, but good for seeing intent)
+        posthog?.capture('onboarding_quiz_multi_select_toggled', {
+            question_id: fieldId,
+            option_id: optionId
         });
     };
 
@@ -405,6 +426,12 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             console.log('Final question reached, checking canProceed...');
             if (canProceed()) {
                 console.log('Proceeding to calculate results...');
+
+                // Track quiz completion
+                posthog?.capture('onboarding_quiz_completed', {
+                    user_responses: answers
+                });
+
                 saveAnswers().catch(err => console.error('Error saving answers:', err));
                 setIsCalculating(true);
             } else {
@@ -514,6 +541,13 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         // Milestone checkpoint: user reached quiz results (end of 12 questions).
         // If they close and return, they should resume here.
         setOnboardingCheckpoint({ routeName: 'ComprehensiveQuiz', meta: { quizStage: 'results' } }).catch(() => { });
+
+        // Track results viewed
+        posthog?.capture('onboarding_quiz_results_viewed', {
+            results: getResultMessage(),
+            category_scores: getCategoryScores()
+        });
+
         Animated.spring(resultScale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
     };
 
@@ -528,6 +562,12 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         await updateOnboardingData({
             nickname: answers.nickname,
         });
+
+        // Track user info completion
+        posthog?.capture('onboarding_user_info_completed', {
+            nickname: answers.nickname
+        });
+
         navigation.navigate('Symptoms');
     };
 

@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { useUserData } from '../../context/UserDataContext';
+import { usePostHog } from 'posthog-react-native';
 import { OnboardingStackParamList } from '../../types';
 
 type PersonalizedPlanScreenProps = {
@@ -22,6 +23,7 @@ type PersonalizedPlanScreenProps = {
 
 export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanScreenProps) {
     const { onboardingData } = useUserData();
+    const posthog = usePostHog();
     const [displayedText, setDisplayedText] = useState('');
     const [showButton, setShowButton] = useState(false);
 
@@ -136,6 +138,7 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
     }, []);
 
     const handleContinue = () => {
+        posthog?.capture('onboarding_personalized_intro_completed');
         navigation.navigate('LongScrollablePlan');
     };
 

@@ -11,6 +11,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { spacing, borderRadius } from '../../theme';
 import { useUserData } from '../../context/UserDataContext';
+import { usePostHog } from 'posthog-react-native';
 import { OnboardingStackParamList } from '../../types';
 
 type SymptomsScreenProps = {
@@ -78,17 +79,22 @@ const SYMPTOMS_DATA: SymptomCategory[] = [
 
 export default function SymptomsScreen({ navigation }: SymptomsScreenProps) {
     const { updateOnboardingData } = useUserData();
+    const posthog = usePostHog();
     const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
 
     const toggleSymptom = (id: string) => {
-        setSelectedSymptoms(prev => 
-            prev.includes(id) 
-                ? prev.filter(s => s !== id) 
+        setSelectedSymptoms(prev =>
+            prev.includes(id)
+                ? prev.filter(s => s !== id)
                 : [...prev, id]
         );
     };
 
     const handleContinue = async () => {
+        posthog?.capture('onboarding_symptoms_completed', {
+            symptoms_count: selectedSymptoms.length,
+            selected_symptoms: selectedSymptoms
+        });
         await updateOnboardingData({ symptoms: selectedSymptoms });
         navigation.navigate('SugarDangers');
     };
@@ -96,7 +102,7 @@ export default function SymptomsScreen({ navigation }: SymptomsScreenProps) {
     return (
         <LooviBackground variant="coralTop">
             <SafeAreaView style={styles.container}>
-                <ScrollView 
+                <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.content}
                     showsVerticalScrollIndicator={false}

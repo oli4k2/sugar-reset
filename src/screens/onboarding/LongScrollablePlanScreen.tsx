@@ -22,6 +22,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { usePostHog } from 'posthog-react-native';
 
 import { OnboardingStackParamList } from '../../types';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
@@ -175,6 +176,7 @@ function FlickeringStars({ count = 10 }: { count?: number }) {
 export default function LongScrollablePlanScreen({ navigation }: LongScrollablePlanScreenProps) {
     const { onboardingData } = useUserData();
     const insets = useSafeAreaInsets();
+    const posthog = usePostHog();
 
     const quitDate = new Date();
     const dayOfMonth = quitDate.getDate();
@@ -196,6 +198,7 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
             : ['energy', 'mood', 'sleep'];
 
     const handleContinue = () => {
+        posthog?.capture('onboarding_plan_view_completed');
         navigation.navigate('Paywall');
     };
 
