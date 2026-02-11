@@ -13,6 +13,7 @@ import {
     Image,
     Dimensions,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../types';
@@ -26,7 +27,9 @@ type SugarResetGraphScreenProps = {
 };
 
 export default function SugarResetGraphScreen({ navigation }: SugarResetGraphScreenProps) {
+    const posthog = usePostHog();
     const handleContinue = () => {
+        posthog?.capture('onboarding_graph_completed');
         navigation.navigate('Goals');
     };
 
@@ -72,12 +75,15 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     content: {
+        flex: 1,
         paddingHorizontal: spacing.screen.horizontal,
         alignItems: 'center',
+        width: '100%',
+        paddingVertical: spacing.md,
     },
     header: {
         alignItems: 'center',
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
     },
     title: {
         fontSize: 26,
@@ -91,11 +97,13 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: looviColors.text.primary,
         textAlign: 'center',
-        marginTop: spacing['3xl'],
+        marginTop: spacing.md,
+        marginBottom: spacing.sm,
     },
     graph: {
-        width: '85%',
-        height: 280,
+        flex: 1,
+        width: '100%',
+        marginVertical: spacing.sm,
     },
     footer: {
         paddingHorizontal: spacing.screen.horizontal,

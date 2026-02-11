@@ -14,6 +14,7 @@ import {
     Animated,
     Dimensions,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing, typography } from '../../theme';
@@ -26,6 +27,7 @@ type QuizIntroScreenProps = {
 };
 
 export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
+    const posthog = usePostHog();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -33,12 +35,12 @@ export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,
-                duration: 800,
+                duration: 2500, // Slow animation
                 useNativeDriver: true,
             }),
             Animated.timing(slideAnim, {
                 toValue: 0,
-                duration: 800,
+                duration: 2500, // Slow animation
                 easing: (t) => 1 - Math.pow(1 - t, 3), // custom ease out
                 useNativeDriver: true,
             }),
@@ -46,11 +48,15 @@ export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
     }, []);
 
     const handleStart = () => {
+        posthog?.capture('onboarding_quiz_start_clicked');
         navigation.navigate('ComprehensiveQuiz');
     };
 
-    const handleSkip = () => {
-        navigation.navigate('ComprehensiveQuiz', { skip: true });
+    const handleLogin = () => {
+        navigation.navigate('Auth' as any, {
+            screen: 'Login',
+            params: { fromOnboardingWelcome: true },
+        });
     };
 
     return (
@@ -88,15 +94,17 @@ export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
                             onPress={handleStart}
                             activeOpacity={0.9}
                         >
-                            <Text style={styles.startButtonText}>Start Now</Text>
+                            <Text style={styles.startButtonText}>Start Quiz</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={styles.skipButton}
-                            onPress={handleSkip}
-                            activeOpacity={0.6}
+                            style={styles.loginButton}
+                            onPress={handleLogin}
+                            activeOpacity={0.7}
                         >
-                            <Text style={styles.skipText}>skip</Text>
+                            <Text style={styles.loginButtonText}>
+                                Already have an account? Log In
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </Animated.View>
@@ -150,11 +158,11 @@ const styles = StyleSheet.create({
         width: '100%',
         gap: spacing.md,
         paddingBottom: spacing.lg,
-        marginTop: spacing['4xl'], // Increased vertical space from subheader
+        marginTop: spacing['2xl'],
     },
     startButton: {
         backgroundColor: looviColors.accent.primary,
-        height: 60, // Fixed height for consistent look
+        height: 60,
         borderRadius: 30,
         alignItems: 'center',
         justifyContent: 'center',
@@ -171,14 +179,14 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         letterSpacing: 0.5,
     },
-    skipButton: {
+    loginButton: {
         alignItems: 'center',
         paddingVertical: spacing.sm,
     },
-    skipText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#2C2C2C', // High-contrast dark charcoal
-        letterSpacing: 1,
+    loginButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#2C2C2C',
+        opacity: 0.8,
     },
 });

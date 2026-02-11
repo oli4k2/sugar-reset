@@ -17,6 +17,7 @@ import {
     Dimensions,
     Keyboard,
     Image,
+    Easing,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +29,7 @@ import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { useUserData } from '../../context/UserDataContext';
+import { usePostHog } from 'posthog-react-native';
 import { PlanBuildingAnimation } from '../../components/PlanBuildingAnimation';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -239,11 +241,28 @@ const getQuestions = (gender: string | null): Question[] => {
 
 export default function ComprehensiveQuizScreen({ navigation, route }: ComprehensiveQuizScreenProps) {
     const { updateOnboardingData, onboardingCheckpoint, setOnboardingCheckpoint } = useUserData();
+    const posthog = usePostHog();
     const skipToUserInfo = !!route.params?.skip;
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [showResult, setShowResult] = useState(false);
     const [showUserInfo, setShowUserInfo] = useState(skipToUserInfo);
     const [isCalculating, setIsCalculating] = useState(false);
+
+    // Track quiz start
+    useEffect(() => {
+        posthog?.capture('onboarding_quiz_started');
+    }, []);
+
+    // Track question entry
+    useEffect(() => {
+        if (!showResult && !showUserInfo) {
+            posthog?.capture('onboarding_quiz_question_viewed', {
+                question_index: currentQuestion,
+                question_id: QUESTIONS[currentQuestion].id,
+                question_title: QUESTIONS[currentQuestion].title
+            });
+        }
+    }, [currentQuestion, showResult, showUserInfo]);
 
     // Answers state
     const [answers, setAnswers] = useState<Record<string, any>>({
@@ -263,9 +282,9 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         age: '',
     });
 
-    const fadeAnim = useRef(new Animated.Value(1)).current;
-    const slideAnim = useRef(new Animated.Value(0)).current;
-    const resultFade = useRef(new Animated.Value(1)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+    const resultFade = useRef(new Animated.Value(0)).current;
     const resultScale = useRef(new Animated.Value(0.92)).current;
 
     // Resume from a milestone checkpoint (only set at the end of the quiz flow).
@@ -276,16 +295,30 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             setShowResult(true);
             resultFade.setValue(1);
             resultScale.setValue(1);
+        } else {
+            // Initial mount animation for the first question
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 1500, // Slow animation for the first question
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 1500,
+                    useNativeDriver: true,
+                }),
+            ]).start();
         }
     }, [onboardingCheckpoint, resultFade, resultScale]);
-    
+
     // Swipe gesture tracking
     const isAnimating = useRef(false);
 
     const QUESTIONS = getQuestions(answers.gender);
     const question = QUESTIONS[currentQuestion];
     const progress = (currentQuestion + 1) / QUESTIONS.length;
-    
+
     // Safety check: ensure question exists and currentQuestion is within bounds
     if (!question || currentQuestion < 0 || currentQuestion >= QUESTIONS.length) {
         return (
@@ -302,10 +335,10 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const animateTransition = (callback: () => void, direction: 'forward' | 'backward' = 'forward') => {
         if (isAnimating.current) return;
         isAnimating.current = true;
-        
+
         const slideOutValue = direction === 'forward' ? -30 : 30;
         const slideInValue = direction === 'forward' ? 30 : -30;
-        
+
         Animated.parallel([
             Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
             Animated.timing(slideAnim, { toValue: slideOutValue, duration: 150, useNativeDriver: true }),
@@ -323,6 +356,14 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
 
     const handleSingleSelect = (optionId: string) => {
         setAnswers(prev => ({ ...prev, [question.id]: optionId }));
+
+        // Track response
+        posthog?.capture('onboarding_quiz_question_answered', {
+            question_id: question.id,
+            question_index: currentQuestion,
+            answer: optionId
+        });
+
         // For question 12 (last question), don't auto-advance - show CTA button instead
         if (currentQuestion < QUESTIONS.length - 1) {
             setTimeout(() => goNext(), 300);
@@ -332,10 +373,31 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const handleMultiSelect = (optionId: string, fieldId: string) => {
         setAnswers(prev => {
             const current = prev[fieldId] || [];
+
+            // Logic for 'sugarSituations' exclusive 'no-pattern' option
+            if (fieldId === 'sugarSituations') {
+                if (optionId === 'no-pattern') {
+                    // If selecting 'no-pattern', it should be the only one
+                    return { ...prev, [fieldId]: current.includes('no-pattern') ? [] : ['no-pattern'] };
+                } else {
+                    // If selecting any other option, remove 'no-pattern'
+                    const newSelection = current.includes(optionId)
+                        ? current.filter((id: string) => id !== optionId)
+                        : [...current.filter((id: string) => id !== 'no-pattern'), optionId];
+                    return { ...prev, [fieldId]: newSelection };
+                }
+            }
+
             if (current.includes(optionId)) {
                 return { ...prev, [fieldId]: current.filter((id: string) => id !== optionId) };
             }
             return { ...prev, [fieldId]: [...current, optionId] };
+        });
+
+        // Track multi-select (this might be noisy if clicked multiple times, but good for seeing intent)
+        posthog?.capture('onboarding_quiz_multi_select_toggled', {
+            question_id: fieldId,
+            option_id: optionId
         });
     };
 
@@ -368,13 +430,19 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const goNext = () => {
         console.log('goNext called, currentQuestion:', currentQuestion, 'QUESTIONS.length:', QUESTIONS.length);
         Keyboard.dismiss();
-        
+
         if (currentQuestion < QUESTIONS.length - 1) {
             animateTransition(() => setCurrentQuestion(prev => prev + 1), 'forward');
         } else {
             console.log('Final question reached, checking canProceed...');
             if (canProceed()) {
                 console.log('Proceeding to calculate results...');
+
+                // Track quiz completion
+                posthog?.capture('onboarding_quiz_completed', {
+                    user_responses: answers
+                });
+
                 saveAnswers().catch(err => console.error('Error saving answers:', err));
                 setIsCalculating(true);
             } else {
@@ -398,14 +466,14 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     const saveAnswers = async () => {
         // Calculate sugar dependency score from all questions
         // Q3: sugarFrequency (1-4 points)
-        const frequencyMap: Record<string, number> = { 
-            'rarely': 1, 
-            'few-times-week': 2, 
-            'daily': 3, 
-            'multiple-daily': 4 
+        const frequencyMap: Record<string, number> = {
+            'rarely': 1,
+            'few-times-week': 2,
+            'daily': 3,
+            'multiple-daily': 4
         };
         const frequencyScore = frequencyMap[answers.sugarFrequency as string] || 0;
-        
+
         // Q4: dailySweetTimes (1-4 points)
         const dailySweetTimesMap: Record<string, number> = {
             '0-1': 1,
@@ -414,10 +482,10 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             '6+': 4
         };
         const dailySweetTimesScore = dailySweetTimesMap[answers.dailySweetTimes as string] || 0;
-        
+
         // Q5: unconsciousSugar (1-4 points)
         const unconsciousSugarScore = parseInt(answers.unconsciousSugar) || 0;
-        
+
         // Q6: sugarChoiceFeeling (1-3 points)
         const choiceFeelingMap: Record<string, number> = {
             'choose': 1,
@@ -425,11 +493,11 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             'already-eating': 3
         };
         const choiceFeelingScore = choiceFeelingMap[answers.sugarChoiceFeeling as string] || 0;
-        
+
         // Q7: sugarSituations (0-2 points, based on number selected, max 2)
         const situationsCount = (answers.sugarSituations || []).length;
         const situationsScore = situationsCount === 0 ? 0 : situationsCount <= 2 ? 1 : 2;
-        
+
         // Q8: reduceSugarAttempt (1-4 points)
         const reduceAttemptMap: Record<string, number> = {
             'succeed': 1,
@@ -438,21 +506,21 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             'never-tried': 4
         };
         const reduceAttemptScore = reduceAttemptMap[answers.reduceSugarAttempt as string] || 0;
-        
+
         // Q9: craveWhenNotHungry (1-4 points)
         const craveWhenNotHungryScore = parseInt(answers.craveWhenNotHungry) || 0;
-        
+
         // Q10: craveIntensity (1-4 points)
         const craveIntensityScore = parseInt(answers.craveIntensity) || 0;
-        
+
         // Q11: avoidSugarDifficulty (1-4 points)
         const avoidDifficultyScore = parseInt(answers.avoidSugarDifficulty) || 0;
-        
+
         // Q12: sugarVisibility (1-4 points)
         const visibilityScore = parseInt(answers.sugarVisibility) || 0;
 
-        const sugarDependencyScore = frequencyScore + dailySweetTimesScore + unconsciousSugarScore + 
-            choiceFeelingScore + situationsScore + reduceAttemptScore + craveWhenNotHungryScore + 
+        const sugarDependencyScore = frequencyScore + dailySweetTimesScore + unconsciousSugarScore +
+            choiceFeelingScore + situationsScore + reduceAttemptScore + craveWhenNotHungryScore +
             craveIntensityScore + avoidDifficultyScore + visibilityScore;
 
         const dataToSave: any = {
@@ -483,7 +551,14 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         setShowResult(true);
         // Milestone checkpoint: user reached quiz results (end of 12 questions).
         // If they close and return, they should resume here.
-        setOnboardingCheckpoint({ routeName: 'ComprehensiveQuiz', meta: { quizStage: 'results' } }).catch(() => {});
+        setOnboardingCheckpoint({ routeName: 'ComprehensiveQuiz', meta: { quizStage: 'results' } }).catch(() => { });
+
+        // Track results viewed
+        posthog?.capture('onboarding_quiz_results_viewed', {
+            results: getResultMessage(),
+            category_scores: getCategoryScores()
+        });
+
         Animated.spring(resultScale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
     };
 
@@ -498,6 +573,12 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         await updateOnboardingData({
             nickname: answers.nickname,
         });
+
+        // Track user info completion
+        posthog?.capture('onboarding_user_info_completed', {
+            nickname: answers.nickname
+        });
+
         navigation.navigate('Symptoms');
     };
 
@@ -548,7 +629,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             'already-eating': 3
         };
         const choiceFeelingValue = choiceFeelingMap[answers.sugarChoiceFeeling as string] || 3;
-        
+
         // Perfect: both are 1
         // Good (3): one is 1, other is 2
         // High (4): both are 2, or one is 1 and other is 3, or one is 2 and other is 3
@@ -556,14 +637,14 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         let autopilotSegments = 5;
         if (unconsciousValue === 1 && choiceFeelingValue === 1) {
             autopilotSegments = 1; // Perfect
-        } else if ((unconsciousValue === 1 && choiceFeelingValue === 2) || 
-                   (unconsciousValue === 2 && choiceFeelingValue === 1)) {
+        } else if ((unconsciousValue === 1 && choiceFeelingValue === 2) ||
+            (unconsciousValue === 2 && choiceFeelingValue === 1)) {
             autopilotSegments = 3; // Good
         } else if ((unconsciousValue === 2 && choiceFeelingValue === 2) ||
-                   (unconsciousValue === 1 && choiceFeelingValue === 3) ||
-                   (unconsciousValue === 3 && choiceFeelingValue === 1) ||
-                   (unconsciousValue === 2 && choiceFeelingValue === 3) ||
-                   (unconsciousValue === 3 && choiceFeelingValue === 2)) {
+            (unconsciousValue === 1 && choiceFeelingValue === 3) ||
+            (unconsciousValue === 3 && choiceFeelingValue === 1) ||
+            (unconsciousValue === 2 && choiceFeelingValue === 3) ||
+            (unconsciousValue === 3 && choiceFeelingValue === 2)) {
             autopilotSegments = 4; // High
         } else {
             autopilotSegments = 5; // Very High
@@ -578,7 +659,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         };
         const reduceAttemptValue = reduceAttemptMap[answers.reduceSugarAttempt as string] || 4;
         const avoidDifficultyValue = parseInt(answers.avoidSugarDifficulty) || 4;
-        
+
         // Perfect: both are 1
         // Good (3): one is 1, other is 2
         // High (4): both are 2, or one is 1 and other is 3, or one is 2 and other is 3
@@ -586,14 +667,14 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         let controlSegments = 5;
         if (reduceAttemptValue === 1 && avoidDifficultyValue === 1) {
             controlSegments = 1; // Perfect
-        } else if ((reduceAttemptValue === 1 && avoidDifficultyValue === 2) || 
-                   (reduceAttemptValue === 2 && avoidDifficultyValue === 1)) {
+        } else if ((reduceAttemptValue === 1 && avoidDifficultyValue === 2) ||
+            (reduceAttemptValue === 2 && avoidDifficultyValue === 1)) {
             controlSegments = 3; // Good
         } else if ((reduceAttemptValue === 2 && avoidDifficultyValue === 2) ||
-                   (reduceAttemptValue === 1 && avoidDifficultyValue === 3) ||
-                   (reduceAttemptValue === 3 && avoidDifficultyValue === 1) ||
-                   (reduceAttemptValue === 2 && avoidDifficultyValue === 3) ||
-                   (reduceAttemptValue === 3 && avoidDifficultyValue === 2)) {
+            (reduceAttemptValue === 1 && avoidDifficultyValue === 3) ||
+            (reduceAttemptValue === 3 && avoidDifficultyValue === 1) ||
+            (reduceAttemptValue === 2 && avoidDifficultyValue === 3) ||
+            (reduceAttemptValue === 3 && avoidDifficultyValue === 2)) {
             controlSegments = 4; // High
         } else {
             controlSegments = 5; // Very High
@@ -602,7 +683,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         // MentalPull: craveWhenNotHungry (1-4) + craveIntensity (1-4)
         const craveWhenNotHungryValue = parseInt(answers.craveWhenNotHungry) || 4;
         const craveIntensityValue = parseInt(answers.craveIntensity) || 4;
-        
+
         // Perfect: both are 1
         // Good (3): one is 1, other is 2
         // High (4): both are 2, or one is 1 and other is 3, or one is 2 and other is 3
@@ -610,14 +691,14 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         let mentalPullSegments = 5;
         if (craveWhenNotHungryValue === 1 && craveIntensityValue === 1) {
             mentalPullSegments = 1; // Perfect
-        } else if ((craveWhenNotHungryValue === 1 && craveIntensityValue === 2) || 
-                   (craveWhenNotHungryValue === 2 && craveIntensityValue === 1)) {
+        } else if ((craveWhenNotHungryValue === 1 && craveIntensityValue === 2) ||
+            (craveWhenNotHungryValue === 2 && craveIntensityValue === 1)) {
             mentalPullSegments = 3; // Good
         } else if ((craveWhenNotHungryValue === 2 && craveIntensityValue === 2) ||
-                   (craveWhenNotHungryValue === 1 && craveIntensityValue === 3) ||
-                   (craveWhenNotHungryValue === 3 && craveIntensityValue === 1) ||
-                   (craveWhenNotHungryValue === 2 && craveIntensityValue === 3) ||
-                   (craveWhenNotHungryValue === 3 && craveIntensityValue === 2)) {
+            (craveWhenNotHungryValue === 1 && craveIntensityValue === 3) ||
+            (craveWhenNotHungryValue === 3 && craveIntensityValue === 1) ||
+            (craveWhenNotHungryValue === 2 && craveIntensityValue === 3) ||
+            (craveWhenNotHungryValue === 3 && craveIntensityValue === 2)) {
             mentalPullSegments = 4; // High
         } else {
             mentalPullSegments = 5; // Very High
@@ -642,7 +723,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         const situations = answers.sugarSituations || [];
         const hasNoPattern = situations.length === 0 || (situations.length === 1 && situations[0] === 'no-pattern');
         const situationsValue = hasNoPattern ? 1 : situations.length >= 3 ? 4 : situations.length === 2 ? 3 : 2;
-        
+
         // Average the three values, then map to segments
         // Perfect (1): all are 1
         // Good (3): average is around 1.5-2
@@ -672,14 +753,14 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     // Calculate result (kept for backward compatibility with sugarDependencyScore)
     const getResultMessage = () => {
         // Q3: sugarFrequency (1-4 points)
-        const frequencyMap: Record<string, number> = { 
-            'rarely': 1, 
-            'few-times-week': 2, 
-            'daily': 3, 
-            'multiple-daily': 4 
+        const frequencyMap: Record<string, number> = {
+            'rarely': 1,
+            'few-times-week': 2,
+            'daily': 3,
+            'multiple-daily': 4
         };
         const frequencyScore = frequencyMap[answers.sugarFrequency as string] || 0;
-        
+
         // Q4: dailySweetTimes (1-4 points)
         const dailySweetTimesMap: Record<string, number> = {
             '0-1': 1,
@@ -688,10 +769,10 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             '6+': 4
         };
         const dailySweetTimesScore = dailySweetTimesMap[answers.dailySweetTimes as string] || 0;
-        
+
         // Q5: unconsciousSugar (1-4 points)
         const unconsciousSugarScore = parseInt(answers.unconsciousSugar) || 0;
-        
+
         // Q6: sugarChoiceFeeling (1-3 points)
         const choiceFeelingMap: Record<string, number> = {
             'choose': 1,
@@ -699,11 +780,11 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             'already-eating': 3
         };
         const choiceFeelingScore = choiceFeelingMap[answers.sugarChoiceFeeling as string] || 0;
-        
+
         // Q7: sugarSituations (0-2 points, based on number selected, max 2)
         const situationsCount = (answers.sugarSituations || []).length;
         const situationsScore = situationsCount === 0 ? 0 : situationsCount <= 2 ? 1 : 2;
-        
+
         // Q8: reduceSugarAttempt (1-4 points)
         const reduceAttemptMap: Record<string, number> = {
             'succeed': 1,
@@ -712,21 +793,21 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             'never-tried': 4
         };
         const reduceAttemptScore = reduceAttemptMap[answers.reduceSugarAttempt as string] || 0;
-        
+
         // Q9: craveWhenNotHungry (1-4 points)
         const craveWhenNotHungryScore = parseInt(answers.craveWhenNotHungry) || 0;
-        
+
         // Q10: craveIntensity (1-4 points)
         const craveIntensityScore = parseInt(answers.craveIntensity) || 0;
-        
+
         // Q11: avoidSugarDifficulty (1-4 points)
         const avoidDifficultyScore = parseInt(answers.avoidSugarDifficulty) || 0;
-        
+
         // Q12: sugarVisibility (1-4 points)
         const visibilityScore = parseInt(answers.sugarVisibility) || 0;
 
-        const totalScore = frequencyScore + dailySweetTimesScore + unconsciousSugarScore + 
-            choiceFeelingScore + situationsScore + reduceAttemptScore + craveWhenNotHungryScore + 
+        const totalScore = frequencyScore + dailySweetTimesScore + unconsciousSugarScore +
+            choiceFeelingScore + situationsScore + reduceAttemptScore + craveWhenNotHungryScore +
             craveIntensityScore + avoidDifficultyScore + visibilityScore;
         const maxScore = 37; // Updated max score: 4+4+4+3+2+4+4+4+4+4 = 37
         const rawPercentage = Math.round((totalScore / maxScore) * 100);
@@ -774,9 +855,9 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             const { translationX, velocityX } = event;
             const swipeThreshold = 50; // Minimum swipe distance
             const velocityThreshold = 400; // Minimum swipe velocity
-            
+
             console.log('Swipe detected:', { translationX, velocityX, currentQuestion, isAnimating: isAnimating.current });
-            
+
             // Swipe right (backward) - only if not on first question
             if ((translationX > swipeThreshold || velocityX > velocityThreshold) && currentQuestion > 0 && !isAnimating.current) {
                 console.log('Going previous');
@@ -891,7 +972,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                             </View>
                                         )}
                                     </TouchableOpacity>
-                                    
+
                                     {option.isOther && isSelected && (
                                         <View style={styles.otherInputContainer}>
                                             <TextInput
@@ -996,12 +1077,13 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             {/* Question Header */}
                             <View style={[styles.questionHeader, { marginBottom: spacing.md }]}>
                                 <View style={styles.questionImageContainer}>
-                                    <Image 
-                                        source={require('../../../assets/images/onboarding/user-info.png')} 
+                                    <Image
+                                        source={require('../../../assets/images/onboarding/user-info.png')}
                                         style={styles.questionImageExtraLarge}
                                         resizeMode="contain"
                                     />
                                 </View>
+                                <Text style={styles.questionPreHeader}>BEFORE WE CONTINUE...</Text>
                                 <Text style={styles.questionTitle}>What can we call you?</Text>
                             </View>
 
@@ -1059,30 +1141,85 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             scrollPadding: isSmallScreen ? spacing.xl : spacing['2xl'],
         };
 
-        // Get color based on score (1 = best, 5 = worst)
+        // Get color based on score (1 = best, 5 = worst) - Monochromatic Scale
         const getScoreColor = (filledSegments: number): string => {
             switch (filledSegments) {
                 case 1:
-                    return '#F5E6D3'; // Whitish-yellow-orange (soft, best)
+                    return '#E6C5A9'; // Darker beige/sand for better visibility
+                case 2:
+                    return looviColors.coralSoft; // Soft coral (#EEC4A0)
                 case 3:
                     return '#F0B88A'; // Medium orange
                 case 4:
-                    return '#E8A87C'; // Orange-coral (current accent)
+                    return looviColors.coralOrange; // Standard coral (#E8A87C)
                 case 5:
-                    return '#D77B5A'; // Red-orange (imposing, worst)
+                    return looviColors.coralDark; // Dark coral (#D4896A)
                 default:
-                    return '#E8A87C'; // Default to accent color
+                    return looviColors.coralOrange;
+            }
+        };
+
+        // Get label based on score
+        const getScoreLabel = (filledSegments: number): string => {
+            switch (filledSegments) {
+                case 1: return 'Minimal';
+                case 2: return 'Low';
+                case 3: return 'Moderate';
+                case 4: return 'High';
+                case 5: return 'Severe';
+                default: return '';
             }
         };
 
         // Helper component for a single bar with segments
-        const CategoryBar = ({ label, filledSegments }: { label: string; filledSegments: number }) => {
+        const CategoryBar = ({ label, filledSegments, delay }: { label: string; filledSegments: number; delay: number }) => {
             const segments = Array.from({ length: 5 }, (_, i) => i < filledSegments);
             const segmentColor = getScoreColor(filledSegments);
+            const scoreLabel = getScoreLabel(filledSegments);
+
+            // Animation for bar entry
+            const barOpacity = useRef(new Animated.Value(0)).current;
+            const barTranslateX = useRef(new Animated.Value(-20)).current;
+
+            useEffect(() => {
+                Animated.sequence([
+                    Animated.delay(delay),
+                    Animated.parallel([
+                        Animated.timing(barOpacity, {
+                            toValue: 1,
+                            duration: 600,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(barTranslateX, {
+                            toValue: 0,
+                            duration: 600,
+                            easing: Easing.out(Easing.cubic),
+                            useNativeDriver: true,
+                        }),
+                    ])
+                ]).start();
+            }, []);
+
             return (
                 <View style={styles.categoryBarContainer}>
-                    <Text style={[styles.categoryBarLabel, isSmallScreen && { fontSize: 13 }]}>{label}</Text>
-                    <View style={styles.categoryBarSegments}>
+                    <View style={styles.categoryHeader}>
+                        <Text style={[styles.categoryBarLabel, isSmallScreen && { fontSize: 13 }]}>{label}</Text>
+                        <Text style={[
+                            styles.categoryScoreLabel,
+                            { color: '#C97B5D' }, // Always use dark readable coral for text
+                            isSmallScreen && { fontSize: 13 }
+                        ]}>
+                            {scoreLabel}
+                        </Text>
+                    </View>
+
+                    <Animated.View style={[
+                        styles.categoryBarSegments,
+                        {
+                            opacity: barOpacity,
+                            transform: [{ translateX: barTranslateX }]
+                        }
+                    ]}>
                         {segments.map((filled, index) => (
                             <View
                                 key={index}
@@ -1095,7 +1232,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 ]}
                             />
                         ))}
-                    </View>
+                    </Animated.View>
                 </View>
             );
         };
@@ -1131,9 +1268,9 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             {/* Subline */}
                             <Text style={[
                                 styles.resultSubline,
-                                isSmallScreen && { 
-                                    fontSize: 15, 
-                                    marginBottom: adaptiveSpacing.sublineBottom 
+                                isSmallScreen && {
+                                    fontSize: 15,
+                                    marginBottom: adaptiveSpacing.sublineBottom
                                 }
                             ]}>
                                 Your responses form a sugar habit loop.
@@ -1148,11 +1285,11 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                     gap: adaptiveSpacing.barGap,
                                 }
                             ]}>
-                                <CategoryBar label="Exposure" filledSegments={categoryScores.exposure} />
-                                <CategoryBar label="Autopilot" filledSegments={categoryScores.autopilot} />
-                                <CategoryBar label="Control" filledSegments={categoryScores.control} />
-                                <CategoryBar label="Mental Pull" filledSegments={categoryScores.mentalPull} />
-                                <CategoryBar label="Environment" filledSegments={categoryScores.environment} />
+                                <CategoryBar label="Exposure" filledSegments={categoryScores.exposure} delay={0} />
+                                <CategoryBar label="Autopilot" filledSegments={categoryScores.autopilot} delay={100} />
+                                <CategoryBar label="Control" filledSegments={categoryScores.control} delay={200} />
+                                <CategoryBar label="Mental Pull" filledSegments={categoryScores.mentalPull} delay={300} />
+                                <CategoryBar label="Environment" filledSegments={categoryScores.environment} delay={400} />
                             </View>
 
                             {/* Asterisk disclaimer */}
@@ -1200,23 +1337,23 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                     <GestureDetector gesture={swipeGesture}>
                         <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
                     </GestureDetector>
-                    
+
                     {/* Progress Bar */}
                     <View style={styles.progressContainer}>
-                            <View style={styles.progressTrack}>
-                                <Animated.View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-                            </View>
-                            <Text style={styles.progressText}>
-                                Question {currentQuestion + 1} of {QUESTIONS.length}
-                            </Text>
+                        <View style={styles.progressTrack}>
+                            <Animated.View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
                         </View>
+                        <Text style={styles.progressText}>
+                            Question {currentQuestion + 1} of {QUESTIONS.length}
+                        </Text>
+                    </View>
 
-                        <View style={styles.swipeWrapper}>
-                            <ScrollView
-                                style={styles.scrollView}
-                                contentContainerStyle={styles.scrollContent}
-                                showsVerticalScrollIndicator={false}
-                            >
+                    <View style={styles.swipeWrapper}>
+                        <ScrollView
+                            style={styles.scrollView}
+                            contentContainerStyle={styles.scrollContent}
+                            showsVerticalScrollIndicator={false}
+                        >
                             <Animated.View
                                 style={[
                                     styles.questionContainer,
@@ -1226,81 +1363,84 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                     },
                                 ]}
                             >
-                            {/* Question Header */}
-                            <View style={styles.questionHeader}>
-                                <View style={styles.questionImageContainer}>
-                                    {question?.image ? (
-                                        <Image 
-                                            source={question.image} 
-                                            style={[
-                                                styles.questionImage,
-                                                (question.id === 'dailySweetTimes' || 
-                                                 question.id === 'sugarSituations' || 
-                                                 question.id === 'reduceSugarAttempt' || 
-                                                 question.id === 'sugarVisibility' ||
-                                                 question.id === 'craveWhenNotHungry' ||
-                                                 question.id === 'avoidSugarDifficulty') && styles.questionImageLarge,
-                                                question.id === 'unconsciousSugar' && styles.questionImageExtraLarge
-                                            ]}
-                                            resizeMode="contain"
-                                        />
-                                    ) : (
-                                        <Text style={styles.questionEmoji}>{question?.emoji || ''}</Text>
+                                {/* Question Header */}
+                                <View style={styles.questionHeader}>
+                                    <View style={styles.questionImageContainer}>
+                                        {question?.image ? (
+                                            <Image
+                                                source={question.image}
+                                                style={[
+                                                    styles.questionImage,
+                                                    (question.id === 'dailySweetTimes' ||
+                                                        question.id === 'sugarSituations' ||
+                                                        question.id === 'reduceSugarAttempt' ||
+                                                        question.id === 'sugarVisibility' ||
+                                                        question.id === 'craveWhenNotHungry' ||
+                                                        question.id === 'avoidSugarDifficulty') && styles.questionImageLarge,
+                                                    question.id === 'unconsciousSugar' && styles.questionImageExtraLarge
+                                                ]}
+                                                resizeMode="contain"
+                                            />
+                                        ) : (
+                                            <Text style={styles.questionEmoji}>{question?.emoji || ''}</Text>
+                                        )}
+                                    </View>
+                                    <Text style={styles.questionTitle}>{question?.title || ''}</Text>
+                                    {(question.type === 'multi' || question.type === 'triggers') && (
+                                        <Text style={styles.multiSelectHint}>Select all that apply</Text>
+                                    )}
+                                    {question?.subtitle && (
+                                        <Text style={styles.questionSubtitle}>{question.subtitle}</Text>
                                     )}
                                 </View>
-                                <Text style={styles.questionTitle}>{question?.title || ''}</Text>
-                                {question?.subtitle && (
-                                    <Text style={styles.questionSubtitle}>{question.subtitle}</Text>
-                                )}
-                            </View>
 
-                            {/* Question Content */}
-                            {renderQuestion()}
-                        </Animated.View>
-                            </ScrollView>
+                                {/* Question Content */}
+                                {renderQuestion()}
+                            </Animated.View>
+                        </ScrollView>
+                    </View>
+
+                    {/* Continue Button (for multi-select, slider, text, triggers) */}
+                    {(question.type === 'multi' || question.type === 'slider' || question.type === 'text' || question.type === 'triggers') && (
+                        <View style={styles.footer}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.continueButton,
+                                    !canProceed() && styles.continueButtonDisabled,
+                                ]}
+                                onPress={goNext}
+                                disabled={!canProceed()}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.continueButtonText}>
+                                    {currentQuestion < QUESTIONS.length - 1 ? 'Continue' : 'Analyse'}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
+                    )}
 
-                        {/* Continue Button (for multi-select, slider, text, triggers) */}
-                        {(question.type === 'multi' || question.type === 'slider' || question.type === 'text' || question.type === 'triggers') && (
-                            <View style={styles.footer}>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.continueButton,
-                                        !canProceed() && styles.continueButtonDisabled,
-                                    ]}
-                                    onPress={goNext}
-                                    disabled={!canProceed()}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.continueButtonText}>
-                                        {currentQuestion < QUESTIONS.length - 1 ? 'Continue' : 'See Results'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {/* CTA Button for question 12 (last question) */}
-                        {currentQuestion === QUESTIONS.length - 1 && question.type !== 'multi' && question.type !== 'slider' && question.type !== 'text' && question.type !== 'triggers' && answers[question.id] !== null && (
-                            <View style={styles.footer}>
-                                <TouchableOpacity
-                                    style={styles.continueButton}
-                                    onPress={handleContinueToAnalysis}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.continueButtonText}>
-                                        Continue to analysis
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
+                    {/* CTA Button for question 12 (last question) */}
+                    {currentQuestion === QUESTIONS.length - 1 && question.type !== 'multi' && question.type !== 'slider' && question.type !== 'text' && question.type !== 'triggers' && answers[question.id] !== null && (
+                        <View style={styles.footer}>
+                            <TouchableOpacity
+                                style={styles.continueButton}
+                                onPress={handleContinueToAnalysis}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.continueButtonText}>
+                                    Analyse
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </SafeAreaView>
             )}
-            
+
             {/* Transition Animation */}
             {isCalculating && (
-                <PlanBuildingAnimation 
-                    answers={answers} 
-                    onComplete={handleAnimationComplete} 
+                <PlanBuildingAnimation
+                    answers={answers}
+                    onComplete={handleAnimationComplete}
                 />
             )}
         </LooviBackground>
@@ -1378,6 +1518,16 @@ const styles = StyleSheet.create({
         width: 105,
         height: 105,
     },
+    questionPreHeader: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: looviColors.text.tertiary,
+        textAlign: 'center',
+        marginTop: spacing['2xl'],
+        marginBottom: spacing.xs,
+        letterSpacing: 1,
+        textTransform: 'uppercase',
+    },
     questionTitle: {
         fontSize: 24,
         fontWeight: '700',
@@ -1390,6 +1540,15 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         color: looviColors.text.secondary,
         textAlign: 'center',
+    },
+    multiSelectHint: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: looviColors.accent.primary,
+        textAlign: 'center',
+        marginTop: -spacing.xs,
+        marginBottom: spacing.sm,
+        fontStyle: 'italic',
     },
     optionsContainer: {
         gap: spacing.md,
@@ -1619,21 +1778,32 @@ const styles = StyleSheet.create({
         marginBottom: spacing.lg,
     },
     categoryBarContainer: {
-        gap: spacing.sm,
+        // gap removed for tighter spacing
+    },
+    categoryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     categoryBarLabel: {
         fontSize: 14,
         fontWeight: '600',
         color: looviColors.text.primary,
-        marginBottom: spacing.xs,
+        marginBottom: 5, // Slightly increased for balanced spacing
+    },
+    categoryScoreLabel: {
+        fontSize: 14,
+        fontWeight: '700',
+        textAlign: 'right',
+        marginBottom: 5,
     },
     categoryBarSegments: {
         flexDirection: 'row',
-        gap: spacing.xs,
+        gap: 6, // Increased gap for better separation
     },
     categoryBarSegment: {
         flex: 1,
-        height: 32,
+        height: 24, // Reduced height for slimmer bars
         backgroundColor: 'rgba(0, 0, 0, 0.1)',
         borderRadius: borderRadius.md,
     },

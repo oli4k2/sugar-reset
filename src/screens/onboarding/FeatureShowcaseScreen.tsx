@@ -17,6 +17,7 @@ import {
     Image,
     ImageSourcePropType,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
@@ -37,6 +38,20 @@ interface Feature {
 }
 
 const FEATURES: Feature[] = [
+    {
+        id: 'welcome',
+        title: 'Join thousands of others',
+        description: 'Join thousands of others breaking the cycle of sugar addiction through science and community support.',
+        descriptionBold: ['thousands', 'breaking the cycle', 'science'],
+        image: require('../../../assets/images/craveless-sugar-reset-header.png'),
+    },
+    {
+        id: 'break_patterns',
+        title: 'Break old patterns',
+        description: 'Turn your sugar dependency into a journey of recovery. Replace old habits with science-backed rituals.',
+        descriptionBold: ['dependency', 'recovery', 'rituals'],
+        image: require('../../public/feature_choose_path.png'), // Placeholder
+    },
     {
         id: '1',
         title: 'Track your progress',
@@ -68,20 +83,34 @@ const FEATURES: Feature[] = [
 ];
 
 export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScreenProps) {
+    const posthog = usePostHog();
     const [currentIndex, setCurrentIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
 
     const handleContinue = () => {
         if (currentIndex < FEATURES.length - 1) {
+            posthog?.capture('onboarding_feature_slide_next_clicked', {
+                current_slide_index: currentIndex,
+                current_slide_id: FEATURES[currentIndex].id
+            });
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
         } else {
+            posthog?.capture('onboarding_features_completed');
             navigation.navigate('SuccessStories');
         }
     };
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         if (viewableItems.length > 0) {
-            setCurrentIndex(viewableItems[0].index || 0);
+            const index = viewableItems[0].index || 0;
+            setCurrentIndex(index);
+
+            // Track slide view
+            posthog?.capture('onboarding_feature_slide_viewed', {
+                slide_index: index,
+                slide_id: FEATURES[index].id,
+                slide_title: FEATURES[index].title
+            });
         }
     }).current;
 
@@ -93,17 +122,17 @@ export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScr
             `(${sortedBoldWords.map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`,
             'gi'
         );
-        
+
         const parts = text.split(pattern);
-        
+
         return (
             <Text style={styles.featureDescription}>
                 {parts.map((part, index) => {
                     if (!part) return null;
-                    const isBold = boldWords.some(boldWord => 
+                    const isBold = boldWords.some(boldWord =>
                         part.toLowerCase() === boldWord.toLowerCase()
                     );
-                    
+
                     return (
                         <Text
                             key={index}
@@ -117,24 +146,77 @@ export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScr
         );
     };
 
-    const renderFeature = ({ item }: { item: Feature }) => (
-        <View style={styles.slideContent}>
-            {/* Illustration */}
-            <View style={styles.illustrationContainer}>
-                <Image
-                    source={item.image}
-                    style={styles.illustration}
-                    resizeMode="contain"
-                />
-            </View>
+    const renderFeature = ({ item }: { item: Feature }) => {
+        if (item.id === 'welcome') {
+            return (
+                <View style={styles.slideContent}>
+                    <View style={styles.welcomeSection}>
+                        <Image
+                            source={item.image}
+                            style={styles.welcomeHeaderImage}
+                            resizeMode="contain"
+                        />
+                        <Text style={styles.welcomeSubtitle}>
+                            Join thousands of others breaking the cycle of sugar addiction through science and community support.
+                        </Text>
 
-            {/* Feature Info */}
-            <View style={styles.featureInfo}>
-                <Text style={styles.featureTitle}>{item.title}</Text>
-                {renderBoldedDescription(item.description, item.descriptionBold)}
+                        {/* Features Row - Horizontal */}
+                        <View style={styles.featuresRow}>
+                            <View style={styles.featureItemCompact}>
+                                <View style={styles.iconContainer}>
+                                    <Image
+                                        source={require('../../public/feature_personalized.png')}
+                                        style={styles.featureIconSmall}
+                                        resizeMode="contain"
+                                    />
+                                </View>
+                                <Text style={styles.featureLabelSmall}>Personalized</Text>
+                            </View>
+                            <View style={styles.featureItemCompact}>
+                                <View style={styles.iconContainer}>
+                                    <Image
+                                        source={require('../../public/feature_science.png')}
+                                        style={styles.featureIconSmall}
+                                        resizeMode="contain"
+                                    />
+                                </View>
+                                <Text style={styles.featureLabelSmall}>Science-Backed</Text>
+                            </View>
+                            <View style={styles.featureItemCompact}>
+                                <View style={styles.iconContainer}>
+                                    <Image
+                                        source={require('../../public/feature_social.png')}
+                                        style={styles.featureIconSocialSmall}
+                                        resizeMode="contain"
+                                    />
+                                </View>
+                                <Text style={styles.featureLabelSmall}>Social Support</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            );
+        }
+
+        return (
+            <View style={styles.slideContent}>
+                {/* Illustration */}
+                <View style={styles.illustrationContainer}>
+                    <Image
+                        source={item.image}
+                        style={styles.illustration}
+                        resizeMode="contain"
+                    />
+                </View>
+
+                {/* Feature Info */}
+                <View style={styles.featureInfo}>
+                    <Text style={styles.featureTitle}>{item.title}</Text>
+                    {renderBoldedDescription(item.description, item.descriptionBold)}
+                </View>
             </View>
-        </View>
-    );
+        );
+    };
 
     return (
         <LooviBackground variant="mixed">
@@ -176,11 +258,7 @@ export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScr
                             onPress={handleContinue}
                             activeOpacity={0.8}
                         >
-                            <Text style={styles.continueButtonText}>
-                                {currentIndex < FEATURES.length - 1
-                                    ? 'Next →'
-                                    : 'Personalize Your Plan →'}
-                            </Text>
+                            <Text style={styles.continueButtonText}>Next →</Text>
                         </TouchableOpacity>
                     </View>
                 </SafeAreaView>
@@ -205,7 +283,58 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingTop: spacing.xl,
-        paddingBottom: 180, // Space for fixed bottom section (pagination + button + safe area)
+        paddingBottom: 150, // Space for fixed bottom section
+    },
+    welcomeSection: {
+        alignItems: 'center',
+        width: SCREEN_WIDTH,
+        paddingHorizontal: spacing.screen.horizontal,
+    },
+    welcomeHeaderImage: {
+        width: SCREEN_WIDTH * 0.85,
+        maxWidth: 320,
+        height: undefined,
+        aspectRatio: 2.8,
+        marginBottom: spacing.lg,
+    },
+    welcomeSubtitle: {
+        fontSize: 16,
+        fontWeight: '400',
+        color: looviColors.text.secondary,
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 40,
+        paddingHorizontal: spacing.md,
+    },
+    featuresRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'flex-start',
+        width: '100%',
+    },
+    featureItemCompact: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    iconContainer: {
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: spacing.xs,
+    },
+    featureIconSmall: {
+        width: 40,
+        height: 40,
+    },
+    featureIconSocialSmall: {
+        width: 46,
+        height: 46,
+    },
+    featureLabelSmall: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: looviColors.text.primary,
+        textAlign: 'center',
     },
     fixedBottom: {
         position: 'absolute',

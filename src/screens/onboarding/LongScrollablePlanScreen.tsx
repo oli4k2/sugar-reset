@@ -22,6 +22,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { usePostHog } from 'posthog-react-native';
 
 import { OnboardingStackParamList } from '../../types';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
@@ -175,9 +176,16 @@ function FlickeringStars({ count = 10 }: { count?: number }) {
 export default function LongScrollablePlanScreen({ navigation }: LongScrollablePlanScreenProps) {
     const { onboardingData } = useUserData();
     const insets = useSafeAreaInsets();
+    const posthog = usePostHog();
 
     const quitDate = new Date();
-    quitDate.setDate(quitDate.getDate() + 28);
+    const dayOfMonth = quitDate.getDate();
+    quitDate.setMonth(quitDate.getMonth() + 2);
+    // Handle cases where the target month has fewer days than the current month
+    // (e.g., March 31st -> June 30th)
+    if (quitDate.getDate() !== dayOfMonth) {
+        quitDate.setDate(0);
+    }
     const formattedDate = quitDate.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -190,8 +198,19 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
             : ['energy', 'mood', 'sleep'];
 
     const handleContinue = () => {
-        navigation.navigate('PlanReveal');
+        posthog?.capture('onboarding_plan_view_completed');
+        navigation.navigate('Paywall');
     };
+
+    // Track land
+    useEffect(() => {
+        posthog?.capture('onboarding_plan_view_started', {
+            goals: onboardingData?.goals || [],
+            triggers: onboardingData?.triggers || [],
+            crave_intensity: onboardingData?.craveIntensity || '0',
+            nickname: onboardingData?.nickname || ''
+        });
+    }, []);
 
     const GoalPill = ({ label }: { label: string }) => (
         <View style={styles.pill}>
@@ -249,6 +268,7 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    bounces={false}
                 >
                     {/* Header */}
                     <View style={styles.headerSection}>
@@ -400,30 +420,25 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
                         </View>
                     </View>
 
-                    {/* CTA */}
-                    <View style={styles.ctaSection}>
-                        <TouchableOpacity
-                            style={styles.button}
-                            onPress={handleContinue}
-                            activeOpacity={0.8}
-                        >
-                            <Text style={styles.buttonText}>Become Craveless</Text>
-                        </TouchableOpacity>
-                        <View style={styles.guaranteeRow}>
-                            <Feather name="shield" size={14} color="rgba(255,255,255,0.7)" />
-                            <Text style={styles.guaranteeText}>Secure & Private</Text>
-                            <View style={styles.dot} />
-                            <Feather name="check" size={14} color="rgba(255,255,255,0.7)" />
-                            <Text style={styles.guaranteeText}>Cancel Anytime</Text>
-                        </View>
-                    </View>
-                    <View
-                        style={[
-                            styles.bottomFiller,
-                            { height: Math.max(40, insets.bottom + 24) },
-                        ]}
-                    />
                 </ScrollView>
+
+                {/* Sticky CTA Footer */}
+                <View style={[styles.ctaSection, { paddingBottom: Math.max(spacing.lg, insets.bottom + 12) }]}>
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={handleContinue}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.buttonText}>Become Craveless</Text>
+                    </TouchableOpacity>
+                    <View style={styles.guaranteeRow}>
+                        <Feather name="shield" size={14} color="rgba(255,255,255,0.7)" />
+                        <Text style={styles.guaranteeText}>Secure & Private</Text>
+                        <View style={styles.dot} />
+                        <Feather name="check" size={14} color="rgba(255,255,255,0.7)" />
+                        <Text style={styles.guaranteeText}>Cancel Anytime</Text>
+                    </View>
+                </View>
             </SafeAreaView>
         </LooviBackground>
     );
@@ -663,7 +678,8 @@ const styles = StyleSheet.create({
     darkSection: {
         backgroundColor: '#1E293B',
         paddingHorizontal: spacing.screen.horizontal,
-        paddingVertical: spacing['3xl'],
+        paddingTop: spacing['3xl'],
+        paddingBottom: 60, // Increased from 30 to add a bit more space above the button
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
         alignItems: 'center',
@@ -725,7 +741,7 @@ const styles = StyleSheet.create({
     ctaSection: {
         backgroundColor: '#1E293B',
         paddingHorizontal: spacing.screen.horizontal,
-        paddingBottom: spacing['3xl'],
+        paddingTop: spacing.xl,
         alignItems: 'center',
     },
     button: {

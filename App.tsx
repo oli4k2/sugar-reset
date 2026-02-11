@@ -9,6 +9,7 @@ import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { PostHogProvider } from 'posthog-react-native';
 import { AuthProvider } from './src/context/AuthContext';
 import { UserDataProvider } from './src/context/UserDataContext';
 import { RevenueCatProvider } from './src/context/RevenueCatContext';
@@ -71,17 +72,25 @@ export default function App() {
           barStyle="light-content"
           backgroundColor={colors.background.primary}
         />
-        <AuthProvider>
-          <RevenueCatProvider>
-            <UserDataProvider>
-              <UserProfileProvider>
-                <RootNavigator />
-              </UserProfileProvider>
-            </UserDataProvider>
-          </RevenueCatProvider>
-        </AuthProvider>
+        <PostHogProvider
+          apiKey="phc_X8ZnTf6o2B7I14EFbCuvH4xlhgLUJe8yu5C8YaZdzVd"
+          options={{
+            host: 'https://eu.i.posthog.com',
+            enableSessionReplay: true,
+          }}
+          autocapture={false}
+        >
+          <AuthProvider>
+            <RevenueCatProvider>
+              <UserDataProvider>
+                <UserProfileProvider>
+                  <RootNavigator />
+                </UserProfileProvider>
+              </UserDataProvider>
+            </RevenueCatProvider>
+          </AuthProvider>
+        </PostHogProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
-

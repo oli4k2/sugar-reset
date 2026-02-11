@@ -18,6 +18,7 @@ import {
     Image,
     ImageSourcePropType,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
@@ -73,6 +74,7 @@ const EXPERT_QUOTES: ExpertQuote[] = [
 ];
 
 export default function SuccessStoriesScreen({ navigation }: SuccessStoriesScreenProps) {
+    const posthog = usePostHog();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -93,6 +95,7 @@ export default function SuccessStoriesScreen({ navigation }: SuccessStoriesScree
     }, []);
 
     const handleContinue = () => {
+        posthog?.capture('onboarding_success_stories_completed');
         navigation.navigate('SugarResetGraph');
     };
 
