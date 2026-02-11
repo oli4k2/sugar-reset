@@ -17,6 +17,7 @@ import {
     Image,
     ImageSourcePropType,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
@@ -82,20 +83,34 @@ const FEATURES: Feature[] = [
 ];
 
 export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScreenProps) {
+    const posthog = usePostHog();
     const [currentIndex, setCurrentIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
 
     const handleContinue = () => {
         if (currentIndex < FEATURES.length - 1) {
+            posthog?.capture('onboarding_feature_slide_next_clicked', {
+                current_slide_index: currentIndex,
+                current_slide_id: FEATURES[currentIndex].id
+            });
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
         } else {
+            posthog?.capture('onboarding_features_completed');
             navigation.navigate('SuccessStories');
         }
     };
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         if (viewableItems.length > 0) {
-            setCurrentIndex(viewableItems[0].index || 0);
+            const index = viewableItems[0].index || 0;
+            setCurrentIndex(index);
+
+            // Track slide view
+            posthog?.capture('onboarding_feature_slide_viewed', {
+                slide_index: index,
+                slide_id: FEATURES[index].id,
+                slide_title: FEATURES[index].title
+            });
         }
     }).current;
 

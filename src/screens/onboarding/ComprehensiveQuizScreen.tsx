@@ -253,6 +253,17 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         posthog?.capture('onboarding_quiz_started');
     }, []);
 
+    // Track question entry
+    useEffect(() => {
+        if (!showResult && !showUserInfo) {
+            posthog?.capture('onboarding_quiz_question_viewed', {
+                question_index: currentQuestion,
+                question_id: QUESTIONS[currentQuestion].id,
+                question_title: QUESTIONS[currentQuestion].title
+            });
+        }
+    }, [currentQuestion, showResult, showUserInfo]);
+
     // Answers state
     const [answers, setAnswers] = useState<Record<string, any>>({
         gender: null,

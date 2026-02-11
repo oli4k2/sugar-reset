@@ -13,6 +13,7 @@ import {
     ScrollView,
     Animated,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -29,6 +30,7 @@ type PromiseScreenProps = {
 
 export default function PromiseScreen({ navigation, route }: PromiseScreenProps) {
     const { updateOnboardingData, onboardingData, setOnboardingCheckpoint } = useUserData();
+    const posthog = usePostHog();
     const nickname = route.params?.nickname || onboardingData?.nickname || 'Friend';
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -64,6 +66,7 @@ export default function PromiseScreen({ navigation, route }: PromiseScreenProps)
     }, []);
 
     const handleMakePromise = async () => {
+        posthog?.capture('onboarding_promise_saved');
         // Mark promise as confirmed and set the journey start date (without completing onboarding yet)
         await updateOnboardingData({
             promiseConfirmed: true,
@@ -109,13 +112,17 @@ export default function PromiseScreen({ navigation, route }: PromiseScreenProps)
                             <SignatureField
                                 key="signature-300"
                                 label={`Sign here, ${nickname}`}
-                                onSignatureChange={(hasSignature) => {
+                                onSignatureChange={(newHasSignature) => {
+                                    if (newHasSignature && !hasSignature) { // Only capture when signature is first made
+                                        posthog?.capture('onboarding_promise_signed');
+                                    }
                                     // #region agent log
-                                    fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'PromiseScreen.tsx:onSignatureChange', message: 'onSignatureChange callback', data: { hasSignature }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5,H8' }) }).catch(() => { });
+                                    fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'PromiseScreen.tsx:onSignatureChange', message: 'onSignatureChange callback', data: { hasSignature: newHasSignature }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H5,H8' }) }).catch(() => { });
                                     // #endregion
-                                    setHasSignature(hasSignature);
+                                    setHasSignature(newHasSignature);
                                 }}
                                 onBegin={() => {
+                                    posthog?.capture('onboarding_promise_signature_started');
                                     // #region agent log
                                     fetch('http://127.0.0.1:7247/ingest/b38713cc-db3b-41be-bf27-fcffc891ae5f', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'PromiseScreen.tsx:onBegin', message: 'onBegin callback', data: { scrollEnabledBefore: scrollEnabled }, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId: 'H1,H2' }) }).catch(() => { });
                                     // #endregion

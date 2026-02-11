@@ -17,6 +17,7 @@ import {
     Image,
     ImageSourcePropType,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
@@ -74,25 +75,42 @@ const scienceSlides: ScienceSlide[] = [
 ];
 
 export default function SugarScienceScreen({ navigation }: SugarScienceScreenProps) {
+    const posthog = usePostHog();
     const [currentIndex, setCurrentIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const scrollX = useRef(new Animated.Value(0)).current;
 
     const handleNext = () => {
         if (currentIndex < scienceSlides.length - 1) {
+            posthog?.capture('onboarding_science_slide_next_clicked', {
+                current_slide_index: currentIndex,
+                current_slide_id: scienceSlides[currentIndex].id
+            });
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
         } else {
+            posthog?.capture('onboarding_science_completed');
             navigation.navigate('FeatureShowcase');
         }
     };
 
     const handleSkip = () => {
+        posthog?.capture('onboarding_science_skipped', {
+            at_index: currentIndex
+        });
         navigation.navigate('FeatureShowcase');
     };
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         if (viewableItems.length > 0) {
-            setCurrentIndex(viewableItems[0].index);
+            const index = viewableItems[0].index;
+            setCurrentIndex(index);
+
+            // Track slide view
+            posthog?.capture('onboarding_science_slide_viewed', {
+                slide_index: index,
+                slide_id: scienceSlides[index].id,
+                slide_title: scienceSlides[index].title
+            });
         }
     }).current;
 

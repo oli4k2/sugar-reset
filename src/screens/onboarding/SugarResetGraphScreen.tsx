@@ -13,6 +13,7 @@ import {
     Image,
     Dimensions,
 } from 'react-native';
+import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from '../../types';
@@ -26,7 +27,9 @@ type SugarResetGraphScreenProps = {
 };
 
 export default function SugarResetGraphScreen({ navigation }: SugarResetGraphScreenProps) {
+    const posthog = usePostHog();
     const handleContinue = () => {
+        posthog?.capture('onboarding_graph_completed');
         navigation.navigate('Goals');
     };
 

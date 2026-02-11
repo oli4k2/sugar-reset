@@ -202,6 +202,16 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
         navigation.navigate('Paywall');
     };
 
+    // Track land
+    useEffect(() => {
+        posthog?.capture('onboarding_plan_view_started', {
+            goals: onboardingData?.goals || [],
+            triggers: onboardingData?.triggers || [],
+            crave_intensity: onboardingData?.craveIntensity || '0',
+            nickname: onboardingData?.nickname || ''
+        });
+    }, []);
+
     const GoalPill = ({ label }: { label: string }) => (
         <View style={styles.pill}>
             <Text style={styles.pillText}>{label}</Text>

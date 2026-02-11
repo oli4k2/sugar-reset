@@ -42,6 +42,9 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
     ];
 
     useEffect(() => {
+        // Track sequence start
+        posthog?.capture('onboarding_personalized_intro_started');
+
         // Sequence of text changes
         const runAnimationSequence = async () => {
             for (let i = 0; i < steps.length; i++) {
@@ -121,6 +124,7 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
 
                     // Show button after all animations finish
                     setShowButton(true);
+                    posthog?.capture('onboarding_personalized_intro_finished_text');
                     Animated.timing(buttonFadeAnim, {
                         toValue: 1,
                         duration: 800,
