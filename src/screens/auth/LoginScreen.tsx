@@ -179,7 +179,7 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
                         {
                             name: 'Onboarding',
                             state: {
-                                routes: [{ name: 'QuizIntro' }],
+                                routes: [{ name: 'Welcome' }],
                                 index: 0,
                             },
                         },
