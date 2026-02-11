@@ -1,9 +1,8 @@
 /**
  * WelcomeScreen
- * 
- * First screen: Animated logo splash, then main content.
- * Shows SugarReset logo with fade animation for 2 seconds,
- * then reveals Get Started / Log In buttons.
+ *
+ * Start screen of the app: Animated logo splash, then logo + Continue / Log In.
+ * No onboarding checkpoint here — returning users always see this start screen.
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -13,13 +12,11 @@ import {
     StyleSheet,
     TouchableOpacity,
     Animated,
-    Image,
     Dimensions,
-    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { spacing } from '../../theme';
+import { spacing, typography } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 
 type WelcomeScreenProps = {
@@ -31,17 +28,13 @@ const { width } = Dimensions.get('window');
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     const [showSplash, setShowSplash] = useState(true);
 
-    // Splash animations
     const logoFade = useRef(new Animated.Value(0)).current;
     const logoScale = useRef(new Animated.Value(0.8)).current;
     const splashOpacity = useRef(new Animated.Value(1)).current;
-
-    // Content animations
     const contentFade = useRef(new Animated.Value(0)).current;
-    const contentSlide = useRef(new Animated.Value(30)).current;
+    const contentSlide = useRef(new Animated.Value(24)).current;
 
     useEffect(() => {
-        // Phase 1: Animate logo (fade in + scale up)
         Animated.sequence([
             Animated.delay(200),
             Animated.parallel([
@@ -57,9 +50,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
                     useNativeDriver: true,
                 }),
             ]),
-            // Phase 2: Hold for a moment
             Animated.delay(2500),
-            // Phase 3: Fade out splash
             Animated.timing(splashOpacity, {
                 toValue: 0,
                 duration: 400,
@@ -67,23 +58,22 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
             }),
         ]).start(() => {
             setShowSplash(false);
-            // Animate content in
             Animated.parallel([
                 Animated.timing(contentFade, {
                     toValue: 1,
-                    duration: 600,
+                    duration: 400,
                     useNativeDriver: true,
                 }),
                 Animated.timing(contentSlide, {
                     toValue: 0,
-                    duration: 600,
+                    duration: 400,
                     useNativeDriver: true,
                 }),
             ]).start();
         });
     }, []);
 
-    const handleGetStarted = () => {
+    const handleContinue = () => {
         navigation.navigate('QuizIntro');
     };
 
@@ -96,7 +86,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
 
     return (
         <LooviBackground variant="mixed">
-            {/* Splash Screen with Logo Animation */}
+            {/* Splash overlay */}
             {showSplash && (
                 <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
                     <Animated.Image
@@ -113,9 +103,9 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
                 </Animated.View>
             )}
 
-            {/* Main Content (after splash) */}
+            {/* Start screen: logo + Continue / Log In (shown after splash) */}
             {!showSplash && (
-                <SafeAreaView style={styles.container}>
+                <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
                     <Animated.View
                         style={[
                             styles.content,
@@ -125,44 +115,21 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
                             },
                         ]}
                     >
-                        {/* Logo Area with dedicated fade animation */}
-                        <Animated.View
-                            style={[
-                                styles.logoContainer,
-                                { opacity: contentFade }
-                            ]}
-                        >
+                        <View style={styles.centered}>
                             <Animated.Image
                                 source={require('../../../assets/images/craveless-logo.png')}
-                                style={[
-                                    styles.logoSmall,
-                                    {
-                                        opacity: contentFade,
-                                        transform: [{
-                                            scale: contentFade.interpolate({
-                                                inputRange: [0, 1],
-                                                outputRange: [0.8, 1]
-                                            })
-                                        }]
-                                    }
-                                ]}
+                                style={styles.logo}
                                 resizeMode="contain"
                             />
-                        </Animated.View>
-
-                        {/* Spacer */}
-                        <View style={styles.spacer} />
-
-                        {/* Buttons */}
-                        <View style={styles.buttonsContainer}>
+                        </View>
+                        <View style={styles.actions}>
                             <TouchableOpacity
                                 style={styles.primaryButton}
-                                onPress={handleGetStarted}
-                                activeOpacity={0.8}
+                                onPress={handleContinue}
+                                activeOpacity={0.9}
                             >
-                                <Text style={styles.primaryButtonText}>Get Started</Text>
+                                <Text style={styles.primaryButtonText}>Continue</Text>
                             </TouchableOpacity>
-
                             <TouchableOpacity
                                 style={styles.secondaryButton}
                                 onPress={handleLogin}
@@ -181,7 +148,6 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
 }
 
 const styles = StyleSheet.create({
-    // Splash Screen
     splashContainer: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'center',
@@ -192,63 +158,56 @@ const styles = StyleSheet.create({
         width: width * 0.7,
         height: width * 0.4,
     },
-
-    // Main Content
     container: {
         flex: 1,
     },
     content: {
         flex: 1,
         paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing['3xl'],
         paddingBottom: spacing['2xl'],
+        justifyContent: 'space-between',
     },
-    logoContainer: {
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
         alignItems: 'center',
-        marginTop: spacing['3xl'] * 2,
     },
-    logoSmall: {
+    logo: {
         width: width * 0.7,
         height: width * 0.4,
-        marginBottom: spacing.md,
     },
-    slogan: {
-        fontSize: 18,
-        fontWeight: '500',
-        color: looviColors.text.secondary,
-        textAlign: 'center',
-        lineHeight: 26,
-        marginTop: spacing.lg,
-    },
-    spacer: {
-        flex: 1,
-    },
-    buttonsContainer: {
+    actions: {
+        width: '100%',
         gap: spacing.md,
+        paddingBottom: spacing.lg,
     },
     primaryButton: {
         backgroundColor: looviColors.accent.primary,
-        paddingVertical: 18,
+        height: 60,
         borderRadius: 30,
         alignItems: 'center',
+        justifyContent: 'center',
         shadowColor: looviColors.coralOrange,
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.25,
         shadowRadius: 12,
-        elevation: 5,
+        elevation: 10,
     },
     primaryButtonText: {
         fontSize: 18,
-        fontWeight: '700',
+        fontWeight: '800',
+        fontFamily: typography.fonts.heading.bold,
         color: '#FFFFFF',
+        letterSpacing: 0.5,
     },
     secondaryButton: {
-        paddingVertical: spacing.md,
         alignItems: 'center',
+        paddingVertical: spacing.sm,
     },
     secondaryButtonText: {
         fontSize: 15,
-        fontWeight: '500',
-        color: looviColors.text.tertiary,
+        fontWeight: '600',
+        color: looviColors.text.primary,
+        opacity: 0.9,
     },
 });

@@ -363,7 +363,14 @@ export default function RootNavigator() {
                                 headerShown: false,
                                 animation: 'fade',
                             }}
-                            initialRouteName={onboardingCheckpoint?.routeName ?? 'Welcome'}
+                            initialRouteName={
+                                // No checkpoint for start screens: always show Welcome (logo + Continue/Log In)
+                                onboardingCheckpoint?.routeName &&
+                                onboardingCheckpoint.routeName !== 'Welcome' &&
+                                onboardingCheckpoint.routeName !== 'QuizIntro'
+                                    ? onboardingCheckpoint.routeName
+                                    : 'Welcome'
+                            }
                         >
                             {/* Phase 1: Quiz */}
                             <OnboardingStack.Screen name="Welcome" component={WelcomeScreen} />

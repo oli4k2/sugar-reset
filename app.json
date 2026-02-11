@@ -9,9 +9,9 @@
     "newArchEnabled": true,
     "scheme": "craveless",
     "splash": {
-      "image": "./src/public/appstore.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0D0F12"
+      "image": "./assets/images/welcome-splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#E8A857"
     },
     "ios": {
       "icon": "./src/public/craveless_app_icon.png",
