@@ -18,7 +18,7 @@ interface RevenueCatContextType {
   error: string | null;
 
   // Methods
-  purchasePackage: (pkg: PurchasesPackage) => Promise<void>;
+  purchasePackage: (pkg: PurchasesPackage) => Promise<CustomerInfo | null>;
   restorePurchases: () => Promise<void>;
   refreshData: () => Promise<void>;
   checkPremiumStatus: () => Promise<void>;
@@ -146,6 +146,8 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         // Refresh offerings in case they changed
         const offering = await revenueCatService.getCurrentOffering();
         setCurrentOffering(offering);
+
+        return info;
       } catch (err: any) {
         console.error('Purchase failed:', err);
         setError(err.message || 'Purchase failed');
