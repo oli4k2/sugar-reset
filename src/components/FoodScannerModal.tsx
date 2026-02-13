@@ -40,12 +40,14 @@ import {
     unpinItem,
 } from '../services/scannerService';
 import { useUserData } from '../context/UserDataContext';
+import { useRevenueCat } from '../hooks/useRevenueCat';
 
 interface FoodScannerModalProps {
     visible: boolean;
     onClose: () => void;
     onScanComplete: (item: ScannedItem) => void;
     selectedDate?: string;
+    onShowPaywall?: () => void;
 }
 
 type ScanStep = 'select' | 'describe' | 'text-input' | 'analyzing' | 'result';
@@ -55,7 +57,9 @@ export default function FoodScannerModal({
     onClose,
     onScanComplete,
     selectedDate,
+    onShowPaywall,
 }: FoodScannerModalProps) {
+    const { isPremium } = useRevenueCat();
     const [step, setStep] = useState<ScanStep>('select');
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [description, setDescription] = useState('');
@@ -72,8 +76,14 @@ export default function FoodScannerModal({
         if (visible) {
             console.log('FoodScannerModal visible');
             loadRecentFoods();
+            // If free user, skip to text input step
+            if (!isPremium) {
+                setStep('text-input');
+            } else {
+                setStep('select');
+            }
         }
-    }, [visible]);
+    }, [visible, isPremium]);
 
     const loadRecentFoods = async () => {
         try {
@@ -238,22 +248,82 @@ export default function FoodScannerModal({
                             <Text style={styles.headerSubtitle}>Identify sugars & macros instantly</Text>
                         </View>
 
-                        <TouchableOpacity style={styles.heroButton} onPress={takePhoto} activeOpacity={0.9}>
-                            <View style={styles.heroContent}>
-                                <View style={styles.shutterRing}><View style={styles.shutterInner} /></View>
-                                <View style={styles.heroTextContainer}>
-                                    <Text style={styles.heroTitle}>Scan Meal</Text>
-                                    <Text style={styles.heroSubtitle}>Capture food to analyze</Text>
+                        {/* Camera Scan - Premium Only */}
+                        {isPremium ? (
+                            <TouchableOpacity style={styles.heroButton} onPress={takePhoto} activeOpacity={0.9}>
+                                <View style={styles.heroContent}>
+                                    <View style={styles.shutterRing}><View style={styles.shutterInner} /></View>
+                                    <View style={styles.heroTextContainer}>
+                                        <Text style={styles.heroTitle}>Scan Meal</Text>
+                                        <Text style={styles.heroSubtitle}>Capture food to analyze</Text>
+                                    </View>
+                                    <Feather name="chevron-right" size={24} color="#FFF" />
                                 </View>
-                                <Feather name="chevron-right" size={24} color="#FFF" />
-                            </View>
-                        </TouchableOpacity>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity 
+                                style={[styles.heroButton, { opacity: 0.6 }]} 
+                                onPress={() => {
+                                    Alert.alert(
+                                        'Premium Feature',
+                                        'Food scanning with camera is a premium feature. Upgrade to unlock instant food analysis!',
+                                        [
+                                            { text: 'Cancel', style: 'cancel' },
+                                            { 
+                                                text: 'Upgrade', 
+                                                onPress: () => {
+                                                    handleClose();
+                                                    onShowPaywall?.();
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                                activeOpacity={0.9}
+                            >
+                                <View style={styles.heroContent}>
+                                    <View style={styles.shutterRing}><View style={styles.shutterInner} /></View>
+                                    <View style={styles.heroTextContainer}>
+                                        <Text style={styles.heroTitle}>Scan Meal</Text>
+                                        <Text style={styles.heroSubtitle}>Premium Feature - Upgrade to unlock</Text>
+                                    </View>
+                                    <Ionicons name="lock-closed" size={24} color="#FFF" />
+                                </View>
+                            </TouchableOpacity>
+                        )}
 
                         <View style={styles.secondaryRow}>
-                            <TouchableOpacity style={styles.secondaryButton} onPress={pickFromGallery}>
-                                <Feather name="image" size={20} color={looviColors.text.primary} />
-                                <Text style={styles.secondaryText}>Gallery</Text>
-                            </TouchableOpacity>
+                            {/* Gallery - Premium Only */}
+                            {isPremium ? (
+                                <TouchableOpacity style={styles.secondaryButton} onPress={pickFromGallery}>
+                                    <Feather name="image" size={20} color={looviColors.text.primary} />
+                                    <Text style={styles.secondaryText}>Gallery</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity 
+                                    style={[styles.secondaryButton, { opacity: 0.6 }]} 
+                                    onPress={() => {
+                                        Alert.alert(
+                                            'Premium Feature',
+                                            'Image analysis is a premium feature. You can still add food manually by typing.',
+                                            [
+                                                { text: 'OK' },
+                                                { 
+                                                    text: 'Upgrade', 
+                                                    onPress: () => {
+                                                        handleClose();
+                                                        onShowPaywall?.();
+                                                    }
+                                                }
+                                            ]
+                                        );
+                                    }}
+                                >
+                                    <Ionicons name="lock-closed" size={20} color={looviColors.text.primary} />
+                                    <Text style={styles.secondaryText}>Gallery</Text>
+                                </TouchableOpacity>
+                            )}
+                            {/* Text Input - Available for All */}
                             <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep('text-input')}>
                                 <Feather name="edit-2" size={20} color={looviColors.text.primary} />
                                 <Text style={styles.secondaryText}>Type</Text>
@@ -350,24 +420,60 @@ export default function FoodScannerModal({
             case 'text-input':
                 return (
                     <View style={styles.stepContainer}>
-                        <View style={styles.header}><Text style={styles.headerTitle}>Type Entry</Text></View>
+                        <View style={styles.header}>
+                            <Text style={styles.headerTitle}>
+                                {isPremium ? 'Type Entry' : 'AI Prompt (Coming Soon)'}
+                            </Text>
+                            {!isPremium && (
+                                <Text style={styles.headerSubtitle}>
+                                    AI-powered food analysis will be available soon
+                                </Text>
+                            )}
+                        </View>
                         <TextInput
                             style={styles.textOnlyInput}
-                            placeholder="What did you eat?"
+                            placeholder={isPremium ? "What did you eat?" : "Type your food description here..."}
                             value={textOnlyInput}
                             onChangeText={setTextOnlyInput}
                             multiline
                             autoFocus
+                            editable={true}
                         />
                         <View style={styles.bottomActions}>
-                            <TouchableOpacity onPress={() => setStep('select')}><Text style={styles.ghostButtonText}>Back</Text></TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.primaryButton, !textOnlyInput.trim() && { opacity: 0.5 }]}
-                                onPress={processTextOnly}
-                                disabled={!textOnlyInput.trim()}
-                            >
-                                <Text style={styles.primaryButtonText}>Analyze</Text>
+                            <TouchableOpacity onPress={() => setStep('select')}>
+                                <Text style={styles.ghostButtonText}>Back</Text>
                             </TouchableOpacity>
+                            {isPremium ? (
+                                <TouchableOpacity
+                                    style={[styles.primaryButton, !textOnlyInput.trim() && { opacity: 0.5 }]}
+                                    onPress={processTextOnly}
+                                    disabled={!textOnlyInput.trim()}
+                                >
+                                    <Text style={styles.primaryButtonText}>Analyze</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    style={[styles.primaryButton, { opacity: 0.6 }]}
+                                    onPress={() => {
+                                        Alert.alert(
+                                            'Coming Soon',
+                                            'AI-powered food analysis is coming soon! Upgrade to Premium to unlock instant food scanning and analysis.',
+                                            [
+                                                { text: 'OK' },
+                                                {
+                                                    text: 'Upgrade',
+                                                    onPress: () => {
+                                                        handleClose();
+                                                        onShowPaywall?.();
+                                                    }
+                                                }
+                                            ]
+                                        );
+                                    }}
+                                >
+                                    <Text style={styles.primaryButtonText}>Coming Soon</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
                 );

@@ -19,11 +19,13 @@ import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
+import { useRevenueCat } from '../hooks/useRevenueCat';
 import { notificationService } from '../services/notificationService';
 import { friendService } from '../services/friendService';
 import { Friend } from '../types';
 import UserAvatar from '../components/UserAvatar';
 import { UserProfilePopup } from '../components/UserProfilePopup';
+import { PremiumGate } from '../components/PremiumGate';
 import { spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -48,6 +50,7 @@ export default function InnerCircleScreen() {
     const navigation = useNavigation<any>();
     const { user } = useAuthContext();
     const { onboardingData } = useUserData();
+    const { isPremium, isLoading: isPremiumLoading } = useRevenueCat();
     const [friends, setFriends] = useState<Friend[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
@@ -135,6 +138,37 @@ export default function InnerCircleScreen() {
             setIsSending(false);
         }
     };
+
+    // Show premium gate if not premium
+    if (!isPremiumLoading && !isPremium) {
+        return (
+            <View style={styles.container}>
+                <LinearGradient colors={THEME.bg as any} style={StyleSheet.absoluteFillObject} />
+                <SafeAreaView style={styles.safeArea}>
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                            <Feather name="x" size={24} color={THEME.textDim} />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>INNER CIRCLE</Text>
+                        <View style={{ width: 40 }} />
+                    </View>
+                    <View style={styles.premiumGateContainer}>
+                        <PremiumGate
+                            message="Inner Circle is a premium feature. Connect with accountability partners and get support when you need it most."
+                            showPaywall={() => {
+                                navigation.goBack();
+                                navigation.navigate('Main', {
+                                    screen: 'Profile',
+                                    params: { showPaywall: true }
+                                });
+                            }}
+                            showUpgradeButton={true}
+                        />
+                    </View>
+                </SafeAreaView>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -322,6 +356,12 @@ const styles = StyleSheet.create({
     },
     safeArea: {
         flex: 1,
+    },
+    premiumGateContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xl,
     },
     header: {
         flexDirection: 'row',

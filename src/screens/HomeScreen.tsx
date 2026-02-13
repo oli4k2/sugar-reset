@@ -1110,6 +1110,13 @@ export default function HomeScreen() {
                             // Refresh streak calculation based on new food logs
                             refreshStreakFromFoodLogs();
                         }}
+                        onShowPaywall={() => {
+                            setShowFoodScannerModal(false);
+                            navigation.getParent()?.navigate('Main', {
+                                screen: 'Profile',
+                                params: { showPaywall: true }
+                            });
+                        }}
                     />
 
                     {/* Wellness Modal - Full-screen shared component */}

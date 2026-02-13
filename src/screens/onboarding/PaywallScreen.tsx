@@ -48,7 +48,7 @@ type PaywallScreenProps = {
 type PaywallStep = 'intro' | 'reminder' | 'plans';
 
 export default function PaywallScreen({ navigation }: PaywallScreenProps) {
-    const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium, customerInfo, findPackageByIdentifier } = useRevenueCat();
+    const { currentOffering, isLoading, purchasePackage, isPremium, customerInfo, findPackageByIdentifier } = useRevenueCat();
     const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint } = useUserData();
     const { isAuthenticated } = useAuthContext();
     const posthog = usePostHog();
@@ -57,7 +57,6 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
-    const [isRestoring, setIsRestoring] = useState(false);
     const [showCancellationOffer, setShowCancellationOffer] = useState(false);
 
     // Animations
@@ -137,14 +136,15 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             current_step: currentStep
         });
 
+        // During onboarding, only allow navigation between steps
+        // No way to skip/decline - must start free trial
         if (currentStep === 'reminder') {
             setCurrentStep('intro');
         } else if (currentStep === 'plans') {
             setCurrentStep('reminder');
-        } else if (currentStep === 'intro') {
-            posthog?.capture('paywall_dismiss_attempted');
-            setShowCancellationOffer(true);
         }
+        // Removed: intro step back button no longer shows cancellation offer
+        // Users must complete the paywall flow to start free trial
     };
 
     const handleAcceptYearly = async (step: 'offer1' | 'offer2' | 'free') => {
@@ -331,23 +331,37 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 });
             }
 
-            // Schedule trial expiration reminder (2 days before trial ends)
+            // Schedule trial expiration reminder (2 days into trial = 1 day before it ends)
+            // Only for yearly subscription (which has the 3-day free trial)
             // Check customerInfo after purchase (it's updated in context)
             // Use a small delay to ensure context has updated
-            setTimeout(async () => {
-                try {
-                    if (customerInfo?.entitlements?.active?.['premium']?.periodType === 'TRIAL' &&
-                        customerInfo.entitlements.active['premium'].expirationDate) {
-                        const expirationDate = new Date(customerInfo.entitlements.active['premium'].expirationDate);
-                        const { notificationService } = await import('../../services/notificationService');
-                        await notificationService.scheduleTrialExpirationReminder(expirationDate);
-                        console.log('✅ Scheduled trial expiration reminder for', expirationDate.toLocaleDateString());
+            if (selectedPlan === 'yearly' && selectedPackage?.packageType === 'ANNUAL') {
+                setTimeout(async () => {
+                    try {
+                        // Get updated customerInfo from RevenueCat
+                        const { revenueCatService } = await import('../../services/revenueCatService');
+                        const updatedInfo = await revenueCatService.getCustomerInfo();
+                        
+                        // Check if user has active premium entitlement with trial period
+                        const premiumEntitlement = updatedInfo?.entitlements?.active?.['premium'];
+                        if (premiumEntitlement && premiumEntitlement.expirationDate) {
+                            const expirationDate = new Date(premiumEntitlement.expirationDate);
+                            const now = new Date();
+                            const daysUntilExpiration = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                            
+                            // Only schedule if trial is active (expires in ~3 days)
+                            if (daysUntilExpiration > 0 && daysUntilExpiration <= 3) {
+                                const { notificationService } = await import('../../services/notificationService');
+                                await notificationService.scheduleTrialExpirationReminder(expirationDate);
+                                console.log('✅ Scheduled trial expiration reminder for', expirationDate.toLocaleDateString(), '(2 days into trial)');
+                            }
+                        }
+                    } catch (notifError) {
+                        console.warn('Could not schedule trial reminder:', notifError);
+                        // Don't fail the purchase if notification scheduling fails
                     }
-                } catch (notifError) {
-                    console.warn('Could not schedule trial reminder:', notifError);
-                    // Don't fail the purchase if notification scheduling fails
-                }
-            }, 500);
+                }, 1000); // Increased delay to ensure RevenueCat has updated
+            }
 
             await completeOnboarding();
 
@@ -389,28 +403,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
         }
     };
 
-    const handleRestore = async () => {
-        try {
-            setIsRestoring(true);
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await restorePurchases();
-
-            if (isPremium) {
-                posthog?.capture('restore_successful');
-                Alert.alert('Success!', 'Your purchases have been restored.');
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } else {
-                posthog?.capture('restore_failed', { reason: 'no_purchases' });
-                Alert.alert('No Purchases Found', 'We couldn\'t find any previous purchases.');
-            }
-        } catch (error: any) {
-            posthog?.capture('restore_failed', { error: error.message });
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert('Restore Failed', error.message || 'Please try again.');
-        } finally {
-            setIsRestoring(false);
-        }
-    };
+    // Restore functionality removed - not needed on paywall
 
     // Calculate billing date (3 days from now)
     const getBillingDate = () => {
@@ -666,18 +659,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 {currentStep === 'reminder' && renderReminderStep()}
                 {currentStep === 'plans' && renderPlansStep()}
 
-                {/* Restore Link */}
-                <TouchableOpacity
-                    onPress={handleRestore}
-                    disabled={isRestoring}
-                    style={styles.restoreButtonBottom}
-                >
-                    {isRestoring ? (
-                        <ActivityIndicator size="small" color={looviColors.text.tertiary} />
-                    ) : (
-                        <Text style={styles.restoreTextBottom}>Restore Purchases</Text>
-                    )}
-                </TouchableOpacity>
+                {/* Restore button removed - not needed on paywall */}
             </SafeAreaView>
 
             <CancellationOfferScreen
@@ -708,20 +690,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         justifyContent: 'center',
     },
-    restoreButtonBottom: {
-        alignItems: 'center',
-        paddingBottom: spacing.lg,
-    },
-    restoreTextBottom: {
-        fontSize: 13,
-        color: looviColors.text.tertiary,
-        textDecorationLine: 'underline',
-    },
-    restoreText: {
-        fontSize: 15,
-        color: looviColors.text.tertiary,
-        fontWeight: '500',
-    },
+    // Restore button styles removed - not used anymore
     stepContainer: {
         flex: 1,
         justifyContent: 'space-between',

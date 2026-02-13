@@ -617,9 +617,10 @@ export const notificationService = {
      */
     async scheduleTrialExpirationReminder(expirationDate: Date): Promise<void> {
         try {
-            // Calculate reminder date (2 days before expiration)
+            // Calculate reminder date (1 day before expiration = 2 days into the 3-day trial)
+            // User has had trial for 2 days, reminder that it ends tomorrow
             const reminderDate = new Date(expirationDate);
-            reminderDate.setDate(reminderDate.getDate() - 2);
+            reminderDate.setDate(reminderDate.getDate() - 1);
             reminderDate.setHours(10, 0, 0, 0); // 10 AM reminder
 
             // Don't schedule if reminder date is in the past
@@ -633,8 +634,8 @@ export const notificationService = {
 
             await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: '⏰ Your trial ends soon!',
-                    body: 'Your 3-day free trial ends in 2 days. Subscribe to keep your premium features!',
+                    title: '⏰ Your trial ends tomorrow!',
+                    body: 'Your 3-day free trial ends tomorrow and will automatically convert to a premium subscription. Cancel anytime in settings.',
                     sound: true,
                     data: {
                         type: 'trial_expiration_reminder',
@@ -648,7 +649,7 @@ export const notificationService = {
                 identifier: 'trial-expiration-reminder',
             });
 
-            console.log(`📅 Scheduled trial expiration reminder for ${reminderDate.toLocaleString()}`);
+            console.log(`📅 Scheduled trial expiration reminder for ${reminderDate.toLocaleString()} (1 day before expiration)`);
         } catch (error) {
             console.error('❌ Failed to schedule trial expiration reminder:', error);
         }

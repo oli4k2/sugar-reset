@@ -32,7 +32,7 @@ interface CancellationOfferProps {
     onClose: () => void;
     onAcceptYearly: (step: OfferStep) => void;
     onAcceptLifetime: (step: OfferStep) => void;
-    onContinueFree: () => void;
+    onContinueFree?: () => void; // Optional - only used if needed
 }
 
 type OfferStep = 'offer1' | 'offer2' | 'free';
@@ -79,8 +79,9 @@ export default function CancellationOfferScreen({
             // Show offer 2
             setCurrentStep('offer2');
         } else if (currentStep === 'offer2') {
-            // Go to free tier
-            setCurrentStep('free');
+            // After both offers declined, close and continue to free tier
+            // No "continue free" button - just close
+            onClose();
         } else {
             onClose();
         }
@@ -98,7 +99,13 @@ export default function CancellationOfferScreen({
 
     const handleContinueFree = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onContinueFree();
+        // Only call if provided (for backward compatibility)
+        if (onContinueFree) {
+            onContinueFree();
+        } else {
+            // Just close - user goes to free tier automatically
+            onClose();
+        }
     };
 
     // Render Offer 1: $12.99/year or $24.99 lifetime
@@ -277,7 +284,7 @@ export default function CancellationOfferScreen({
 
                         {currentStep === 'offer1' && renderOffer1()}
                         {currentStep === 'offer2' && renderOffer2()}
-                        {currentStep === 'free' && renderFreeTier()}
+                        {/* Removed free tier step - users go directly to free tier after declining both offers */}
                     </SafeAreaView>
                 </Animated.View>
             </View>
