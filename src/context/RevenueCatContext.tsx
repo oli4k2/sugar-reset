@@ -22,6 +22,7 @@ interface RevenueCatContextType {
   restorePurchases: () => Promise<void>;
   refreshData: () => Promise<void>;
   checkPremiumStatus: () => Promise<void>;
+  findPackageByIdentifier: (identifier: string) => Promise<PurchasesPackage | null>;
 }
 
 const RevenueCatContext = createContext<RevenueCatContextType | null>(null);
@@ -197,6 +198,33 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     await loadData();
   }, [loadData]);
 
+  // Find a package by identifier across all offerings
+  const findPackageByIdentifier = useCallback(async (identifier: string): Promise<PurchasesPackage | null> => {
+    try {
+      // First check current offering
+      if (currentOffering?.availablePackages) {
+        const pkg = currentOffering.availablePackages.find(p => p.identifier === identifier);
+        if (pkg) return pkg;
+      }
+
+      // If not found, search all offerings
+      const offerings = await revenueCatService.getOfferings();
+      if (offerings?.all) {
+        for (const offering of Object.values(offerings.all)) {
+          if (offering?.availablePackages) {
+            const pkg = offering.availablePackages.find(p => p.identifier === identifier);
+            if (pkg) return pkg;
+          }
+        }
+      }
+
+      return null;
+    } catch (err) {
+      console.error('Failed to find package:', err);
+      return null;
+    }
+  }, [currentOffering]);
+
   const value: RevenueCatContextType = {
     isPremium,
     isLoading,
@@ -207,6 +235,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     restorePurchases,
     refreshData,
     checkPremiumStatus,
+    findPackageByIdentifier,
   };
 
   return <RevenueCatContext.Provider value={value}>{children}</RevenueCatContext.Provider>;

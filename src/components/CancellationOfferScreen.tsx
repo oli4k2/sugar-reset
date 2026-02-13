@@ -4,8 +4,8 @@
  * Shown when users try to cancel their subscription or after trial expires.
  * Multi-step offer flow:
  * 
- * Offer 1: $15/year OR $25 lifetime (with X button)
- * Offer 2: $15 lifetime - Final chance (with X button)
+ * Offer 1: $12.99/year OR $24.99 lifetime (with X button)
+ * Offer 2: $14.99 lifetime - Final chance (with X button)
  * Free tier: If they decline everything
  */
 
@@ -30,8 +30,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 interface CancellationOfferProps {
     visible: boolean;
     onClose: () => void;
-    onAcceptYearly: () => void;
-    onAcceptLifetime: () => void;
+    onAcceptYearly: (step: OfferStep) => void;
+    onAcceptLifetime: (step: OfferStep) => void;
     onContinueFree: () => void;
 }
 
@@ -88,12 +88,12 @@ export default function CancellationOfferScreen({
 
     const handleAcceptYearly = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onAcceptYearly();
+        onAcceptYearly(currentStep);
     };
 
     const handleAcceptLifetime = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onAcceptLifetime();
+        onAcceptLifetime(currentStep);
     };
 
     const handleContinueFree = () => {
@@ -101,7 +101,7 @@ export default function CancellationOfferScreen({
         onContinueFree();
     };
 
-    // Render Offer 1: $15/year or $25 lifetime
+    // Render Offer 1: $12.99/year or $24.99 lifetime
     const renderOffer1 = () => (
         <View style={styles.offerContent}>
             <Text style={styles.waitTitle}>Wait! Don't Go</Text>
@@ -117,11 +117,11 @@ export default function CancellationOfferScreen({
                     activeOpacity={0.8}
                 >
                     <Text style={styles.dealLabel}>YEARLY DEAL</Text>
-                    <Text style={styles.dealOriginalPrice}>$29.99</Text>
-                    <Text style={styles.dealNewPrice}>$15</Text>
+                    <Text style={styles.dealOriginalPrice}>$14.99</Text>
+                    <Text style={styles.dealNewPrice}>$12.99</Text>
                     <Text style={styles.dealPeriod}>per year</Text>
                     <View style={styles.savingsBadge}>
-                        <Text style={styles.savingsText}>Save 50%</Text>
+                        <Text style={styles.savingsText}>Save 13%</Text>
                     </View>
                 </TouchableOpacity>
 
@@ -135,11 +135,11 @@ export default function CancellationOfferScreen({
                         <Text style={styles.bestValueText}>BEST VALUE</Text>
                     </View>
                     <Text style={styles.dealLabel}>LIFETIME</Text>
-                    <Text style={styles.dealOriginalPrice}>$99.99</Text>
-                    <Text style={styles.dealNewPrice}>$25</Text>
+                    <Text style={styles.dealOriginalPrice}>$24.99</Text>
+                    <Text style={styles.dealNewPrice}>$24.99</Text>
                     <Text style={styles.dealPeriod}>one-time</Text>
                     <View style={[styles.savingsBadge, styles.savingsBadgeGold]}>
-                        <Text style={styles.savingsText}>Save 75%</Text>
+                        <Text style={styles.savingsText}>Best Deal</Text>
                     </View>
                 </TouchableOpacity>
             </View>
@@ -152,7 +152,7 @@ export default function CancellationOfferScreen({
         </View>
     );
 
-    // Render Offer 2: $15 Lifetime - Final chance
+    // Render Offer 2: $14.99 Lifetime - Final chance
     const renderOffer2 = () => (
         <View style={styles.offerContent}>
             <Text style={styles.finalChanceEmoji}>🎁</Text>
@@ -163,8 +163,8 @@ export default function CancellationOfferScreen({
             </Text>
 
             <View style={styles.lifetimeCard}>
-                <Text style={styles.lifetimeOriginal}>$99.99</Text>
-                <Text style={styles.lifetimePrice}>$15</Text>
+                <Text style={styles.lifetimeOriginal}>$24.99</Text>
+                <Text style={styles.lifetimePrice}>$14.99</Text>
                 <Text style={styles.lifetimePeriod}>Lifetime Access</Text>
 
                 <View style={styles.lifetimeFeaturesList}>
@@ -179,7 +179,7 @@ export default function CancellationOfferScreen({
                 onPress={handleAcceptLifetime}
                 activeOpacity={0.8}
             >
-                <Text style={styles.lifetimeCtaText}>Get Lifetime for $15</Text>
+                <Text style={styles.lifetimeCtaText}>Get Lifetime for $14.99</Text>
             </TouchableOpacity>
         </View>
     );

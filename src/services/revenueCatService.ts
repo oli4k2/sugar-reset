@@ -25,11 +25,11 @@ const createMockOffering = (): PurchasesOffering => {
     identifier: 'monthly',
     packageType: 'MONTHLY',
     product: {
-      identifier: 'premium_monthly',
+      identifier: 'monthly_subscription',
       description: 'Premium Monthly Subscription',
       title: 'Premium Monthly',
-      price: 9.99,
-      priceString: '$9.99',
+      price: 8.99,
+      priceString: '$8.99',
       currencyCode: 'USD',
       introPrice: null,
     },
@@ -40,44 +40,84 @@ const createMockOffering = (): PurchasesOffering => {
     identifier: 'annual',
     packageType: 'ANNUAL',
     product: {
-      identifier: 'premium_yearly',
+      identifier: 'yearly_subscription',
       description: 'Premium Annual Subscription',
       title: 'Premium Annual',
-      price: 99.99,
-      priceString: '$99.99',
+      price: 14.99,
+      priceString: '$14.99',
       currencyCode: 'USD',
       introPrice: {
         price: 0,
         priceString: '$0.00',
-        period: 'P1W',
+        period: 'P3D',
         cycles: 1,
-        periodNumberOfUnits: 1,
-        periodUnit: 'WEEK',
+        periodNumberOfUnits: 3,
+        periodUnit: 'DAY',
       },
     },
     offeringIdentifier: 'default',
   } as PurchasesPackage;
 
-  const lifetimePackage: PurchasesPackage = {
-    identifier: 'lifetime',
-    packageType: 'LIFETIME',
+  // Cancellation offer packages
+  const yearlyOfferPackage: PurchasesPackage = {
+    identifier: 'annual_offer1',
+    packageType: 'ANNUAL',
     product: {
-      identifier: 'premium_lifetime',
-      description: 'Premium Lifetime Access',
-      title: 'Premium Lifetime',
-      price: 99.99,
-      priceString: '$99.99',
+      identifier: 'yearly_subscription_offer',
+      description: 'Premium Annual Subscription - Special Offer',
+      title: 'Premium Annual - Special Offer',
+      price: 12.99,
+      priceString: '$12.99',
       currencyCode: 'USD',
       introPrice: null,
     },
     offeringIdentifier: 'default',
   } as PurchasesPackage;
 
+  const lifetimeOffer1Package: PurchasesPackage = {
+    identifier: 'lifetime_offer1',
+    packageType: 'LIFETIME',
+    product: {
+      identifier: 'lifetime_offer_1',
+      description: 'Premium Lifetime Access - Offer 1',
+      title: 'Premium Lifetime - Offer 1',
+      price: 24.99,
+      priceString: '$24.99',
+      currencyCode: 'USD',
+      introPrice: null,
+    },
+    offeringIdentifier: 'default',
+  } as PurchasesPackage;
+
+  const lifetimeOffer2Package: PurchasesPackage = {
+    identifier: 'lifetime_offer2',
+    packageType: 'LIFETIME',
+    product: {
+      identifier: 'lifetime_offer_2',
+      description: 'Premium Lifetime Access - Offer 2',
+      title: 'Premium Lifetime - Offer 2',
+      price: 14.99,
+      priceString: '$14.99',
+      currencyCode: 'USD',
+      introPrice: null,
+    },
+    offeringIdentifier: 'default',
+  } as PurchasesPackage;
+
+  // Use lifetime_offer1 as the default lifetime package (no regular lifetime)
+  const lifetimePackage = lifetimeOffer1Package;
+
   return {
     identifier: 'default',
     serverDescription: 'Premium Subscription',
     metadata: {},
-    availablePackages: [monthlyPackage, yearlyPackage, lifetimePackage],
+    availablePackages: [
+      monthlyPackage,
+      yearlyPackage,
+      yearlyOfferPackage,
+      lifetimeOffer1Package,
+      lifetimeOffer2Package,
+    ],
     lifetime: lifetimePackage,
     annual: yearlyPackage,
     sixMonth: null,
@@ -102,7 +142,7 @@ const createMockCustomerInfo = (isPremium: boolean = false): CustomerInfo => {
               originalPurchaseDate: new Date().toISOString(),
               expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
               store: Platform.OS === 'ios' ? 'APP_STORE' : 'PLAY_STORE',
-              productIdentifier: 'premium_monthly',
+              productIdentifier: 'monthly_subscription',
               isSandbox: true,
               unsubscribeDetectedAt: null,
               billingIssueDetectedAt: null,
@@ -111,8 +151,8 @@ const createMockCustomerInfo = (isPremium: boolean = false): CustomerInfo => {
         : {},
       all: {},
     },
-    activeSubscriptions: isPremium ? ['premium_monthly'] : [],
-    allPurchasedProductIdentifiers: isPremium ? ['premium_monthly'] : [],
+    activeSubscriptions: isPremium ? ['monthly_subscription', 'yearly_subscription'] : [],
+    allPurchasedProductIdentifiers: isPremium ? ['monthly_subscription', 'yearly_subscription', 'lifetime_offer_1', 'lifetime_offer_2'] : [],
     latestExpirationDate: isPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null,
     firstSeen: new Date().toISOString(),
     originalAppUserId: 'mock_user',

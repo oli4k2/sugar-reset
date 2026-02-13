@@ -152,7 +152,7 @@ export function useAuth(): UseAuthReturn {
                             errorMessage = errorData.error || errorMessage;
                         } else {
                             errorMessage = `Server error (${response.status})`;
-                        }
+            }
                     } catch (e) {
                         errorMessage = responseText || `Server error (${response.status})`;
                     }
@@ -178,7 +178,7 @@ export function useAuth(): UseAuthReturn {
                 // Store email locally for when user clicks the link
                 await AsyncStorage.setItem(EMAIL_STORAGE_KEY, email);
                 console.log('✅ Magic link sent successfully via Resend');
-                return true;
+            return true;
             } catch (fetchError: any) {
                 // If it's a network error or the API isn't deployed, provide helpful error
                 if (fetchError.message?.includes('405') || fetchError.message?.includes('404') || fetchError.message?.includes('not available')) {

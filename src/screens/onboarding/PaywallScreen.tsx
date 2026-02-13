@@ -47,7 +47,7 @@ type PaywallScreenProps = {
 type PaywallStep = 'intro' | 'reminder' | 'plans';
 
 export default function PaywallScreen({ navigation }: PaywallScreenProps) {
-    const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium } = useRevenueCat();
+    const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium, customerInfo, findPackageByIdentifier } = useRevenueCat();
     const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint } = useUserData();
     const { isAuthenticated } = useAuthContext();
 
@@ -125,36 +125,75 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
         }
     };
 
-    const handleAcceptYearly = async () => {
+    const handleAcceptYearly = async (step: 'offer1' | 'offer2' | 'free') => {
         setShowCancellationOffer(false);
-        if (currentOffering?.annual) {
-            setSelectedPackage(currentOffering.annual);
-            await handleStartTrial();
-        } else {
-            Alert.alert('Error', 'Yearly plan not available');
+        setIsPurchasing(true);
+        try {
+            // Try to find the cancellation offer yearly package
+            // Offer 1: 'annual_offer1' for yearly_subscription_offer ($12.99)
+            // Offer 2: 'annual_offer2' for yearly_subscription_offer_2 ($14.99) - if exists
+            let offerPackage: PurchasesPackage | null = null;
+            
+            if (step === 'offer1') {
+                // Search across all offerings for annual_offer1
+                offerPackage = await findPackageByIdentifier('annual_offer1');
+            } else if (step === 'offer2') {
+                // Search across all offerings for annual_offer2
+                offerPackage = await findPackageByIdentifier('annual_offer2');
+            }
+            
+            // Fallback to regular annual if offer package not found
+            if (!offerPackage && currentOffering?.annual) {
+                offerPackage = currentOffering.annual;
+            }
+            
+            if (offerPackage) {
+                await purchasePackage(offerPackage);
+                await completeSuccessFlow();
+            } else {
+                Alert.alert('Error', 'Yearly offer not available');
+            }
+        } catch (e: any) {
+            console.warn(e);
+            Alert.alert('Error', e.message);
+        } finally {
+            setIsPurchasing(false);
         }
     };
 
-    const handleAcceptLifetime = async () => {
+    const handleAcceptLifetime = async (step: 'offer1' | 'offer2' | 'free') => {
         setShowCancellationOffer(false);
-        // For now using annual as placeholder for lifetime
-        // Ideally you would have a specific lifetime package configured
-        if (currentOffering?.lifetime) {
-            setSelectedPackage(currentOffering.lifetime);
-            setIsPurchasing(true);
-            try {
-                await purchasePackage(currentOffering.lifetime);
-                await completeSuccessFlow();
-            } catch (e: any) {
-                console.warn(e);
-                Alert.alert('Error', e.message);
-            } finally {
-                setIsPurchasing(false);
+        setIsPurchasing(true);
+        try {
+            // Try to find the cancellation offer lifetime package based on step
+            // Offer 1: 'lifetime_offer1' for lifetime_offer_1 ($24.99)
+            // Offer 2: 'lifetime_offer2' for lifetime_offer_2 ($14.99)
+            let offerPackage: PurchasesPackage | null = null;
+            
+            if (step === 'offer1') {
+                // Search across all offerings for lifetime_offer1
+                offerPackage = await findPackageByIdentifier('lifetime_offer1');
+            } else if (step === 'offer2') {
+                // Search across all offerings for lifetime_offer2
+                offerPackage = await findPackageByIdentifier('lifetime_offer2');
             }
-        } else if (currentOffering?.annual) {
-            // Fallback to annual if no lifetime configured (for testing)
-            setSelectedPackage(currentOffering.annual);
-            await handleStartTrial();
+            
+            // Fallback to regular lifetime if offer packages not found
+            if (!offerPackage && currentOffering?.lifetime) {
+                offerPackage = currentOffering.lifetime;
+            }
+            
+            if (offerPackage) {
+                await purchasePackage(offerPackage);
+                await completeSuccessFlow();
+            } else {
+                Alert.alert('Error', 'Lifetime offer not available');
+            }
+        } catch (e: any) {
+            console.warn(e);
+            Alert.alert('Error', e.message);
+        } finally {
+            setIsPurchasing(false);
         }
     };
 
@@ -212,21 +251,25 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 return;
             }
 
-            const customerInfo = await purchasePackage(selectedPackage);
+            await purchasePackage(selectedPackage);
 
             // Schedule trial expiration reminder (2 days before trial ends)
-            if (customerInfo?.entitlements?.active?.['premium']?.periodType === 'TRIAL' &&
-                customerInfo.entitlements.active['premium'].expirationDate) {
+            // Check customerInfo after purchase (it's updated in context)
+            // Use a small delay to ensure context has updated
+            setTimeout(async () => {
                 try {
-                    const expirationDate = new Date(customerInfo.entitlements.active['premium'].expirationDate);
-                    const { notificationService } = await import('../../services/notificationService');
-                    await notificationService.scheduleTrialExpirationReminder(expirationDate);
-                    console.log('✅ Scheduled trial expiration reminder for', expirationDate.toLocaleDateString());
+                    if (customerInfo?.entitlements?.active?.['premium']?.periodType === 'TRIAL' &&
+                        customerInfo.entitlements.active['premium'].expirationDate) {
+                        const expirationDate = new Date(customerInfo.entitlements.active['premium'].expirationDate);
+                        const { notificationService } = await import('../../services/notificationService');
+                        await notificationService.scheduleTrialExpirationReminder(expirationDate);
+                        console.log('✅ Scheduled trial expiration reminder for', expirationDate.toLocaleDateString());
+                    }
                 } catch (notifError) {
                     console.warn('Could not schedule trial reminder:', notifError);
                     // Don't fail the purchase if notification scheduling fails
                 }
-            }
+            }, 500);
 
             await completeOnboarding();
 
@@ -288,10 +331,10 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     };
 
     // Get price info
-    const getMonthlyPrice = () => currentOffering?.monthly?.product.priceString || '$9.99';
-    const getYearlyPrice = () => currentOffering?.annual?.product.priceString || '$29.99';
+    const getMonthlyPrice = () => currentOffering?.monthly?.product.priceString || '$8.99';
+    const getYearlyPrice = () => currentOffering?.annual?.product.priceString || '$14.99';
     const getYearlyMonthlyEquivalent = () => {
-        const price = currentOffering?.annual?.product.price || 29.99;
+        const price = currentOffering?.annual?.product.price || 14.99;
         return `$${(price / 12).toFixed(2)}`;
     };
 
