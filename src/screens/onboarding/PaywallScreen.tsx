@@ -7,8 +7,8 @@
  * Step 3: Timeline with plan selection - 3-day free trial
  * 
  * After trial cancellation:
- * - Offer 1: $15/year or $25 lifetime
- * - Offer 2: $15 lifetime (final)
+ * - Offer 1: $12.99/year or $24.99 lifetime
+ * - Offer 2: $14.99 lifetime (final)
  * - Free tier if declined
  */
 
@@ -34,6 +34,7 @@ import { useRevenueCat } from '../../hooks/useRevenueCat';
 import { useUserData } from '../../context/UserDataContext';
 import { useAuthContext } from '../../context/AuthContext';
 import * as Haptics from 'expo-haptics';
+import { usePostHog } from 'posthog-react-native';
 
 import CancellationOfferScreen from '../../components/CancellationOfferScreen';
 
@@ -50,6 +51,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     const { currentOffering, isLoading, purchasePackage, restorePurchases, isPremium, customerInfo, findPackageByIdentifier } = useRevenueCat();
     const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint } = useUserData();
     const { isAuthenticated } = useAuthContext();
+    const posthog = usePostHog();
 
     const [currentStep, setCurrentStep] = useState<PaywallStep>('intro');
     const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
@@ -80,7 +82,18 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 useNativeDriver: true,
             }),
         ]).start();
-    }, [currentStep]);
+
+        // Track step view
+        posthog?.capture('paywall_step_viewed', {
+            step: currentStep,
+            has_trial: currentStep === 'plans'
+        });
+
+        // Map intro and reminder to paywall viewed for consistency with high-level conversion funnel
+        if (currentStep === 'intro') {
+            posthog?.capture('paywall_viewed');
+        }
+    }, [currentStep, posthog]);
 
     // Set default package
     useEffect(() => {
@@ -107,6 +120,10 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
 
     const handleNextStep = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        posthog?.capture('paywall_step_next_clicked', {
+            current_step: currentStep
+        });
+
         if (currentStep === 'intro') {
             setCurrentStep('reminder');
         } else if (currentStep === 'reminder') {
@@ -116,16 +133,24 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
 
     const handleBack = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        posthog?.capture('paywall_back_clicked', {
+            current_step: currentStep
+        });
+
         if (currentStep === 'reminder') {
             setCurrentStep('intro');
         } else if (currentStep === 'plans') {
             setCurrentStep('reminder');
         } else if (currentStep === 'intro') {
+            posthog?.capture('paywall_dismiss_attempted');
             setShowCancellationOffer(true);
         }
     };
 
     const handleAcceptYearly = async (step: 'offer1' | 'offer2' | 'free') => {
+        posthog?.capture('paywall_cancellation_yearly_accepted', {
+            offer_step: step
+        });
         setShowCancellationOffer(false);
         setIsPurchasing(true);
         try {
@@ -148,13 +173,29 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             }
             
             if (offerPackage) {
+                posthog?.capture('purchase_initiated', {
+                    package_id: offerPackage.identifier,
+                    package_type: 'annual',
+                    is_downsell: true,
+                    offer_step: step
+                });
                 await purchasePackage(offerPackage);
+                posthog?.capture('purchase_successful', {
+                    package_id: offerPackage.identifier,
+                    package_type: 'annual',
+                    is_downsell: true
+                });
                 await completeSuccessFlow();
             } else {
                 Alert.alert('Error', 'Yearly offer not available');
             }
         } catch (e: any) {
             console.warn(e);
+            posthog?.capture('purchase_failed', {
+                error: e.message,
+                package_type: 'annual',
+                is_downsell: true
+            });
             Alert.alert('Error', e.message);
         } finally {
             setIsPurchasing(false);
@@ -162,6 +203,9 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     };
 
     const handleAcceptLifetime = async (step: 'offer1' | 'offer2' | 'free') => {
+        posthog?.capture('paywall_cancellation_lifetime_accepted', {
+            offer_step: step
+        });
         setShowCancellationOffer(false);
         setIsPurchasing(true);
         try {
@@ -184,13 +228,29 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             }
             
             if (offerPackage) {
+                posthog?.capture('purchase_initiated', {
+                    package_id: offerPackage.identifier,
+                    package_type: 'lifetime',
+                    is_downsell: true,
+                    offer_step: step
+                });
                 await purchasePackage(offerPackage);
+                posthog?.capture('purchase_successful', {
+                    package_id: offerPackage.identifier,
+                    package_type: 'lifetime',
+                    is_downsell: true
+                });
                 await completeSuccessFlow();
             } else {
                 Alert.alert('Error', 'Lifetime offer not available');
             }
         } catch (e: any) {
             console.warn(e);
+            posthog?.capture('purchase_failed', {
+                error: e.message,
+                package_type: 'lifetime',
+                is_downsell: true
+            });
             Alert.alert('Error', e.message);
         } finally {
             setIsPurchasing(false);
@@ -198,6 +258,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     };
 
     const handleContinueFree = async () => {
+        posthog?.capture('paywall_cancellation_declined_continue_free');
         setShowCancellationOffer(false);
         await completeOnboarding();
 
@@ -243,6 +304,15 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             setIsPurchasing(true);
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+            if (selectedPackage) {
+                posthog?.capture('purchase_initiated', {
+                    package_id: selectedPackage.identifier,
+                    package_type: selectedPackage.packageType,
+                    price: selectedPackage.product.price,
+                    currency: selectedPackage.product.currencyCode
+                });
+            }
+
             // Check if purchasePackage is available
             if (!purchasePackage) {
                 console.error('purchasePackage function is not available');
@@ -251,7 +321,15 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 return;
             }
 
+            // Note: purchasePackage returns void, customerInfo is updated in context
             await purchasePackage(selectedPackage);
+
+            if (selectedPackage) {
+                posthog?.capture('purchase_successful', {
+                    package_id: selectedPackage.identifier,
+                    package_type: selectedPackage.packageType
+                });
+            }
 
             // Schedule trial expiration reminder (2 days before trial ends)
             // Check customerInfo after purchase (it's updated in context)
@@ -295,7 +373,15 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             }
         } catch (error: any) {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            if (error.message !== 'Purchase cancelled') {
+            if (error.message === 'Purchase cancelled' || (error.userCancelled)) {
+                posthog?.capture('purchase_cancelled', {
+                    package_id: selectedPackage?.identifier
+                });
+            } else {
+                posthog?.capture('purchase_failed', {
+                    package_id: selectedPackage?.identifier,
+                    error: error.message
+                });
                 Alert.alert('Error', error.message || 'Please try again.');
             }
         } finally {
@@ -310,12 +396,15 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             await restorePurchases();
 
             if (isPremium) {
+                posthog?.capture('restore_successful');
                 Alert.alert('Success!', 'Your purchases have been restored.');
                 await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } else {
+                posthog?.capture('restore_failed', { reason: 'no_purchases' });
                 Alert.alert('No Purchases Found', 'We couldn\'t find any previous purchases.');
             }
         } catch (error: any) {
+            posthog?.capture('restore_failed', { error: error.message });
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert('Restore Failed', error.message || 'Please try again.');
         } finally {
