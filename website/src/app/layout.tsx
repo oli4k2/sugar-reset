@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   title: "Craveless",
   description: "Reset your sugar habits.",
   icons: {
-    icon: "/craveless_icon.png",
+    icon: "/craveless_app_icon.png",
   },
 };
 

@@ -4,17 +4,17 @@
     "slug": "sugar-reset",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./src/public/craveless_app_icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "scheme": "craveless",
     "splash": {
-      "image": "./assets/images/craveless-logo-auth.png",
+      "image": "./src/public/appstore.png",
       "resizeMode": "contain",
       "backgroundColor": "#0D0F12"
     },
     "ios": {
-      "icon": "./src/public/appstore.png",
+      "icon": "./src/public/craveless_app_icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.sugarreset.app",
       "appleTeamId": "LX5566JXPP",
@@ -26,7 +26,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./src/public/craveless_app_icon.png",
         "backgroundColor": "#0D0F12"
       },
       "package": "com.craveless.app",
@@ -39,7 +39,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./src/public/craveless_app_icon.png"
     },
     "extra": {
       "eas": {
