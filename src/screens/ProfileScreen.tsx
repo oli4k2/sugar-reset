@@ -44,6 +44,7 @@ import { AppIcon } from '../components/OnboardingIcon';
 import * as Haptics from 'expo-haptics';
 import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
 import CancellationOfferScreen from '../components/CancellationOfferScreen';
+import { ReviewPromptModal } from '../components/ReviewPromptModal';
 
 interface MenuItem {
     id: string;
@@ -88,6 +89,7 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
             { id: 'clearData', emoji: '🗑️', label: 'Clear All Data' },
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
             { id: 'migrateUsernames', emoji: '👤', label: 'Migrate Usernames (GDPR)' },
+            { id: 'testReviewPrompt', emoji: '⭐', label: 'Test Review Popup' },
         ],
     }] : []),
     {
@@ -116,6 +118,8 @@ export default function ProfileScreen() {
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
+    const [showReviewPrompt, setShowReviewPrompt] = useState(false);
+    const [reviewPromptVariant, setReviewPromptVariant] = useState<'first_scan' | 'day_two'>('first_scan');
 
     // Fetch pledge status from Firebase (same source as UserProfilePopup)
     useEffect(() => {
@@ -848,6 +852,30 @@ export default function ProfileScreen() {
                                                     case 'clearData': handleClearAllData(); break;
                                                     case 'cleanupCommunity': handleCleanupCommunityData(); break;
                                                     case 'migrateUsernames': handleMigrateUsernames(); break;
+                                                    case 'testReviewPrompt': {
+                                                        Alert.alert(
+                                                            'Test Review Popup',
+                                                            'Which variant?',
+                                                            [
+                                                                {
+                                                                    text: 'First Scan',
+                                                                    onPress: () => {
+                                                                        setReviewPromptVariant('first_scan');
+                                                                        setShowReviewPrompt(true);
+                                                                    },
+                                                                },
+                                                                {
+                                                                    text: 'Day Two',
+                                                                    onPress: () => {
+                                                                        setReviewPromptVariant('day_two');
+                                                                        setShowReviewPrompt(true);
+                                                                    },
+                                                                },
+                                                                { text: 'Cancel', style: 'cancel' },
+                                                            ]
+                                                        );
+                                                        break;
+                                                    }
                                                     case 'privacy': navigation.navigate('PrivacyPolicy'); break;
                                                     case 'terms': navigation.navigate('TermsOfService'); break;
                                                 }
@@ -1070,6 +1098,13 @@ export default function ProfileScreen() {
                             }}
                         />
                     )}
+
+                    {/* Review Prompt Modal (Developer Testing) */}
+                    <ReviewPromptModal
+                        visible={showReviewPrompt}
+                        onClose={() => setShowReviewPrompt(false)}
+                        variant={reviewPromptVariant}
+                    />
                 </SafeAreaView>
             </LooviBackground >
         </>

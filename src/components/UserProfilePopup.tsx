@@ -23,6 +23,7 @@ import { looviColors } from './LooviBackground';
 import { UserAvatar } from './UserAvatar';
 import { friendService } from '../services/friendService';
 import { useAuthContext } from '../context/AuthContext';
+import { useUserData } from '../context/UserDataContext';
 import { UserStats } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -51,10 +52,12 @@ export function UserProfilePopup({
     avatarValue,
 }: UserProfilePopupProps) {
     const { user } = useAuthContext();
+    const { latestHealthScore, streakData } = useUserData();
     const [stats, setStats] = useState<UserStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [friendStatus, setFriendStatus] = useState<FriendStatus>('loading');
     const [isAddingFriend, setIsAddingFriend] = useState(false);
+    const isSelf = user?.id === userId;
 
     // Check friend status when popup becomes visible
     const checkFriendStatus = async () => {
@@ -125,11 +128,19 @@ export function UserProfilePopup({
                             : null;
                         const isFromToday = statsDate === today;
 
-                        setStats({
+                        const adjustedStats = {
                             ...fetchedStats,
                             goalAchieved: isFromToday ? fetchedStats.goalAchieved : false,
                             pledgedToday: isFromToday ? fetchedStats.pledgedToday : false,
-                        });
+                        };
+
+                        // For self: use fresh local values instead of potentially stale Firestore data
+                        if (isSelf) {
+                            adjustedStats.healthScore = latestHealthScore || adjustedStats.healthScore;
+                            adjustedStats.currentStreak = streakData?.currentStreak ?? adjustedStats.currentStreak;
+                        }
+
+                        setStats(adjustedStats);
                     } else {
                         setStats(fetchedStats);
                     }

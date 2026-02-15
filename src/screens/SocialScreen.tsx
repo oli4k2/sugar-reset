@@ -274,7 +274,28 @@ export default function SocialScreen() {
                 return userInfo && userInfo.displayName && userInfo.displayName.trim() !== '';
             });
 
-            const entries: LeaderboardEntry[] = validStats.map((stat, index) => {
+            // Override the current user's score/streak with fresh local values
+            // (Firestore read may lag behind the write we just did)
+            const currentUserId = user?.id;
+            const freshStats = validStats.map(stat => {
+                if (stat.userId === currentUserId) {
+                    return {
+                        ...stat,
+                        healthScore: latestHealthScore || stat.healthScore,
+                        currentStreak: streakData?.currentStreak ?? stat.currentStreak,
+                    };
+                }
+                return stat;
+            });
+
+            // Re-sort after overriding the current user's score
+            if (type === 'health') {
+                freshStats.sort((a, b) => b.healthScore - a.healthScore);
+            } else {
+                freshStats.sort((a, b) => b.currentStreak - a.currentStreak);
+            }
+
+            const entries: LeaderboardEntry[] = freshStats.map((stat, index) => {
                 const userInfo = usersMap.get(stat.userId);
                 const badge = index === 0 ? '🏆' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
 
