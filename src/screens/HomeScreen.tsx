@@ -63,6 +63,13 @@ import { userService } from '../services/userService';
 import { MascotTip } from '../components/MascotTip';
 import { friendService } from '../services/friendService';
 import StreakInfoModal from '../components/StreakInfoModal';
+import { ReviewPromptModal } from '../components/ReviewPromptModal';
+import {
+    shouldShowFirstScanPrompt,
+    markFirstScanPromptShown,
+    shouldShowDayTwoPrompt,
+    markDayTwoPromptShown,
+} from '../services/reviewPromptService';
 
 function formatDuration(ms: number) {
     const seconds = Math.floor((ms / 1000) % 60);
@@ -112,6 +119,8 @@ export default function HomeScreen() {
     const [hasCommunityTipDoneToday, setHasCommunityTipDoneToday] = useState(false);
     const [hasCheckedCircleToday, setHasCheckedCircleToday] = useState(false);
     const [showStreakInfoModal, setShowStreakInfoModal] = useState(false);
+    const [showReviewPrompt, setShowReviewPrompt] = useState(false);
+    const [reviewPromptVariant, setReviewPromptVariant] = useState<'first_scan' | 'day_two'>('first_scan');
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const fallbackDateRef = useRef(new Date().toISOString()); // Stable fallback
     const navigation = useNavigation<any>(); // Type as any to allow navigation to new modal screens
@@ -324,6 +333,28 @@ export default function HomeScreen() {
         };
         checkFoodLogged();
     }, []);
+
+    // Check if we should show the day-2 review prompt
+    useEffect(() => {
+        const checkDayTwoPrompt = async () => {
+            try {
+                const show = await shouldShowDayTwoPrompt(onboardingData.completedAt);
+                if (show) {
+                    // Slight delay so the home screen loads first
+                    setTimeout(() => {
+                        setReviewPromptVariant('day_two');
+                        setShowReviewPrompt(true);
+                        markDayTwoPromptShown();
+                    }, 2000);
+                }
+            } catch (error) {
+                console.warn('Error checking day-2 review prompt:', error);
+            }
+        };
+        if (!isLoading) {
+            checkDayTwoPrompt();
+        }
+    }, [isLoading, onboardingData.completedAt]);
 
     const duration = formatDuration(timeElapsed);
     const daysSugarFree = duration.days;
@@ -1102,12 +1133,26 @@ export default function HomeScreen() {
                         onScanComplete={() => {
                             setShowFoodScannerModal(false);
                             // Refresh food logged status
-                            getScannedItems().then(items => {
+                            getScannedItems().then(async (items) => {
                                 const today = new Date().toISOString().split('T')[0];
                                 const hasLoggedToday = items.some(item =>
                                     item.timestamp.split('T')[0] === today
                                 );
                                 setHasFoodLoggedToday(hasLoggedToday);
+
+                                // Check if this was the user's first scan ever
+                                try {
+                                    const showPrompt = await shouldShowFirstScanPrompt(items.length);
+                                    if (showPrompt) {
+                                        setTimeout(() => {
+                                            setReviewPromptVariant('first_scan');
+                                            setShowReviewPrompt(true);
+                                            markFirstScanPromptShown();
+                                        }, 800);
+                                    }
+                                } catch (e) {
+                                    console.warn('Error checking first scan review prompt:', e);
+                                }
                             });
                             // Refresh streak calculation based on new food logs
                             refreshStreakFromFoodLogs();
@@ -1134,6 +1179,13 @@ export default function HomeScreen() {
                     <StreakInfoModal
                         visible={showStreakInfoModal}
                         onClose={() => setShowStreakInfoModal(false)}
+                    />
+
+                    {/* Review Prompt Modal */}
+                    <ReviewPromptModal
+                        visible={showReviewPrompt}
+                        onClose={() => setShowReviewPrompt(false)}
+                        variant={reviewPromptVariant}
                     />
                 </SafeAreaView>
             </LooviBackground >

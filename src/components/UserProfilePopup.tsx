@@ -116,7 +116,23 @@ export function UserProfilePopup({
             // Fetch stats
             friendService.getFriendStats(userId)
                 .then(fetchedStats => {
-                    setStats(fetchedStats);
+                    if (fetchedStats) {
+                        // goalAchieved and pledgedToday are daily flags —
+                        // only trust them if updatedAt is from today
+                        const today = new Date().toISOString().split('T')[0];
+                        const statsDate = fetchedStats.updatedAt
+                            ? new Date(fetchedStats.updatedAt).toISOString().split('T')[0]
+                            : null;
+                        const isFromToday = statsDate === today;
+
+                        setStats({
+                            ...fetchedStats,
+                            goalAchieved: isFromToday ? fetchedStats.goalAchieved : false,
+                            pledgedToday: isFromToday ? fetchedStats.pledgedToday : false,
+                        });
+                    } else {
+                        setStats(fetchedStats);
+                    }
                 })
                 .catch(error => {
                     console.error('Error fetching user stats:', error);

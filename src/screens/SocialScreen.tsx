@@ -35,6 +35,7 @@ import { CommunityStatsWidget } from '../components/CommunityStatsWidget';
 import { CreatePostModal } from '../components/CreatePostModal';
 import { friendService } from '../services/friendService';
 import { postService } from '../services/postService';
+import { userService } from '../services/userService';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
 import { useUserProfile } from '../context/UserProfileContext';
@@ -247,6 +248,20 @@ export default function SocialScreen() {
 
     const loadLeaderboard = async (type: 'health' | 'streak' = leaderboardType) => {
         try {
+            // Sync current user's fresh 7-day health score before fetching leaderboard
+            if (user?.id) {
+                try {
+                    await userService.syncUserStats(user.id, {
+                        currentStreak: streakData?.currentStreak || 0,
+                        healthScore: latestHealthScore || 0,
+                        goalAchieved: (streakData?.currentStreak || 0) > 0,
+                        updatedAt: new Date(),
+                    });
+                } catch (syncErr) {
+                    console.warn('Failed to sync stats before leaderboard load:', syncErr);
+                }
+            }
+
             const stats = type === 'streak'
                 ? await friendService.getLeaderboardByStreak(20)
                 : await friendService.getLeaderboard(20);

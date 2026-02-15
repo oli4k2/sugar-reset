@@ -473,29 +473,36 @@ export const friendService = {
             const fallbackQ = query(
                 statsRef,
                 orderBy('healthScore', 'desc'),
-                limit(limitCount)
+                limit(limitCount * 3) // Fetch extra to filter out stale users
             );
 
             const fallbackSnapshot = await getDocs(fallbackQ);
             const now2 = new Date();
-            const fallbackStats = fallbackSnapshot.docs.map(doc => {
-                const data = doc.data();
-                const updatedAt = toDate(data.updatedAt) as Date;
-                let adjustedStreak = data.currentStreak || 0;
-                if (updatedAt) {
-                    const daysSince = Math.floor((now2.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
-                    if (daysSince > 2) adjustedStreak = 0;
-                }
-                return {
-                    userId: doc.id,
-                    currentStreak: adjustedStreak,
-                    healthScore: data.healthScore || 0,
-                    goalAchieved: data.goalAchieved || false,
-                    pledgedToday: data.pledgedToday || false,
-                    updatedAt,
-                };
-            });
-            return fallbackStats;
+            const oneWeekAgoFallback = new Date();
+            oneWeekAgoFallback.setDate(oneWeekAgoFallback.getDate() - 7);
+
+            const fallbackStats = fallbackSnapshot.docs
+                .map(doc => {
+                    const data = doc.data();
+                    const updatedAt = toDate(data.updatedAt) as Date;
+                    let adjustedStreak = data.currentStreak || 0;
+                    if (updatedAt) {
+                        const daysSince = Math.floor((now2.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                        if (daysSince > 2) adjustedStreak = 0;
+                    }
+                    return {
+                        userId: doc.id,
+                        currentStreak: adjustedStreak,
+                        healthScore: data.healthScore || 0,
+                        goalAchieved: data.goalAchieved || false,
+                        pledgedToday: data.pledgedToday || false,
+                        updatedAt,
+                    };
+                })
+                // Filter: only include users active in the last 7 days
+                .filter(stat => stat.updatedAt && stat.updatedAt >= oneWeekAgoFallback);
+
+            return fallbackStats.slice(0, limitCount);
         }
     },
 
@@ -548,30 +555,37 @@ export const friendService = {
             const fallbackQ = query(
                 statsRef,
                 orderBy('currentStreak', 'desc'),
-                limit(limitCount)
+                limit(limitCount * 3) // Fetch extra to filter out stale users
             );
 
             const fallbackSnapshot = await getDocs(fallbackQ);
             const now2 = new Date();
-            const fallbackStats = fallbackSnapshot.docs.map(doc => {
-                const data = doc.data();
-                const updatedAt = toDate(data.updatedAt) as Date;
-                let adjustedStreak = data.currentStreak || 0;
-                if (updatedAt) {
-                    const daysSince = Math.floor((now2.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
-                    if (daysSince > 2) adjustedStreak = 0;
-                }
-                return {
-                    userId: doc.id,
-                    currentStreak: adjustedStreak,
-                    healthScore: data.healthScore || 0,
-                    goalAchieved: data.goalAchieved || false,
-                    pledgedToday: data.pledgedToday || false,
-                    updatedAt,
-                };
-            });
+            const oneWeekAgoFallback = new Date();
+            oneWeekAgoFallback.setDate(oneWeekAgoFallback.getDate() - 7);
+
+            const fallbackStats = fallbackSnapshot.docs
+                .map(doc => {
+                    const data = doc.data();
+                    const updatedAt = toDate(data.updatedAt) as Date;
+                    let adjustedStreak = data.currentStreak || 0;
+                    if (updatedAt) {
+                        const daysSince = Math.floor((now2.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                        if (daysSince > 2) adjustedStreak = 0;
+                    }
+                    return {
+                        userId: doc.id,
+                        currentStreak: adjustedStreak,
+                        healthScore: data.healthScore || 0,
+                        goalAchieved: data.goalAchieved || false,
+                        pledgedToday: data.pledgedToday || false,
+                        updatedAt,
+                    };
+                })
+                // Filter: only include users active in the last 7 days
+                .filter(stat => stat.updatedAt && stat.updatedAt >= oneWeekAgoFallback);
+
             fallbackStats.sort((a, b) => b.currentStreak - a.currentStreak);
-            return fallbackStats;
+            return fallbackStats.slice(0, limitCount);
         }
     },
 

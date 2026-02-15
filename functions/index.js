@@ -114,6 +114,8 @@ exports.getPosts = onCall(async (request) => {
 
 /**
  * Get leaderboard data
+ * Only includes users who have been active in the last 7 days
+ * Health scores are based on rolling 7-day data synced by the client
  */
 exports.getLeaderboard = onCall(async (request) => {
     if (!request.auth) {
@@ -122,23 +124,45 @@ exports.getLeaderboard = onCall(async (request) => {
 
     const limitCount = request.data?.limit || 10;
 
+    // Calculate date 7 days ago — only show recently active users
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
     try {
         const snapshot = await db.collection('userStats')
+            .where('updatedAt', '>=', sevenDaysAgo)
+            .orderBy('updatedAt', 'desc')
             .orderBy('healthScore', 'desc')
-            .limit(limitCount)
+            .limit(limitCount * 2)
             .get();
 
-        const entries = snapshot.docs.map((doc, index) => {
+        const now = new Date();
+        const entries = snapshot.docs.map((doc) => {
             const data = doc.data();
+            const updatedAt = data.updatedAt?.toDate?.();
+            // Zero-out streak if user hasn't updated in 2+ days (grace period exceeded)
+            let adjustedStreak = data.currentStreak || 0;
+            if (updatedAt) {
+                const daysSince = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                if (daysSince > 2) adjustedStreak = 0;
+            }
             return {
                 userId: doc.id,
                 healthScore: data.healthScore || 0,
-                currentStreak: data.currentStreak || 0,
-                rank: index + 1,
+                currentStreak: adjustedStreak,
             };
         });
 
-        return { entries };
+        // Sort by healthScore (Firestore compound ordering may not be exact)
+        entries.sort((a, b) => b.healthScore - a.healthScore);
+
+        // Add ranks and trim to requested limit
+        const ranked = entries.slice(0, limitCount).map((entry, index) => ({
+            ...entry,
+            rank: index + 1,
+        }));
+
+        return { entries: ranked };
     } catch (error) {
         console.error('Error fetching leaderboard:', error);
         throw new HttpsError('internal', 'Failed to fetch leaderboard');
