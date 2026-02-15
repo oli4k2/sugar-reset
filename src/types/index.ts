@@ -167,7 +167,7 @@ export type OnboardingStackParamList = {
     PersonalizedPlan: undefined;
     LongScrollablePlan: undefined;
     PlanReveal: undefined;
-    Paywall: undefined;
+    Paywall: { showFullFlow?: boolean } | undefined;
 
     // Legacy (keep for backwards compatibility)
     QualificationQuiz: undefined;

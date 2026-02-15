@@ -567,6 +567,15 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         // Show userInfo screen after results
         setShowResult(false);
         setShowUserInfo(true);
+
+        // Reset and animate fadeAnim/slideAnim for the user info screen
+        // (they may be at 0 if we resumed from a checkpoint)
+        fadeAnim.setValue(0);
+        slideAnim.setValue(20);
+        Animated.parallel([
+            Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+            Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+        ]).start();
     };
 
     const handleUserInfoContinue = async () => {

@@ -199,6 +199,12 @@ function MainTabNavigator() {
     );
 }
 
+// Wrapper component so useInviteLinkHandler (which calls useNavigation) runs inside NavigationContainer
+function InviteLinkHandler() {
+    useInviteLinkHandler();
+    return null;
+}
+
 // Loading Screen
 function LoadingScreen() {
     return (
@@ -223,8 +229,7 @@ export default function RootNavigator() {
     // Handle email magic link deep links
     const { isProcessing: isProcessingEmailLink } = useEmailLinkHandler();
     
-    // Handle invite link deep links
-    useInviteLinkHandler();
+    // Note: useInviteLinkHandler is called inside NavigationContainer via InviteLinkHandler component below
 
     // Screen tracking for PostHog
     const onNavigationStateChange = () => {
@@ -344,6 +349,7 @@ export default function RootNavigator() {
             onStateChange={onNavigationStateChange}
             onReady={onNavigationStateChange}
         >
+            <InviteLinkHandler />
             <RootStack.Navigator
                 screenOptions={{
                     headerShown: false,

@@ -59,7 +59,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     
     // If user has completed onboarding AND we're not showing full flow, they're accessing from within the app
     const isFromApp = hasCompletedOnboarding && !showFullFlow;
-    const [currentStep, setCurrentStep] = useState<PaywallStep>(isFromApp ? 'plans' : 'intro');
+    const [currentStep, setCurrentStep] = useState<PaywallStep>('intro'); // Always start at intro, will be adjusted if needed
     const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
@@ -77,6 +77,24 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
+    const stepInitialized = useRef(false);
+
+    // Ensure we start at the correct step based on showFullFlow
+    // During onboarding (showFullFlow = true), always start at 'intro'
+    // When accessed from app (isFromApp = true), start at 'plans'
+    // Only initialize once to avoid resetting if user has progressed
+    useEffect(() => {
+        if (!stepInitialized.current) {
+            if (showFullFlow) {
+                // During onboarding, always start at intro step
+                setCurrentStep('intro');
+            } else if (isFromApp) {
+                // When accessed from within the app, start at plans
+                setCurrentStep('plans');
+            }
+            stepInitialized.current = true;
+        }
+    }, [showFullFlow, isFromApp]);
 
     // Animate on step change
     useEffect(() => {

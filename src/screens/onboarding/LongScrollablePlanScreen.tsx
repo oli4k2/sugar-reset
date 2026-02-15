@@ -199,7 +199,7 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
 
     const handleContinue = () => {
         posthog?.capture('onboarding_plan_view_completed');
-        navigation.navigate('Paywall');
+        navigation.navigate('Paywall', { showFullFlow: true });
     };
 
     // Track land
