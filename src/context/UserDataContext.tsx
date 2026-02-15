@@ -236,7 +236,10 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 };
                 setStreakData(legacyStreakData);
             }).catch(err => {
-                console.error('Error calculating initial streak:', err);
+                // Log only in development (non-critical background operation)
+                if (__DEV__) {
+                    console.error('Error calculating initial streak:', err);
+                }
             });
         }
     }, [hasLoadedOnce, onboardingData?.startDate, onboardingData?.plan]);

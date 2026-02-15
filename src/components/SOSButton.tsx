@@ -21,6 +21,7 @@ import { looviColors } from './LooviBackground';
 import { notificationService } from '../services/notificationService';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
+import { handleError } from '../utils/errorHandler';
 
 interface SOSButtonProps {
     style?: any;
@@ -69,8 +70,7 @@ export function SOSButton({ style, size = 'small' }: SOSButtonProps) {
                 Alert.alert('Error', 'Failed to send SOS. Please try again.');
             }
         } catch (error) {
-            console.error('SOS error:', error);
-            Alert.alert('Error', 'Failed to send SOS. Please try again.');
+            handleError(error, 'Failed to send SOS. Please try again.', 'SOSButton');
         } finally {
             setIsSending(false);
             setMessage('');

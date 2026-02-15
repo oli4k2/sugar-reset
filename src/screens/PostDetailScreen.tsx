@@ -34,6 +34,7 @@ import postService, { Comment } from '../services/postService';
 import { Post } from '../types';
 import { UserAvatar } from '../components/UserAvatar';
 import { adminService } from '../services/adminService';
+import { handleError, handleValidationError, handleRateLimitError } from '../utils/errorHandler';
 
 type PostDTO = Omit<Post, 'createdAt' | 'updatedAt'> & {
     createdAt: string;
@@ -142,10 +143,16 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             // Refresh comments
             await loadData();
         } catch (error: any) {
-            console.error('Error submitting comment:', error);
-            // Show the error message (includes profanity filter message)
-            const message = error?.message || 'Failed to post comment. Please try again.';
-            Alert.alert('Error', message);
+            // Check for specific error types to show appropriate messages
+            if (error?.message?.includes('too quickly') || error?.message?.includes('rate limit')) {
+                handleRateLimitError(error);
+            } else if (error?.message?.includes('invalid') || error?.message?.includes('Invalid')) {
+                handleValidationError(error);
+            } else {
+                // Show user-friendly error message (profanity filter, validation, etc.)
+                const message = error?.message || 'Failed to post comment. Please try again.';
+                handleError(error, message, 'AddComment');
+            }
         } finally {
             setSubmitting(false);
         }

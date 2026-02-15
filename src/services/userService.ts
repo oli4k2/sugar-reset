@@ -36,14 +36,17 @@ const toDate = (timestamp: Timestamp | null): Date | null => {
 
 /**
  * Helper to handle Firestore errors gracefully
+ * Only logs in development mode to avoid exposing technical details
  */
 const handleFirestoreError = (error: any, operation: string): null => {
-    if (error?.code === 'unavailable' || error?.message?.includes('offline')) {
-        console.log(`📴 Firestore offline for: ${operation}`);
-    } else if (!isFirebaseReady()) {
-        // Don't log if Firebase isn't configured - expected behavior
-    } else {
-        console.warn(`⚠️ ${operation} failed:`, error?.code || error?.message);
+    if (__DEV__) {
+        if (error?.code === 'unavailable' || error?.message?.includes('offline')) {
+            console.log(`📴 Firestore offline for: ${operation}`);
+        } else if (!isFirebaseReady()) {
+            // Don't log if Firebase isn't configured - expected behavior
+        } else {
+            console.warn(`⚠️ ${operation} failed:`, error?.code || error?.message);
+        }
     }
     return null;
 };

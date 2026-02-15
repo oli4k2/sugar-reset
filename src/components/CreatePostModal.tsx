@@ -24,6 +24,7 @@ import { looviColors } from './LooviBackground';
 import { postService } from '../services/postService';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
+import { handleError, handleValidationError, handleRateLimitError } from '../utils/errorHandler';
 
 interface CreatePostModalProps {
     visible: boolean;
@@ -94,10 +95,16 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
             ]);
             onPostCreated?.();
         } catch (error: any) {
-            console.error('Error creating post:', error);
-            // Show the error message (includes profanity filter message)
-            const message = error?.message || 'Failed to create post. Please try again.';
-            Alert.alert('Error', message);
+            // Check for specific error types to show appropriate messages
+            if (error?.message?.includes('too quickly') || error?.message?.includes('rate limit')) {
+                handleRateLimitError(error);
+            } else if (error?.message?.includes('invalid') || error?.message?.includes('Invalid')) {
+                handleValidationError(error);
+            } else {
+                // Show user-friendly error message (profanity filter, validation, etc.)
+                const message = error?.message || 'Failed to create post. Please try again.';
+                handleError(error, message, 'CreatePost');
+            }
         } finally {
             setIsPosting(false);
         }

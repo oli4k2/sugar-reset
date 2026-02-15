@@ -490,7 +490,10 @@ export default function ProfileScreen() {
                                 routes: [{ name: 'Onboarding' }],
                             });
                         } catch (error) {
-                            console.error('Error signing out:', error);
+                            // Log only in development, don't show to user (sign out errors are usually non-critical)
+                            if (__DEV__) {
+                                console.error('Error signing out:', error);
+                            }
                         }
                     }
                 },
