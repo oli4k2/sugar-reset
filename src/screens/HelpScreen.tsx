@@ -11,8 +11,8 @@ import { GlassCard } from '../components/GlassCard';
 export default function HelpScreen() {
     const navigation = useNavigation();
 
-    const handleEmailSupport = () => {
-        Linking.openURL('mailto:hello@scriptcollective.com');
+    const handleOpenSupport = () => {
+        Linking.openURL('https://craveless.info/support');
     };
 
     return (
@@ -52,13 +52,13 @@ export default function HelpScreen() {
                     </GlassCard>
 
                     <GlassCard variant="light" padding="lg" style={styles.card}>
-                        <Text style={styles.sectionTitle}>Contact Support</Text>
+                        <Text style={styles.sectionTitle}>Need More Help?</Text>
                         <Text style={styles.paragraph}>
-                            Need more help? Our team is here to support you on your sugar-free journey.
+                            Visit our support page for more answers and to contact our team.
                         </Text>
-                        <TouchableOpacity style={styles.emailButton} onPress={handleEmailSupport}>
-                            <Feather name="mail" size={20} color="#FFFFFF" style={styles.emailIcon} />
-                            <Text style={styles.emailButtonText}>hello@scriptcollective.com</Text>
+                        <TouchableOpacity style={styles.emailButton} onPress={handleOpenSupport}>
+                            <Feather name="external-link" size={20} color="#FFFFFF" style={styles.emailIcon} />
+                            <Text style={styles.emailButtonText}>Visit Support Page</Text>
                         </TouchableOpacity>
                     </GlassCard>
                 </ScrollView>

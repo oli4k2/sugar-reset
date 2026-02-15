@@ -224,15 +224,35 @@ class RevenueCatServiceImpl implements RevenueCatService {
     }
 
     try {
+      // Prioritize platform-specific keys over the generic fallback
+      const iosKey = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY;
+      const androidKey = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
+      const fallbackKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
+
       const apiKey = Platform.select({
-        ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || process.env.EXPO_PUBLIC_REVENUECAT_API_KEY,
-        android:
-          process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || process.env.EXPO_PUBLIC_REVENUECAT_API_KEY,
+        ios: iosKey || fallbackKey,
+        android: androidKey || fallbackKey,
       });
 
       if (!apiKey) {
         console.warn('⚠️ RevenueCat: No API key found in environment variables');
         return;
+      }
+
+      // Log which key is being used (for debugging)
+      if (__DEV__) {
+        const keySource = Platform.select({
+          ios: iosKey ? 'EXPO_PUBLIC_REVENUECAT_IOS_API_KEY' : 'EXPO_PUBLIC_REVENUECAT_API_KEY (fallback)',
+          android: androidKey ? 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY' : 'EXPO_PUBLIC_REVENUECAT_API_KEY (fallback)',
+        });
+        console.log(`🔑 RevenueCat: Using ${keySource}`);
+        
+        // Warn if using fallback key when platform-specific key should be used
+        if (Platform.OS === 'ios' && !iosKey && fallbackKey) {
+          console.warn('⚠️ RevenueCat: Using fallback key for iOS. Consider setting EXPO_PUBLIC_REVENUECAT_IOS_API_KEY for production.');
+        } else if (Platform.OS === 'android' && !androidKey && fallbackKey) {
+          console.warn('⚠️ RevenueCat: Using fallback key for Android. Consider setting EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY for production.');
+        }
       }
 
       // Enable debug logs in development

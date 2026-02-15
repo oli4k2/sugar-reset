@@ -783,8 +783,8 @@ export default function ProfileScreen() {
                                                     case 'restore': handleRestorePurchases(); break;
                                                     case 'deleteAccount': handleDeleteAccount(); break;
                                                     case 'notifications': setShowNotificationSettings(true); break;
-                                                    case 'help': Linking.openURL('mailto:support@sugar-reset.com'); break;
-                                                    case 'feedback': Linking.openURL('mailto:feedback@sugar-reset.com'); break;
+                                                    case 'help': Linking.openURL('https://craveless.info/support'); break;
+                                                    case 'feedback': Linking.openURL('https://craveless.info/support'); break;
                                                     case 'rate': StoreReview.requestReview(); break;
                                                     case 'viewNotifications': handleViewNotifications(); break;
                                                     case 'scheduleTestNotifications': handleScheduleTestNotifications(); break;
