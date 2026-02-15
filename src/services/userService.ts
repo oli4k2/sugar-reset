@@ -87,11 +87,12 @@ export const userService = {
             }
 
             const data = docSnap.data();
+            // Username is optional - existing users may not have one, and that's fine
             return {
                 id: docSnap.id,
                 email: data.email,
                 displayName: data.displayName,
-                username: data.username,
+                username: data.username, // Optional - may be undefined for existing users
                 photoURL: data.photoURL,
                 avatarType: data.avatarType || null,
                 avatarValue: data.avatarValue || null,
