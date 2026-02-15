@@ -869,58 +869,72 @@ export default function AnalyticsScreen() {
                         </View>
 
                         {/* Nutrition Summary - Simplified */}
-                        {nutritionInsights && nutritionInsights.avgCalories > 0 && (
+                        {nutritionInsights && (
                             <GlassCard variant="light" padding="lg" style={styles.nutritionSummaryCard}>
                                 <Text style={styles.nutritionSummaryTitle}>Nutrition Summary</Text>
 
-                                <View style={styles.nutritionStatsRow}>
-                                    <View style={styles.nutritionStat}>
-                                        <Text style={styles.nutritionStatValue}>{nutritionInsights.avgCalories}</Text>
-                                        <Text style={styles.nutritionStatLabel}>Calories/day</Text>
-                                    </View>
-                                    <View style={styles.nutritionStatDivider} />
-                                    <View style={styles.nutritionStat}>
-                                        <Text style={[
-                                            styles.nutritionStatValue,
-                                            { color: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444' }
-                                        ]}>
-                                            {nutritionInsights.avgAddedSugar}g
-                                        </Text>
-                                        <Text style={styles.nutritionStatLabel}>Sugar/day</Text>
-                                    </View>
-                                    <View style={styles.nutritionStatDivider} />
-                                    <View style={styles.nutritionStat}>
-                                        <Text style={styles.nutritionStatValue}>{nutritionInsights.avgProtein}g</Text>
-                                        <Text style={styles.nutritionStatLabel}>Protein/day</Text>
-                                    </View>
-                                </View>
+                                {nutritionInsights.avgCalories > 0 ? (
+                                    <>
+                                        <View style={styles.nutritionStatsRow}>
+                                            <View style={styles.nutritionStat}>
+                                                <Text style={styles.nutritionStatValue}>{nutritionInsights.avgCalories}</Text>
+                                                <Text style={styles.nutritionStatLabel}>Calories/day</Text>
+                                            </View>
+                                            <View style={styles.nutritionStatDivider} />
+                                            <View style={styles.nutritionStat}>
+                                                <Text style={[
+                                                    styles.nutritionStatValue,
+                                                    { color: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444' }
+                                                ]}>
+                                                    {nutritionInsights.avgAddedSugar}g
+                                                </Text>
+                                                <Text style={styles.nutritionStatLabel}>Sugar/day</Text>
+                                            </View>
+                                            <View style={styles.nutritionStatDivider} />
+                                            <View style={styles.nutritionStat}>
+                                                <Text style={styles.nutritionStatValue}>{nutritionInsights.avgProtein}g</Text>
+                                                <Text style={styles.nutritionStatLabel}>Protein/day</Text>
+                                            </View>
+                                        </View>
 
-                                {/* Visual sugar meter */}
-                                <View style={styles.sugarMeter}>
-                                    <View style={styles.sugarMeterHeader}>
-                                        <Text style={styles.sugarMeterLabel}>Daily Sugar</Text>
-                                        <Text style={styles.sugarMeterValue}>
-                                            {nutritionInsights.avgAddedSugar}g / {dailySugarLimit}g recommended
+                                        {/* Visual sugar meter */}
+                                        <View style={styles.sugarMeter}>
+                                            <View style={styles.sugarMeterHeader}>
+                                                <Text style={styles.sugarMeterLabel}>Daily Sugar</Text>
+                                                <Text style={styles.sugarMeterValue}>
+                                                    {nutritionInsights.avgAddedSugar}g / {dailySugarLimit}g recommended
+                                                </Text>
+                                            </View>
+                                            <View style={styles.sugarMeterTrack}>
+                                                <View
+                                                    style={[
+                                                        styles.sugarMeterFill,
+                                                        {
+                                                            width: `${Math.min((nutritionInsights.avgAddedSugar / (dailySugarLimit * 2)) * 100, 100)}%`,
+                                                            backgroundColor: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444'
+                                                        }
+                                                    ]}
+                                                />
+                                                <View style={styles.sugarMeterMarker} />
+                                            </View>
+                                            <View style={styles.sugarMeterLabels}>
+                                                <Text style={styles.sugarMeterMarkerLabel}>0g</Text>
+                                                <Text style={[styles.sugarMeterMarkerLabel, { position: 'absolute', left: '50%' }]}>{dailySugarLimit}g</Text>
+                                                <Text style={styles.sugarMeterMarkerLabel}>50g+</Text>
+                                            </View>
+                                        </View>
+                                    </>
+                                ) : (
+                                    <View style={styles.noNutritionData}>
+                                        <Ionicons name="nutrition-outline" size={32} color={looviColors.text.tertiary} />
+                                        <Text style={styles.noNutritionDataText}>
+                                            No food logged in this timeframe
+                                        </Text>
+                                        <Text style={styles.noNutritionDataSubtext}>
+                                            Start logging food to see your nutrition summary
                                         </Text>
                                     </View>
-                                    <View style={styles.sugarMeterTrack}>
-                                        <View
-                                            style={[
-                                                styles.sugarMeterFill,
-                                                {
-                                                    width: `${Math.min((nutritionInsights.avgAddedSugar / (dailySugarLimit * 2)) * 100, 100)}%`,
-                                                    backgroundColor: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444'
-                                                }
-                                            ]}
-                                        />
-                                        <View style={styles.sugarMeterMarker} />
-                                    </View>
-                                    <View style={styles.sugarMeterLabels}>
-                                        <Text style={styles.sugarMeterMarkerLabel}>0g</Text>
-                                        <Text style={[styles.sugarMeterMarkerLabel, { position: 'absolute', left: '50%' }]}>{dailySugarLimit}g</Text>
-                                        <Text style={styles.sugarMeterMarkerLabel}>50g+</Text>
-                                    </View>
-                                </View>
+                                )}
                             </GlassCard>
                         )}
 
@@ -1172,6 +1186,24 @@ const styles = StyleSheet.create({
     // Nutrition Summary
     nutritionSummaryCard: {
         marginBottom: spacing.lg,
+    },
+    noNutritionData: {
+        alignItems: 'center',
+        paddingVertical: spacing.xl,
+        paddingHorizontal: spacing.lg,
+    },
+    noNutritionDataText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: looviColors.text.primary,
+        marginTop: spacing.md,
+        textAlign: 'center',
+    },
+    noNutritionDataSubtext: {
+        fontSize: 14,
+        color: looviColors.text.secondary,
+        marginTop: spacing.xs,
+        textAlign: 'center',
     },
     nutritionSummaryTitle: {
         fontFamily: typography.fonts.heading.bold,
