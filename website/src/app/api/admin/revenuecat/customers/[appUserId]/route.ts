@@ -16,7 +16,7 @@ function verifyAdmin(request: NextRequest): boolean {
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { appUserId: string } }
+    { params }: { params: Promise<{ appUserId: string }> }
 ) {
     try {
         if (!verifyAdmin(request)) {
@@ -33,7 +33,8 @@ export async function GET(
             );
         }
 
-        const appUserId = decodeURIComponent(params.appUserId);
+        const { appUserId: appUserIdParam } = await params;
+        const appUserId = decodeURIComponent(appUserIdParam);
 
         const response = await fetch(
             `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
