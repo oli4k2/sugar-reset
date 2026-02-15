@@ -25,6 +25,7 @@ import {
 import { db, isFirebaseReady } from '../config/firebase';
 import { User, UserStats, UserPreferences, StreakData, DailyCheckIn, Friend } from '../types';
 import { generateUniqueUsername } from '../utils/usernameGenerator';
+import { sanitizeDisplayName, validateDisplayName } from '../utils/inputSanitizer';
 
 /**
  * Convert Firestore timestamp to Date
@@ -309,11 +310,18 @@ export const userService = {
      * Also updates authorName in all posts and comments by this user
      */
     async updateDisplayName(userId: string, displayName: string): Promise<void> {
+        // Validate and sanitize display name
+        const validation = validateDisplayName(displayName);
+        if (!validation.valid) {
+            throw new Error(validation.error || 'Invalid display name');
+        }
+        
+        const sanitized = sanitizeDisplayName(displayName);
         const docRef = doc(db, 'users', userId);
         await updateDoc(docRef, {
-            displayName,
+            displayName: sanitized,
             // Store lowercase version for search
-            displayNameLower: displayName.toLowerCase(),
+            displayNameLower: sanitized.toLowerCase(),
             updatedAt: serverTimestamp(),
         });
 
@@ -327,7 +335,7 @@ export const userService = {
             let batchCount = 0;
 
             postsSnapshot.docs.forEach((postDoc) => {
-                batch.update(postDoc.ref, { authorName: displayName });
+                batch.update(postDoc.ref, { authorName: sanitized });
                 batchCount++;
             });
 
@@ -350,7 +358,7 @@ export const userService = {
                 if (!userCommentsSnapshot.empty) {
                     const commentBatch = writeBatch(db);
                     userCommentsSnapshot.docs.forEach((commentDoc) => {
-                        commentBatch.update(commentDoc.ref, { authorName: displayName });
+                        commentBatch.update(commentDoc.ref, { authorName: sanitized });
                         commentUpdateCount++;
                     });
                     await commentBatch.commit();

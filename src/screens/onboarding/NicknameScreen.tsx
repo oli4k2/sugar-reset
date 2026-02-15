@@ -13,6 +13,7 @@ import {
     TextInput,
     KeyboardAvoidingView,
     Platform,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,6 +22,7 @@ import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { useUserData } from '../../context/UserDataContext';
 import ProgressBar from '../../components/ProgressBar';
+import { validateDisplayName, sanitizeDisplayName } from '../../utils/inputSanitizer';
 
 type NicknameScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Nickname'>;
@@ -31,9 +33,18 @@ export default function NicknameScreen({ navigation }: NicknameScreenProps) {
     const { updateOnboardingData } = useUserData();
 
     const handleContinue = async () => {
-        const name = nickname.trim() || 'Friend';
-        await updateOnboardingData({ nickname: name });
-        navigation.navigate('Promise', { nickname: name });
+        const trimmed = nickname.trim() || 'Friend';
+        
+        // Validate and sanitize the nickname
+        const validation = validateDisplayName(trimmed);
+        if (!validation.valid) {
+            Alert.alert('Invalid Name', validation.error || 'Please enter a valid name');
+            return;
+        }
+        
+        const sanitized = sanitizeDisplayName(trimmed);
+        await updateOnboardingData({ nickname: sanitized });
+        navigation.navigate('Promise', { nickname: sanitized });
     };
 
     const isButtonEnabled = nickname.trim().length > 0;

@@ -29,6 +29,14 @@ import {
 import { db } from '../config/firebase';
 import { Post } from '../types';
 import { profanityFilter } from './profanityFilter';
+import { 
+    validateTitle, 
+    sanitizeTitle, 
+    validatePostContent, 
+    sanitizePostContent,
+    checkPostRateLimit,
+    checkCommentRateLimit
+} from '../utils/inputSanitizer';
 
 // Remove local Post interface definition
 /* export interface Post ... (removed) */
@@ -90,11 +98,31 @@ export const postService = {
             avatarValue?: string | null;
         }
     ): Promise<string> {
+        // Rate limiting check
+        const rateLimitCheck = checkPostRateLimit(authorId);
+        if (!rateLimitCheck.allowed) {
+            throw new Error(rateLimitCheck.error || 'You are posting too quickly. Please wait a moment.');
+        }
+
+        // Validate and sanitize title
+        const titleValidation = validateTitle(title, 140);
+        if (!titleValidation.valid) {
+            throw new Error(titleValidation.error || 'Invalid title');
+        }
+        const sanitizedTitle = sanitizeTitle(title, 140);
+
+        // Validate and sanitize content
+        const contentValidation = validatePostContent(content, 5000);
+        if (!contentValidation.valid) {
+            throw new Error(contentValidation.error || 'Invalid content');
+        }
+        const sanitizedContent = sanitizePostContent(content);
+
         // Check for profanity in title and content
-        if (profanityFilter.containsProfanity(title)) {
+        if (profanityFilter.containsProfanity(sanitizedTitle)) {
             throw new Error('Your title contains inappropriate language. Please revise and try again.');
         }
-        if (profanityFilter.containsProfanity(content)) {
+        if (profanityFilter.containsProfanity(sanitizedContent)) {
             throw new Error('Your post contains inappropriate language. Please revise and try again.');
         }
 
@@ -107,8 +135,8 @@ export const postService = {
             photoURL: avatarData?.photoURL || null,
             avatarType: avatarData?.avatarType || null,
             avatarValue: avatarData?.avatarValue || null,
-            title: title.trim(),
-            content: content.trim(),
+            title: sanitizedTitle,
+            content: sanitizedContent,
             tags: tags.map(t => t.toLowerCase().trim()).filter(Boolean),
             upvotes: 0,
             commentCount: 0,
@@ -266,8 +294,21 @@ export const postService = {
             avatarValue?: string | null;
         }
     ): Promise<string> {
+        // Rate limiting check
+        const rateLimitCheck = checkCommentRateLimit(authorId);
+        if (!rateLimitCheck.allowed) {
+            throw new Error(rateLimitCheck.error || 'You are commenting too quickly. Please wait a moment.');
+        }
+
+        // Validate and sanitize content
+        const contentValidation = validatePostContent(content, 1000);
+        if (!contentValidation.valid) {
+            throw new Error(contentValidation.error || 'Invalid comment');
+        }
+        const sanitizedContent = sanitizePostContent(content);
+
         // Check for profanity in comment
-        if (profanityFilter.containsProfanity(content)) {
+        if (profanityFilter.containsProfanity(sanitizedContent)) {
             throw new Error('Your comment contains inappropriate language. Please revise and try again.');
         }
 
@@ -280,7 +321,7 @@ export const postService = {
             photoURL: avatarData?.photoURL || null,
             avatarType: avatarData?.avatarType || null,
             avatarValue: avatarData?.avatarValue || null,
-            content: content.trim(),
+            content: sanitizedContent,
             createdAt: serverTimestamp(),
         };
 
