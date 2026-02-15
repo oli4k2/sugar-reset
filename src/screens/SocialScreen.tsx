@@ -106,6 +106,7 @@ export default function SocialScreen() {
     }, [user?.id]);
 
     // Handle openAddFriends navigation param (from InnerCircle SOS)
+    // Also handle inviteUserId from deep links
     const route = useRoute<any>();
     useEffect(() => {
         if (route.params?.openAddFriends) {
@@ -118,7 +119,36 @@ export default function SocialScreen() {
             // Clear the param
             navigation.setParams({ initialTab: undefined });
         }
-    }, [route.params?.openAddFriends, route.params?.initialTab]);
+        
+        // Handle invite user ID from deep link
+        if (route.params?.inviteUserId) {
+            const inviteUserId = route.params.inviteUserId;
+            setActiveTab('circle');
+            // Fetch the user profile and set search query
+            (async () => {
+                try {
+                    const { userService } = await import('../services/userService');
+                    const userProfile = await userService.getUserProfile(inviteUserId);
+                    if (userProfile) {
+                        // Set search query to the user's username or displayName
+                        // Prefer username for search since it's unique and searchable
+                        const searchTerm = userProfile.username || userProfile.displayName || '';
+                        if (searchTerm) {
+                            setSearchQuery(searchTerm);
+                        }
+                    }
+                    // Open modal after fetching user (or immediately if fetch fails)
+                    setShowSearchModal(true);
+                } catch (error) {
+                    console.error('Error fetching invite user:', error);
+                    // Still open modal even if fetch fails
+                    setShowSearchModal(true);
+                }
+            })();
+            // Clear the param
+            navigation.setParams({ inviteUserId: undefined });
+        }
+    }, [route.params?.openAddFriends, route.params?.initialTab, route.params?.inviteUserId]);
 
     const loadData = async () => {
         if (!user) return;
@@ -949,7 +979,11 @@ export default function SocialScreen() {
 
                 <FriendSearchModal
                     visible={showSearchModal}
-                    onClose={() => setShowSearchModal(false)}
+                    onClose={() => {
+                        setShowSearchModal(false);
+                        setSearchQuery(''); // Clear search when closing
+                    }}
+                    initialSearchQuery={searchQuery}
                 />
 
                 <CreatePostModal

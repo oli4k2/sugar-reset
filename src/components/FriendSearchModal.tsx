@@ -36,10 +36,10 @@ interface FriendSearchModalProps {
     onRequestSent?: () => void;
 }
 
-export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSearchModalProps) {
+export function FriendSearchModal({ visible, onClose, onRequestSent, initialSearchQuery }: FriendSearchModalProps) {
     const { user } = useAuthContext();
     const { onboardingData } = useUserData();
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
     const [searchResults, setSearchResults] = useState<User[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [sendingTo, setSendingTo] = useState<string | null>(null);
@@ -77,6 +77,13 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
             setIsSearching(false);
         }
     }, [user?.id]);
+
+    // Update search query when initialSearchQuery prop changes
+    useEffect(() => {
+        if (initialSearchQuery && initialSearchQuery !== searchQuery) {
+            setSearchQuery(initialSearchQuery);
+        }
+    }, [initialSearchQuery]);
 
     // Auto-search with debounce as user types
     useEffect(() => {
@@ -200,9 +207,9 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                     </View>
                     <View style={styles.userInfo}>
                         <Text style={styles.userName}>
-                            {item.displayName || 'Anonymous'}
+                            {item.displayName || item.username || 'Anonymous'}
                         </Text>
-                        {item.username && (
+                        {item.displayName && item.username && (
                             <Text style={styles.userEmail}>@{item.username}</Text>
                         )}
                     </View>

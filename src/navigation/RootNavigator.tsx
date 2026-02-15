@@ -22,6 +22,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
 import { useRevenueCat } from '../hooks/useRevenueCat';
 import { useEmailLinkHandler } from '../hooks/useEmailLinkHandler';
+import { useInviteLinkHandler } from '../hooks/useInviteLinkHandler';
 
 // Onboarding Screens
 
@@ -221,6 +222,9 @@ export default function RootNavigator() {
 
     // Handle email magic link deep links
     const { isProcessing: isProcessingEmailLink } = useEmailLinkHandler();
+    
+    // Handle invite link deep links
+    useInviteLinkHandler();
 
     // Screen tracking for PostHog
     const onNavigationStateChange = () => {
