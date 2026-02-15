@@ -10,6 +10,7 @@ import {
     Image,
     Animated,
     Easing,
+    PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -67,6 +68,23 @@ export default function InnerCircleScreen() {
 
     // Pulse animation for the connection lines
     const pulseAnim = useRef(new Animated.Value(0)).current;
+    
+    // Swipe to dismiss
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => false,
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                // Only respond to downward swipes from top
+                return gestureState.dy > 10 && Math.abs(gestureState.dx) < Math.abs(gestureState.dy);
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                // If swiped down more than 100px, dismiss
+                if (gestureState.dy > 100) {
+                    navigation.goBack();
+                }
+            },
+        })
+    ).current;
 
     // Fetch real friends from Firestore
     useEffect(() => {
@@ -146,7 +164,7 @@ export default function InnerCircleScreen() {
                 <LinearGradient colors={THEME.bg as any} style={StyleSheet.absoluteFillObject} />
                 <SafeAreaView style={styles.safeArea}>
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, { paddingTop: 12 }]}>
                             <Feather name="x" size={24} color={THEME.textDim} />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>INNER CIRCLE</Text>
@@ -156,11 +174,7 @@ export default function InnerCircleScreen() {
                         <PremiumGate
                             message="Inner Circle is a premium feature. Connect with accountability partners and get support when you need it most."
                             showPaywall={() => {
-                                navigation.goBack();
-                                navigation.navigate('Main', {
-                                    screen: 'Profile',
-                                    params: { showPaywall: true }
-                                });
+                                navigation.navigate('Paywall');
                             }}
                             showUpgradeButton={true}
                         />
@@ -171,10 +185,10 @@ export default function InnerCircleScreen() {
     }
 
     return (
-        <View style={styles.container}>
+        <View style={styles.container} {...panResponder.panHandlers}>
             <LinearGradient colors={THEME.bg as any} style={StyleSheet.absoluteFillObject} />
 
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
@@ -368,7 +382,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        height: 60,
+        paddingTop: 12, // Consistent padding for status bar
+        minHeight: 60,
     },
     headerTitle: {
         fontSize: 14,

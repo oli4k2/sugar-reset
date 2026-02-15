@@ -81,6 +81,7 @@ export default function SocialScreen() {
     const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
     const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const [leaderboardType, setLeaderboardType] = useState<'health' | 'streak'>('health');
     const [searchQuery, setSearchQuery] = useState('');
     const [userVotes, setUserVotes] = useState<Map<string, 'up' | 'down'>>(new Map());
 
@@ -112,8 +113,12 @@ export default function SocialScreen() {
             setShowSearchModal(true);
             // Clear the param to prevent re-opening on focus
             navigation.setParams({ openAddFriends: undefined });
+        } else if (route.params?.initialTab) {
+            setActiveTab(route.params.initialTab);
+            // Clear the param
+            navigation.setParams({ initialTab: undefined });
         }
-    }, [route.params?.openAddFriends]);
+    }, [route.params?.openAddFriends, route.params?.initialTab]);
 
     const loadData = async () => {
         if (!user) return;
@@ -210,9 +215,11 @@ export default function SocialScreen() {
         }
     };
 
-    const loadLeaderboard = async () => {
+    const loadLeaderboard = async (type: 'health' | 'streak' = leaderboardType) => {
         try {
-            const stats = await friendService.getLeaderboard(10);
+            const stats = type === 'streak'
+                ? await friendService.getLeaderboardByStreak(20)
+                : await friendService.getLeaderboard(20);
             const userIds = stats.map(s => s.userId);
             const usersMap = await friendService.getUsersByIds(userIds);
 
@@ -244,6 +251,13 @@ export default function SocialScreen() {
             console.error('Error loading leaderboard:', error);
         }
     };
+
+    // Reload leaderboard when type changes
+    useEffect(() => {
+        if (activeTab === 'leaderboard') {
+            loadLeaderboard(leaderboardType);
+        }
+    }, [leaderboardType]);
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -561,42 +575,7 @@ export default function SocialScreen() {
                 </View>
             )}
 
-            {/* Outgoing (Pending) Friend Requests Section */}
-            {outgoingRequests.length > 0 && (
-                <View style={styles.requestsSection}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Pending</Text>
-                        <View style={[styles.badge, { backgroundColor: looviColors.accent.secondary }]}>
-                            <Text style={styles.badgeText}>{outgoingRequests.length}</Text>
-                        </View>
-                    </View>
-                    {outgoingRequests.map((request) => (
-                        <GlassCard key={request.id} variant="light" padding="md" style={styles.pendingCard}>
-                            <View style={styles.friendRow}>
-                                <View style={[styles.friendAvatar, { backgroundColor: looviColors.accent.warning }]}>
-                                    <Ionicons name="hourglass-outline" size={18} color="#FFFFFF" />
-                                </View>
-                                <View style={styles.friendInfo}>
-                                    <Text style={styles.friendName}>
-                                        {request.toName || 'User'}
-                                    </Text>
-                                    <Text style={styles.friendUsername}>
-                                        {request.toEmail || 'Awaiting response...'}
-                                    </Text>
-                                </View>
-                                <TouchableOpacity
-                                    style={styles.cancelButton}
-                                    onPress={() => handleCancelRequest(request.id)}
-                                >
-                                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </GlassCard>
-                    ))}
-                </View>
-            )}
-
-            {/* Friends List */}
+            {/* Friends List - on top */}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Your Circle</Text>
             </View>
@@ -613,7 +592,7 @@ export default function SocialScreen() {
                 </GlassCard>
             ) : (
                 friends.map((friend) => (
-                    <GlassCard key={friend.uid} variant="light" padding="md" style={styles.friendCard}>
+                    <GlassCard key={friend.uid} variant="light" padding="sm" style={styles.friendCard}>
                         <View style={styles.friendRow}>
                             <TouchableOpacity
                                 onPress={() => showUserProfile({
@@ -626,7 +605,7 @@ export default function SocialScreen() {
                                 activeOpacity={0.7}
                             >
                                 <UserAvatar
-                                    size={48}
+                                    size={32}
                                     photoURL={friend.photoURL}
                                     avatarType={friend.avatarType}
                                     avatarValue={friend.avatarValue}
@@ -668,17 +647,11 @@ export default function SocialScreen() {
                                 <Text style={styles.celebrateEmoji}>🎉</Text>
                             </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            style={styles.removeFriendHint}
-                            onPress={() => handleRemoveFriend(friend.uid, friend.displayName)}
-                        >
-                            <Text style={styles.removeFriendText}>Hold to remove</Text>
-                        </TouchableOpacity>
                     </GlassCard>
                 ))
             )}
 
-            {/* Add Friends CTA - moved above Grow Your Circle */}
+            {/* Add Friends CTA - in the middle */}
             <TouchableOpacity
                 style={styles.outlineButton}
                 activeOpacity={0.8}
@@ -710,6 +683,41 @@ export default function SocialScreen() {
                     <Text style={styles.inviteCtaButtonText}>Share Invite Link</Text>
                 </TouchableOpacity>
             </GlassCard>
+
+            {/* Outgoing (Pending) Friend Requests Section - at the bottom */}
+            {outgoingRequests.length > 0 && (
+                <View style={styles.requestsSection}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Pending</Text>
+                        <View style={[styles.badge, { backgroundColor: looviColors.accent.secondary }]}>
+                            <Text style={styles.badgeText}>{outgoingRequests.length}</Text>
+                        </View>
+                    </View>
+                    {outgoingRequests.map((request) => (
+                        <GlassCard key={request.id} variant="light" padding="md" style={styles.pendingCard}>
+                            <View style={styles.friendRow}>
+                                <View style={[styles.friendAvatar, { backgroundColor: looviColors.accent.warning }]}>
+                                    <Ionicons name="hourglass-outline" size={18} color="#FFFFFF" />
+                                </View>
+                                <View style={styles.friendInfo}>
+                                    <Text style={styles.friendName}>
+                                        {request.toName || 'User'}
+                                    </Text>
+                                    <Text style={styles.friendUsername}>
+                                        {request.toEmail || 'Awaiting response...'}
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={styles.cancelButton}
+                                    onPress={() => handleCancelRequest(request.id)}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </GlassCard>
+                    ))}
+                </View>
+            )}
         </View>
     );
 
@@ -718,6 +726,24 @@ export default function SocialScreen() {
             {/* Leaderboard Type Selector */}
             <View style={styles.leaderboardHeader}>
                 <Text style={styles.leaderboardTitle}>Top Users This Week</Text>
+                <View style={styles.leaderboardToggle}>
+                    <TouchableOpacity
+                        style={[styles.leaderboardToggleBtn, leaderboardType === 'health' && styles.leaderboardToggleBtnActive]}
+                        onPress={() => setLeaderboardType('health')}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="heart" size={14} color={leaderboardType === 'health' ? '#FFFFFF' : looviColors.text.tertiary} />
+                        <Text style={[styles.leaderboardToggleText, leaderboardType === 'health' && styles.leaderboardToggleTextActive]}>Health</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.leaderboardToggleBtn, leaderboardType === 'streak' && styles.leaderboardToggleBtnActive]}
+                        onPress={() => setLeaderboardType('streak')}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="flame" size={14} color={leaderboardType === 'streak' ? '#FFFFFF' : looviColors.text.tertiary} />
+                        <Text style={[styles.leaderboardToggleText, leaderboardType === 'streak' && styles.leaderboardToggleTextActive]}>Streak</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {isLoading ? (
@@ -767,14 +793,23 @@ export default function SocialScreen() {
                                             />
                                             <View style={{ marginLeft: spacing.sm }}>
                                                 <Text style={styles.leaderboardName}>{entry.name}</Text>
-                                                <Text style={styles.leaderboardScore}>{entry.score} pts</Text>
+                                                <Text style={styles.leaderboardScore}>
+                                                    {leaderboardType === 'streak' ? `${entry.streak} day streak` : `${entry.score} pts`}
+                                                </Text>
                                             </View>
                                         </View>
                                     </View>
-                                    <View style={styles.streakBadge}>
-                                        <Ionicons name="flame" size={14} color="#FFFFFF" />
-                                        <Text style={styles.streakBadgeText}>{entry.streak}</Text>
-                                    </View>
+                                    {leaderboardType === 'streak' ? (
+                                        <View style={styles.streakBadge}>
+                                            <Ionicons name="flame" size={14} color="#FFFFFF" />
+                                            <Text style={styles.streakBadgeText}>{entry.streak}</Text>
+                                        </View>
+                                    ) : (
+                                        <View style={[styles.streakBadge, { backgroundColor: looviColors.accent.primary }]}>
+                                            <Ionicons name="heart" size={14} color="#FFFFFF" />
+                                            <Text style={styles.streakBadgeText}>{entry.score}</Text>
+                                        </View>
+                                    )}
                                 </View>
                             </GlassCard>
                         </TouchableOpacity>
@@ -804,14 +839,23 @@ export default function SocialScreen() {
                                         />
                                         <View style={{ marginLeft: spacing.sm }}>
                                             <Text style={styles.leaderboardName}>You</Text>
-                                            <Text style={styles.leaderboardScore}>{userScore} pts</Text>
+                                            <Text style={styles.leaderboardScore}>
+                                                {leaderboardType === 'streak' ? `${userStreak} day streak` : `${userScore} pts`}
+                                            </Text>
                                         </View>
                                     </View>
                                 </View>
-                                <View style={styles.streakBadge}>
-                                    <Ionicons name="flame" size={14} color="#FFFFFF" />
-                                    <Text style={styles.streakBadgeText}>{userStreak}</Text>
-                                </View>
+                                {leaderboardType === 'streak' ? (
+                                    <View style={styles.streakBadge}>
+                                        <Ionicons name="flame" size={14} color="#FFFFFF" />
+                                        <Text style={styles.streakBadgeText}>{userStreak}</Text>
+                                    </View>
+                                ) : (
+                                    <View style={[styles.streakBadge, { backgroundColor: looviColors.accent.primary }]}>
+                                        <Ionicons name="heart" size={14} color="#FFFFFF" />
+                                        <Text style={styles.streakBadgeText}>{userScore}</Text>
+                                    </View>
+                                )}
                             </View>
                         </GlassCard>
                     </View>
@@ -1204,12 +1248,12 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     friendCard: {
-        marginBottom: spacing.sm,
+        marginBottom: 4,
     },
     friendRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 8,
     },
     friendAvatar: {
         width: 44,
@@ -1228,7 +1272,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     friendName: {
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: '600',
         color: looviColors.text.primary,
     },
@@ -1290,6 +1334,33 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
         color: looviColors.text.primary,
+    },
+    leaderboardToggle: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        borderRadius: 10,
+        padding: 3,
+        marginTop: spacing.sm,
+        alignSelf: 'flex-start',
+    },
+    leaderboardToggleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 8,
+        gap: 4,
+    },
+    leaderboardToggleBtnActive: {
+        backgroundColor: looviColors.accent.primary,
+    },
+    leaderboardToggleText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: looviColors.text.tertiary,
+    },
+    leaderboardToggleTextActive: {
+        color: '#FFFFFF',
     },
     leaderboardCard: {
         marginBottom: spacing.sm,
@@ -1404,17 +1475,7 @@ const styles = StyleSheet.create({
     celebrateEmoji: {
         fontSize: 20,
     },
-    removeFriendHint: {
-        marginTop: 8,
-        paddingTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(0, 0, 0, 0.05)',
-        alignItems: 'center',
-    },
-    removeFriendText: {
-        fontSize: 11,
-        color: looviColors.text.tertiary,
-    },
+
     // Invite CTA card
     inviteCtaCard: {
         marginTop: spacing.md,

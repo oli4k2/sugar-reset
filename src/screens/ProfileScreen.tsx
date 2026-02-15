@@ -20,6 +20,7 @@ import {
     ActivityIndicator,
     Switch,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as StoreReview from 'expo-store-review';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -316,7 +317,7 @@ export default function ProfileScreen() {
 
             if (summary.count === 0) {
                 Alert.alert(
-                    'Scheduled Notifications', 
+                    'Scheduled Notifications',
                     'No notifications scheduled.\n\nTo test:\n• Use "Test Trial Notification" to schedule a test reminder',
                     [{ text: 'OK' }]
                 );
@@ -360,10 +361,10 @@ export default function ProfileScreen() {
         try {
             const { notificationService } = await import('../services/notificationService');
             const Notifications = await import('expo-notifications');
-            
+
             // Check permissions first
             const { status } = await Notifications.default.getPermissionsAsync();
-            
+
             if (status !== 'granted') {
                 Alert.alert(
                     'Permissions Required',
@@ -376,11 +377,11 @@ export default function ProfileScreen() {
             // Schedule all daily reminders
             await notificationService.scheduleDailyReminder(20, 0);
             await notificationService.scheduleAllDailyReminders();
-            
+
             // Also schedule a test notification for 1 minute from now
             const testDate = new Date();
             testDate.setMinutes(testDate.getMinutes() + 1);
-            
+
             await Notifications.default.scheduleNotificationAsync({
                 content: {
                     title: '🧪 Test Notification',
@@ -629,22 +630,37 @@ export default function ProfileScreen() {
                             <View style={styles.floatingStatsRow}>
                                 {/* Streak */}
                                 <View style={styles.floatingStatCard}>
-                                    <Text style={styles.floatingStatEmoji}>🔥</Text>
+                                    <View style={{ marginBottom: 4 }}>
+                                        <Ionicons name="flame" size={24} color="#F97316" />
+                                    </View>
                                     <Text style={styles.floatingStatValue}>{daysSugarFree}</Text>
                                     <Text style={styles.floatingStatLabel}>Streak</Text>
                                 </View>
 
                                 {/* Health */}
                                 <View style={styles.floatingStatCard}>
-                                    <Text style={styles.floatingStatEmoji}>❤️</Text>
+                                    <View style={{ marginBottom: 4 }}>
+                                        <Ionicons name="heart" size={24} color={looviColors.accent.primary} />
+                                    </View>
                                     <Text style={styles.floatingStatValue}>{healthScoreDisplay}</Text>
                                     <Text style={styles.floatingStatLabel}>Health</Text>
                                 </View>
 
                                 {/* Pledge */}
                                 <View style={styles.floatingStatCard}>
-                                    <Text style={styles.floatingStatEmoji}>{hasPledgedToday ? '✅' : '🖐️'}</Text>
-                                    <Text style={styles.floatingStatValue}>{hasPledgedToday ? 'Yes' : 'No'}</Text>
+                                    <View style={{ marginBottom: 4 }}>
+                                        <Ionicons
+                                            name={hasPledgedToday ? "hand-left" : "hand-left-outline"}
+                                            size={24}
+                                            color={hasPledgedToday ? "#22C55E" : looviColors.text.tertiary}
+                                        />
+                                    </View>
+                                    <Text style={[
+                                        styles.floatingStatValue,
+                                        { color: hasPledgedToday ? "#22C55E" : looviColors.text.primary }
+                                    ]}>
+                                        {hasPledgedToday ? 'Yes' : 'No'}
+                                    </Text>
                                     <Text style={styles.floatingStatLabel}>Pledge</Text>
                                 </View>
                             </View>
@@ -712,7 +728,7 @@ export default function ProfileScreen() {
                                                     case 'rate': StoreReview.requestReview(); break;
                                                     case 'viewNotifications': handleViewNotifications(); break;
                                                     case 'scheduleTestNotifications': handleScheduleTestNotifications(); break;
-                                                    case 'testPaywall': navigation.navigate('Paywall'); break;
+                                                    case 'testPaywall': navigation.navigate('Paywall', { showFullFlow: true }); break;
                                                     case 'testCancellationOffer': {
                                                         setShowCancellationOffer(true);
                                                         break;
@@ -722,7 +738,7 @@ export default function ProfileScreen() {
                                                         const testExpirationDate = new Date();
                                                         testExpirationDate.setDate(testExpirationDate.getDate() + 2);
                                                         testExpirationDate.setHours(10, 0, 0, 0);
-                                                        
+
                                                         import('../services/notificationService').then(({ notificationService }) => {
                                                             notificationService.scheduleTrialExpirationReminder(testExpirationDate)
                                                                 .then(() => {

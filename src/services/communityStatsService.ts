@@ -20,6 +20,13 @@ import {
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseReady, app } from '../config/firebase';
 
+export interface MoodDistribution {
+    great: number;
+    good: number;
+    okay: number;
+    struggling: number;
+}
+
 export interface CommunityStats {
     totalUsers: number;
     activeUsers: number; // Users with activity in last 7 days
@@ -28,6 +35,8 @@ export interface CommunityStats {
     totalDaysSugarFree: number; // Sum of all user streaks
     topStreak: number;
     topHealthScore: number;
+    moodDistribution: MoodDistribution | null;
+    goalAchievementRate: number | null; // percentage of active users who achieved their goal
     updatedAt: Date;
 }
 
@@ -82,7 +91,7 @@ export const communityStatsService = {
 
             const data = statsSnap.data();
             console.log('✅ Community stats loaded successfully');
-            return {
+            const fetchedStats = {
                 totalUsers: data.totalUsers || 0,
                 activeUsers: data.activeUsers || 0,
                 averageStreak: data.averageStreak || 0,
@@ -90,8 +99,21 @@ export const communityStatsService = {
                 totalDaysSugarFree: data.totalDaysSugarFree || 0,
                 topStreak: data.topStreak || 0,
                 topHealthScore: data.topHealthScore || 0,
+                moodDistribution: data.moodDistribution || null,
+                goalAchievementRate: data.goalAchievementRate ?? null,
                 updatedAt: data.updatedAt?.toDate() || new Date(),
             };
+
+            // If the cached stats don't have mood data yet, recalculate from scratch
+            if (!fetchedStats.moodDistribution) {
+                console.log('📊 Cached stats missing mood data, recalculating...');
+                const freshStats = await this.calculateCommunityStats();
+                if (freshStats) {
+                    return freshStats;
+                }
+            }
+
+            return fetchedStats;
         } catch (error: any) {
             // Enhanced error logging for debugging
             console.error('❌ Community stats error details:', {
@@ -171,6 +193,8 @@ export const communityStatsService = {
             totalDaysSugarFree: data.totalDaysSugarFree || 0,
             topStreak: data.topStreak || 0,
             topHealthScore: data.topHealthScore || 0,
+            moodDistribution: data.moodDistribution || null,
+            goalAchievementRate: data.goalAchievementRate ?? null,
             updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
         };
     },
@@ -234,6 +258,15 @@ export const communityStatsService = {
             totalDaysSugarFree: parseInt(fields.totalDaysSugarFree?.integerValue || '0', 10),
             topStreak: parseInt(fields.topStreak?.integerValue || '0', 10),
             topHealthScore: parseInt(fields.topHealthScore?.integerValue || '0', 10),
+            moodDistribution: fields.moodDistribution?.mapValue?.fields ? {
+                great: parseInt(fields.moodDistribution.mapValue.fields.great?.integerValue || '0', 10),
+                good: parseInt(fields.moodDistribution.mapValue.fields.good?.integerValue || '0', 10),
+                okay: parseInt(fields.moodDistribution.mapValue.fields.okay?.integerValue || '0', 10),
+                struggling: parseInt(fields.moodDistribution.mapValue.fields.struggling?.integerValue || '0', 10),
+            } : null,
+            goalAchievementRate: fields.goalAchievementRate?.integerValue
+                ? parseInt(fields.goalAchievementRate.integerValue, 10)
+                : null,
             updatedAt: fields.updatedAt?.timestampValue ? new Date(fields.updatedAt.timestampValue) : new Date(),
         };
     },
@@ -250,6 +283,8 @@ export const communityStatsService = {
             totalDaysSugarFree: 0,
             topStreak: 0,
             topHealthScore: 0,
+            moodDistribution: null,
+            goalAchievementRate: null,
             updatedAt: new Date(),
         };
     },
@@ -267,16 +302,7 @@ export const communityStatsService = {
             const snapshot = await getDocs(q);
 
             if (snapshot.empty) {
-                return {
-                    totalUsers: 0,
-                    activeUsers: 0,
-                    averageStreak: 0,
-                    averageHealthScore: 0,
-                    totalDaysSugarFree: 0,
-                    topStreak: 0,
-                    topHealthScore: 0,
-                    updatedAt: new Date(),
-                };
+                return this.getDefaultStats();
             }
 
             let totalStreak = 0;
@@ -284,29 +310,71 @@ export const communityStatsService = {
             let topStreak = 0;
             let topHealthScore = 0;
             let activeCount = 0;
+            let goalAchievedCount = 0;
 
+            // Mood distribution counters
+            const moodCounts = { great: 0, good: 0, okay: 0, struggling: 0 };
+
+            const now = new Date();
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
             snapshot.docs.forEach(doc => {
                 const data = doc.data();
-                const streak = data.currentStreak || 0;
+                const rawStreak = data.currentStreak || 0;
                 const healthScore = data.healthScore || 0;
                 const updatedAt = data.updatedAt?.toDate();
 
-                totalStreak += streak;
+                // IMPORTANT: Adjust streak for inactive users.
+                // If the user hasn't updated their stats in more than 2 days
+                // (exceeding the grace period), their streak should be 0
+                // because they couldn't have been logging food.
+                let adjustedStreak = rawStreak;
+                if (updatedAt) {
+                    const daysSinceUpdate = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                    if (daysSinceUpdate > 2) {
+                        adjustedStreak = 0;
+                    }
+                } else {
+                    // No updatedAt means we can't trust the streak
+                    adjustedStreak = 0;
+                }
+
+                totalStreak += adjustedStreak;
                 totalHealthScore += healthScore;
 
-                if (streak > topStreak) topStreak = streak;
+                if (adjustedStreak > topStreak) topStreak = adjustedStreak;
                 if (healthScore > topHealthScore) topHealthScore = healthScore;
 
                 // Count as active if updated in last 7 days
                 if (updatedAt && updatedAt > sevenDaysAgo) {
                     activeCount++;
+
+                    // Aggregate goal achievement for active users
+                    if (data.goalAchieved) {
+                        goalAchievedCount++;
+                    }
+
+                    // Aggregate mood from latest mood check-in
+                    const mood = data.latestMood || data.mood;
+                    if (mood) {
+                        const moodLower = String(mood).toLowerCase();
+                        if (moodLower === 'great' || moodLower === 'amazing' || moodLower === 'excellent') {
+                            moodCounts.great++;
+                        } else if (moodLower === 'good' || moodLower === 'happy' || moodLower === 'fine') {
+                            moodCounts.good++;
+                        } else if (moodLower === 'okay' || moodLower === 'neutral' || moodLower === 'meh') {
+                            moodCounts.okay++;
+                        } else {
+                            moodCounts.struggling++;
+                        }
+                    }
                 }
             });
 
             const totalUsers = snapshot.size;
+            const totalMoodResponses = moodCounts.great + moodCounts.good + moodCounts.okay + moodCounts.struggling;
+
             const stats: CommunityStats = {
                 totalUsers,
                 activeUsers: activeCount,
@@ -315,11 +383,17 @@ export const communityStatsService = {
                 totalDaysSugarFree: totalStreak,
                 topStreak,
                 topHealthScore,
+                moodDistribution: totalMoodResponses > 0 ? moodCounts : null,
+                goalAchievementRate: activeCount > 0 ? Math.round((goalAchievedCount / activeCount) * 100) : null,
                 updatedAt: new Date(),
             };
 
-            // Cache the calculated stats
-            await this.saveCommunityStats(stats);
+            // Try to cache the calculated stats (may fail if client writes are blocked)
+            try {
+                await this.saveCommunityStats(stats);
+            } catch (saveError: any) {
+                console.warn('⚠️ Could not cache community stats (expected if client writes are blocked):', saveError?.code);
+            }
 
             return stats;
         } catch (error) {
@@ -339,7 +413,8 @@ export const communityStatsService = {
                 updatedAt: serverTimestamp(),
             });
         } catch (error) {
-            console.error('Error saving community stats:', error);
+            // Expected to fail — Firestore rules block client writes to communityStats
+            console.warn('⚠️ Community stats save skipped (client writes blocked by rules)');
         }
     },
 

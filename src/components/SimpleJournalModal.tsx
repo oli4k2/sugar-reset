@@ -88,64 +88,67 @@ export default function SimpleJournalModal({
             onRequestClose={handleClose}
         >
             <KeyboardAvoidingView
-                style={styles.overlay}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardAvoidingView}
             >
-                <View style={styles.container}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                            <Ionicons name="close" size={24} color={looviColors.text.secondary} />
-                        </TouchableOpacity>
-                        <View style={styles.headerCenter}>
-                            <Text style={styles.title}>
-                                {isEditing ? 'Edit Entry' : 'New Journal Entry'}
-                            </Text>
-                            <Text style={styles.dateText}>{dateFormatted}</Text>
+                <View style={styles.overlay}>
+                    <View style={styles.container}>
+                        {/* Header */}
+                        <View style={styles.header}>
+                            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                                <Ionicons name="close" size={24} color={looviColors.text.secondary} />
+                            </TouchableOpacity>
+                            <View style={styles.headerCenter}>
+                                <Text style={styles.title}>
+                                    {isEditing ? 'Edit Entry' : 'New Journal Entry'}
+                                </Text>
+                                <Text style={styles.dateText}>{dateFormatted}</Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={handleSave}
+                                style={[styles.saveButton, (!notes.trim() || isSaving) && styles.saveButtonDisabled]}
+                                disabled={!notes.trim() || isSaving}
+                            >
+                                <Text style={[
+                                    styles.saveButtonText,
+                                    (!notes.trim() || isSaving) && styles.saveButtonTextDisabled
+                                ]}>
+                                    {isSaving ? 'Saving...' : 'Save'}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            onPress={handleSave}
-                            style={[styles.saveButton, (!notes.trim() || isSaving) && styles.saveButtonDisabled]}
-                            disabled={!notes.trim() || isSaving}
+
+                        {/* Content */}
+                        <ScrollView
+                            style={styles.scrollView}
+                            contentContainerStyle={styles.scrollContent}
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={false}
                         >
-                            <Text style={[
-                                styles.saveButtonText,
-                                (!notes.trim() || isSaving) && styles.saveButtonTextDisabled
-                            ]}>
-                                {isSaving ? 'Saving...' : 'Save'}
-                            </Text>
-                        </TouchableOpacity>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>How are you feeling?</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="Write about your day, cravings, victories, or anything on your mind..."
+                                    placeholderTextColor={looviColors.text.muted}
+                                    value={notes}
+                                    onChangeText={setNotes}
+                                    multiline
+                                    textAlignVertical="top"
+                                    autoFocus={!existingEntry}
+                                />
+                            </View>
+
+                            {/* Tips */}
+                            <View style={styles.tipsContainer}>
+                                <Text style={styles.tipsTitle}>💡 Journal Ideas</Text>
+                                <Text style={styles.tip}>• How did you handle cravings today?</Text>
+                                <Text style={styles.tip}>• What made you feel good?</Text>
+                                <Text style={styles.tip}>• Any challenges you overcame?</Text>
+                                <Text style={styles.tip}>• What are you grateful for?</Text>
+                            </View>
+                        </ScrollView>
                     </View>
-
-                    {/* Content */}
-                    <ScrollView
-                        style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
-                        keyboardShouldPersistTaps="handled"
-                    >
-                        <View style={styles.inputContainer}>
-                            <Text style={styles.label}>How are you feeling?</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                placeholder="Write about your day, cravings, victories, or anything on your mind..."
-                                placeholderTextColor={looviColors.text.muted}
-                                value={notes}
-                                onChangeText={setNotes}
-                                multiline
-                                textAlignVertical="top"
-                                autoFocus={!existingEntry}
-                            />
-                        </View>
-
-                        {/* Tips */}
-                        <View style={styles.tipsContainer}>
-                            <Text style={styles.tipsTitle}>💡 Journal Ideas</Text>
-                            <Text style={styles.tip}>• How did you handle cravings today?</Text>
-                            <Text style={styles.tip}>• What made you feel good?</Text>
-                            <Text style={styles.tip}>• Any challenges you overcame?</Text>
-                            <Text style={styles.tip}>• What are you grateful for?</Text>
-                        </View>
-                    </ScrollView>
                 </View>
             </KeyboardAvoidingView>
         </Modal>
@@ -153,16 +156,25 @@ export default function SimpleJournalModal({
 }
 
 const styles = StyleSheet.create({
+    keyboardAvoidingView: {
+        flex: 1,
+    },
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
+        alignItems: 'center',
     },
     container: {
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        maxHeight: '85%',
+        marginTop: 60,
+        flex: 1,
+        width: '100%',
+        maxWidth: 400,
+        overflow: 'hidden',
+        marginHorizontal: spacing.lg,
     },
     header: {
         flexDirection: 'row',
@@ -209,6 +221,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: spacing.lg,
+        paddingBottom: spacing.xl + 40, // Extra padding for keyboard
     },
     inputContainer: {
         marginBottom: spacing.lg,

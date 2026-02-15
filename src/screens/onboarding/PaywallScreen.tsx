@@ -42,22 +42,37 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type PaywallScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Paywall'>;
+    route?: any;
 };
 
 // Paywall steps
 type PaywallStep = 'intro' | 'reminder' | 'plans';
 
-export default function PaywallScreen({ navigation }: PaywallScreenProps) {
+export default function PaywallScreen({ navigation, route }: PaywallScreenProps) {
     const { currentOffering, isLoading, purchasePackage, isPremium, customerInfo, findPackageByIdentifier } = useRevenueCat();
     const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint } = useUserData();
     const { isAuthenticated } = useAuthContext();
     const posthog = usePostHog();
 
-    const [currentStep, setCurrentStep] = useState<PaywallStep>('intro');
+    // Check if we should show full flow (from route params or if in onboarding)
+    const showFullFlow = route?.params?.showFullFlow || !hasCompletedOnboarding;
+    
+    // If user has completed onboarding AND we're not showing full flow, they're accessing from within the app
+    const isFromApp = hasCompletedOnboarding && !showFullFlow;
+    const [currentStep, setCurrentStep] = useState<PaywallStep>(isFromApp ? 'plans' : 'intro');
     const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [showCancellationOffer, setShowCancellationOffer] = useState(false);
+    
+    // Check if user can get a trial (hasn't used one before)
+    // RevenueCat tracks trial usage - check if user has ever had a trial period
+    const yearlyPkg = currentOffering?.annual;
+    const hasUsedTrial = customerInfo?.entitlements?.all?.['premium']?.periodType === 'TRIAL' ||
+                         (customerInfo?.entitlements?.all?.['premium']?.willRenew === false && 
+                          customerInfo?.entitlements?.all?.['premium']?.expirationDate && 
+                          new Date(customerInfo.entitlements.all['premium'].expirationDate) < new Date());
+    const canGetTrial = !hasUsedTrial && (yearlyPkg?.product?.introPrice !== null);
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -136,6 +151,12 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             current_step: currentStep
         });
 
+        // If accessed from inside the app, allow going back to app
+        if (isFromApp) {
+            navigation.goBack();
+            return;
+        }
+
         // During onboarding, only allow navigation between steps
         // No way to skip/decline - must start free trial
         if (currentStep === 'reminder') {
@@ -158,7 +179,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             // Offer 1: 'annual_offer1' for yearly_subscription_offer ($12.99)
             // Offer 2: 'annual_offer2' for yearly_subscription_offer_2 ($14.99) - if exists
             let offerPackage: PurchasesPackage | null = null;
-            
+
             if (step === 'offer1') {
                 // Search across all offerings for annual_offer1
                 offerPackage = await findPackageByIdentifier('annual_offer1');
@@ -166,12 +187,12 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 // Search across all offerings for annual_offer2
                 offerPackage = await findPackageByIdentifier('annual_offer2');
             }
-            
+
             // Fallback to regular annual if offer package not found
             if (!offerPackage && currentOffering?.annual) {
                 offerPackage = currentOffering.annual;
             }
-            
+
             if (offerPackage) {
                 posthog?.capture('purchase_initiated', {
                     package_id: offerPackage.identifier,
@@ -213,7 +234,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             // Offer 1: 'lifetime_offer1' for lifetime_offer_1 ($24.99)
             // Offer 2: 'lifetime_offer2' for lifetime_offer_2 ($14.99)
             let offerPackage: PurchasesPackage | null = null;
-            
+
             if (step === 'offer1') {
                 // Search across all offerings for lifetime_offer1
                 offerPackage = await findPackageByIdentifier('lifetime_offer1');
@@ -221,12 +242,12 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 // Search across all offerings for lifetime_offer2
                 offerPackage = await findPackageByIdentifier('lifetime_offer2');
             }
-            
+
             // Fallback to regular lifetime if offer packages not found
             if (!offerPackage && currentOffering?.lifetime) {
                 offerPackage = currentOffering.lifetime;
             }
-            
+
             if (offerPackage) {
                 posthog?.capture('purchase_initiated', {
                     package_id: offerPackage.identifier,
@@ -321,8 +342,22 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                 return;
             }
 
-            // Note: purchasePackage returns void, customerInfo is updated in context
+            // Purchase the package - this will throw if it fails
             await purchasePackage(selectedPackage);
+
+            // Verify purchase actually succeeded by checking premium status
+            // Wait a moment for RevenueCat to update
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Check if purchase was successful
+            const { revenueCatService } = await import('../../services/revenueCatService');
+            const updatedInfo = await revenueCatService.getCustomerInfo();
+            const hasPremium = updatedInfo?.entitlements?.active?.['premium'];
+
+            if (!hasPremium) {
+                // Purchase didn't actually complete - don't proceed
+                throw new Error('Purchase verification failed. The subscription was not activated. Please try again.');
+            }
 
             if (selectedPackage) {
                 posthog?.capture('purchase_successful', {
@@ -333,36 +368,29 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
 
             // Schedule trial expiration reminder (2 days into trial = 1 day before it ends)
             // Only for yearly subscription (which has the 3-day free trial)
-            // Check customerInfo after purchase (it's updated in context)
-            // Use a small delay to ensure context has updated
             if (selectedPlan === 'yearly' && selectedPackage?.packageType === 'ANNUAL') {
-                setTimeout(async () => {
-                    try {
-                        // Get updated customerInfo from RevenueCat
-                        const { revenueCatService } = await import('../../services/revenueCatService');
-                        const updatedInfo = await revenueCatService.getCustomerInfo();
-                        
-                        // Check if user has active premium entitlement with trial period
-                        const premiumEntitlement = updatedInfo?.entitlements?.active?.['premium'];
-                        if (premiumEntitlement && premiumEntitlement.expirationDate) {
-                            const expirationDate = new Date(premiumEntitlement.expirationDate);
-                            const now = new Date();
-                            const daysUntilExpiration = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                            
-                            // Only schedule if trial is active (expires in ~3 days)
-                            if (daysUntilExpiration > 0 && daysUntilExpiration <= 3) {
-                                const { notificationService } = await import('../../services/notificationService');
-                                await notificationService.scheduleTrialExpirationReminder(expirationDate);
-                                console.log('✅ Scheduled trial expiration reminder for', expirationDate.toLocaleDateString(), '(2 days into trial)');
-                            }
+                try {
+                    // Check if user has active premium entitlement with trial period
+                    const premiumEntitlement = updatedInfo?.entitlements?.active?.['premium'];
+                    if (premiumEntitlement && premiumEntitlement.expirationDate) {
+                        const expirationDate = new Date(premiumEntitlement.expirationDate);
+                        const now = new Date();
+                        const daysUntilExpiration = Math.ceil((expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+                        // Only schedule if trial is active (expires in ~3 days)
+                        if (daysUntilExpiration > 0 && daysUntilExpiration <= 3) {
+                            const { notificationService } = await import('../../services/notificationService');
+                            await notificationService.scheduleTrialExpirationReminder(expirationDate);
+                            console.log('✅ Scheduled trial expiration reminder for', expirationDate.toLocaleDateString(), '(2 days into trial)');
                         }
-                    } catch (notifError) {
-                        console.warn('Could not schedule trial reminder:', notifError);
-                        // Don't fail the purchase if notification scheduling fails
                     }
-                }, 1000); // Increased delay to ensure RevenueCat has updated
+                } catch (notifError) {
+                    console.warn('Could not schedule trial reminder:', notifError);
+                    // Don't fail the purchase if notification scheduling fails
+                }
             }
 
+            // Only complete onboarding if purchase was successful
             await completeOnboarding();
 
             if (!isAuthenticated) {
@@ -387,17 +415,27 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             }
         } catch (error: any) {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            if (error.message === 'Purchase cancelled' || (error.userCancelled)) {
+
+            // Don't complete onboarding if purchase failed
+            const errorMessage = error.message || 'Purchase failed. Please try again.';
+
+            // Check if it was a user cancellation
+            if (error.message?.includes('cancelled') || error.message?.includes('canceled') || error.userCancelled) {
                 posthog?.capture('purchase_cancelled', {
-                    package_id: selectedPackage?.identifier
+                    package_id: selectedPackage?.identifier,
+                    package_type: selectedPackage?.packageType
                 });
+                Alert.alert('Purchase Cancelled', 'You cancelled the purchase. You can try again anytime.');
             } else {
                 posthog?.capture('purchase_failed', {
+                    error: errorMessage,
                     package_id: selectedPackage?.identifier,
-                    error: error.message
+                    package_type: selectedPackage?.packageType
                 });
-                Alert.alert('Error', error.message || 'Please try again.');
+                Alert.alert('Purchase Failed', errorMessage);
             }
+
+            // Don't complete onboarding - user stays on paywall to retry
         } finally {
             setIsPurchasing(false);
         }
@@ -413,10 +451,10 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     };
 
     // Get price info
-    const getMonthlyPrice = () => currentOffering?.monthly?.product.priceString || '$8.99';
-    const getYearlyPrice = () => currentOffering?.annual?.product.priceString || '$14.99';
+    const getMonthlyPrice = () => currentOffering?.monthly?.product.priceString || '$9.99';
+    const getYearlyPrice = () => currentOffering?.annual?.product.priceString || '$29.99';
     const getYearlyMonthlyEquivalent = () => {
-        const price = currentOffering?.annual?.product.price || 14.99;
+        const price = currentOffering?.annual?.product.price || 29.99;
         return `$${(price / 12).toFixed(2)}`;
     };
 
@@ -506,12 +544,21 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
     );
 
     // Render Step 3: Plans
-    const renderPlansStep = () => (
+    const renderPlansStep = () => {
+        // Check if selected package has a trial period
+        const yearlyPkg = currentOffering?.annual;
+        const hasTrial = canGetTrial && (yearlyPkg?.product?.introPrice !== null);
+        const title = isFromApp 
+            ? (hasTrial ? 'Upgrade to Premium' : 'Subscribe to Premium')
+            : 'Start your 3-day FREE\ntrial to continue.';
+        
+        return (
         <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <View style={styles.contentArea}>
-                <Text style={styles.mainTitle}>Start your 3-day FREE{'\n'}trial to continue.</Text>
+                <Text style={styles.mainTitle}>{title}</Text>
 
-                {/* Timeline */}
+                {/* Timeline - Only show during onboarding */}
+                {!isFromApp && (
                 <View style={styles.timeline}>
                     {/* Today */}
                     <View style={styles.timelineItem}>
@@ -551,6 +598,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                             <View style={[styles.timelineIcon, styles.timelineIconFuture]}>
                                 <Ionicons name="card" size={16} color="#FFFFFF" />
                             </View>
+                            <View style={styles.timelineLineBottom} />
                         </View>
                         <View style={styles.timelineContent}>
                             <Text style={styles.timelineTitle}>In 3 Days - Billing Starts</Text>
@@ -560,6 +608,7 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                         </View>
                     </View>
                 </View>
+                )}
 
                 {/* Plan Selection */}
                 <View style={styles.planSelection}>
@@ -597,9 +646,11 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                         }}
                         activeOpacity={0.8}
                     >
-                        <View style={styles.freeTrialBadge}>
-                            <Text style={styles.freeTrialBadgeText}>3 DAYS FREE</Text>
-                        </View>
+                        {hasTrial && (
+                            <View style={styles.freeTrialBadge}>
+                                <Text style={styles.freeTrialBadgeText}>3 DAYS FREE</Text>
+                            </View>
+                        )}
                         <Text style={styles.planLabel}>Yearly</Text>
                         <Text style={styles.planPrice}>{getYearlyMonthlyEquivalent()}<Text style={styles.planPeriod}>/mo</Text></Text>
                         <View style={[
@@ -615,10 +666,12 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
             </View>
 
             <View style={styles.bottomArea}>
-                <View style={styles.noPaymentRow}>
-                    <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
-                    <Text style={styles.noPaymentText}>No Payment Due Now</Text>
-                </View>
+                {hasTrial && (
+                    <View style={styles.noPaymentRow}>
+                        <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
+                        <Text style={styles.noPaymentText}>No Payment Due Now</Text>
+                    </View>
+                )}
 
                 <TouchableOpacity
                     style={[styles.primaryButton, isPurchasing && styles.buttonDisabled]}
@@ -629,25 +682,31 @@ export default function PaywallScreen({ navigation }: PaywallScreenProps) {
                     {isPurchasing ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                        <Text style={styles.primaryButtonText}>Start My 3-Day Free Trial</Text>
+                        <Text style={styles.primaryButtonText}>
+                            {hasTrial ? 'Start My 3-Day Free Trial' : 'Subscribe Now'}
+                        </Text>
                     )}
                 </TouchableOpacity>
 
                 <Text style={styles.priceSubtext}>
-                    3 days free, then {selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} ({selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)
+                    {hasTrial 
+                        ? `3 days free, then ${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} (${selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)`
+                        : `${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} (${selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)`
+                    }
                 </Text>
             </View>
         </Animated.View>
-    );
+        );
+    };
 
     return (
         <LooviBackground variant="white">
             <SafeAreaView style={styles.container}>
                 {/* Header */}
                 <View style={styles.header}>
-                    {currentStep !== 'intro' ? (
+                    {(currentStep !== 'intro' || isFromApp) ? (
                         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                            <Ionicons name="chevron-back" size={24} color={looviColors.text.primary} />
+                            <Ionicons name={isFromApp ? "close" : "chevron-back"} size={24} color={looviColors.text.primary} />
                         </TouchableOpacity>
                     ) : (
                         <View style={styles.backButton} />
@@ -836,6 +895,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#E5E5E5',
         marginVertical: 4,
     },
+    timelineLineBottom: {
+        width: 3,
+        height: 20,
+        backgroundColor: '#E5E5E5',
+        marginTop: 4,
+    },
     timelineContent: {
         flex: 1,
         paddingLeft: spacing.md,
@@ -873,18 +938,23 @@ const styles = StyleSheet.create({
     },
     freeTrialBadge: {
         position: 'absolute',
-        top: -10,
-        right: spacing.sm,
-        backgroundColor: looviColors.text.primary,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 3,
-        borderRadius: 8,
+        top: -12,
+        alignSelf: 'center',
+        left: 0,
+        right: 0,
+        alignItems: 'center',
+        zIndex: 1,
     },
     freeTrialBadgeText: {
+        backgroundColor: looviColors.text.primary,
         color: '#FFFFFF',
-        fontSize: 9,
+        fontSize: 12,
         fontWeight: '800',
-        letterSpacing: 0.5,
+        letterSpacing: 1,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 4,
+        borderRadius: 10,
+        overflow: 'hidden',
     },
     planLabel: {
         fontSize: 14,

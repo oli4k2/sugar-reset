@@ -16,6 +16,7 @@ import {
     Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BlurView } from 'expo-blur';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
@@ -51,6 +52,8 @@ interface MascotTipProps {
     // Community tip completion tracking
     hasCommunityTipDoneToday?: boolean;
     onCommunityTipDone?: () => void;
+    // Circle check tracking
+    hasCheckedCircleToday?: boolean;
 }
 
 // Encouraging messages for when all daily tasks are done - with green styling
@@ -214,7 +217,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
             priority: 65,
             friendId: friend.id,
         });
-    } else if (props.hasInnerCircleFriends) {
+    } else if (props.hasInnerCircleFriends && !props.hasCheckedCircleToday) {
         tips.push({
             id: 'cheer_friends',
             icon: 'smile',
@@ -302,6 +305,7 @@ export const MascotTip: React.FC<MascotTipProps> = ({
     forceTip,
     hasCommunityTipDoneToday,
     onCommunityTipDone,
+    hasCheckedCircleToday,
 }) => {
     const slideAnim = useRef(new Animated.Value(-100)).current;
     const bounceAnim = useRef(new Animated.Value(0)).current;
@@ -318,7 +322,8 @@ export const MascotTip: React.FC<MascotTipProps> = ({
         healthScore,
         friendsNeedingSupport,
         hasCommunityTipDoneToday,
-    }), [hasPledgedToday, hasFoodLoggedToday, hasWellnessToday, hasInnerCircleFriends, currentStreak, healthScore, friendsNeedingSupport, hasCommunityTipDoneToday]);
+        hasCheckedCircleToday,
+    }), [hasPledgedToday, hasFoodLoggedToday, hasWellnessToday, hasInnerCircleFriends, currentStreak, healthScore, friendsNeedingSupport, hasCommunityTipDoneToday, hasCheckedCircleToday]);
 
     // Reset index when tips change
     useEffect(() => {
@@ -405,14 +410,15 @@ export const MascotTip: React.FC<MascotTipProps> = ({
         }
     };
 
-    // Determine bubble background color - use looviColors.accent.success for consistency
-    const successColor = looviColors.accent.success; // #7FB069
-    const bubbleBackgroundColor = currentTip.isSuccess
-        ? `rgba(127, 176, 105, 0.15)` // Green tint using accent.success
+    // Determine bubble styling
+    const isSuccess = currentTip.isSuccess;
+
+    const bubbleBackgroundColor = isSuccess
+        ? 'transparent'
         : 'rgba(255, 255, 255, 0.7)';
 
-    const bubbleBorderColor = currentTip.isSuccess
-        ? 'rgba(127, 176, 105, 0.3)'  // Green border using accent.success
+    const bubbleBorderColor = isSuccess
+        ? 'rgba(255, 255, 255, 0.3)'
         : 'rgba(255, 255, 255, 0.5)';
 
     return (
@@ -445,11 +451,23 @@ export const MascotTip: React.FC<MascotTipProps> = ({
             >
                 <View style={[styles.bubbleArrow, { borderRightColor: bubbleBackgroundColor }]} />
                 <TouchableOpacity
-                    activeOpacity={0.9}
-                    onPress={handlePress}
+                    activeOpacity={isSuccess ? 1 : 0.9}
+                    onPress={isSuccess ? undefined : handlePress}
+                    disabled={!!isSuccess}
                     style={styles.bubbleTouchable}
                 >
-                    <View style={[styles.bubble, { backgroundColor: bubbleBackgroundColor, borderColor: bubbleBorderColor }]}>
+                    <View style={[
+                        styles.bubble,
+                        { backgroundColor: bubbleBackgroundColor, borderColor: bubbleBorderColor },
+                        isSuccess && { shadowOpacity: 0, elevation: 0, overflow: 'hidden' }
+                    ]}>
+                        {isSuccess && (
+                            <BlurView
+                                intensity={20}
+                                tint="light"
+                                style={StyleSheet.absoluteFill}
+                            />
+                        )}
                         {/* Navigation arrows (left) */}
                         {tips.length > 1 && (
                             <TouchableOpacity
@@ -491,7 +509,7 @@ export const MascotTip: React.FC<MascotTipProps> = ({
                                 <Ionicons name="chevron-forward" size={18} color={looviColors.text.tertiary} />
                             </TouchableOpacity>
                         ) : (
-                            <Ionicons name="chevron-forward" size={18} color={looviColors.text.tertiary} />
+                            !isSuccess && <Ionicons name="chevron-forward" size={18} color={looviColors.text.tertiary} />
                         )}
                     </View>
 
@@ -527,17 +545,17 @@ const styles = StyleSheet.create({
     },
     mascotContainer: {
         position: 'absolute',
-        left: -20,
-        top: 15,
+        left: 0,
+        top: 8, // Move up to align with text bubble
         zIndex: 10,
     },
     mascotImage: {
-        width: 90,
-        height: 90,
+        width: 68, // 75% of 90
+        height: 68,
     },
     bubbleContainer: {
         flex: 1,
-        marginLeft: 55,
+        marginLeft: 76, // 68 + spacing
         marginTop: 0,
         flexDirection: 'row',
         alignItems: 'center',
@@ -590,7 +608,7 @@ const styles = StyleSheet.create({
         marginRight: spacing.sm,
     },
     iconContainerSuccess: {
-        backgroundColor: 'rgba(127, 176, 105, 0.2)', // Using accent.success color
+        backgroundColor: 'transparent',
     },
     tipTextContainer: {
         flex: 1,

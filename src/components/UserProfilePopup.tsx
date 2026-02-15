@@ -172,6 +172,37 @@ export function UserProfilePopup({
         }
     };
 
+    const [isRemovingFriend, setIsRemovingFriend] = useState(false);
+
+    const handleRemoveFriend = () => {
+        if (!user) return;
+
+        Alert.alert(
+            'Remove Friend',
+            `Are you sure you want to remove ${displayName} from your Inner Circle?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsRemovingFriend(true);
+                        try {
+                            await friendService.removeFriend(user.id, userId);
+                            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            setFriendStatus('none');
+                        } catch (error) {
+                            console.error('Error removing friend:', error);
+                            Alert.alert('Error', 'Failed to remove friend');
+                        } finally {
+                            setIsRemovingFriend(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const renderFriendButton = () => {
         if (friendStatus === 'loading' || friendStatus === 'self') {
             return null;
@@ -179,9 +210,26 @@ export function UserProfilePopup({
 
         if (friendStatus === 'friend') {
             return (
-                <View style={styles.friendBadge}>
-                    <Ionicons name="people" size={16} color={looviColors.accent.primary} />
-                    <Text style={styles.friendBadgeText}>In Your Inner Circle</Text>
+                <View>
+                    <View style={styles.friendBadge}>
+                        <Ionicons name="people" size={16} color={looviColors.accent.primary} />
+                        <Text style={styles.friendBadgeText}>In Your Inner Circle</Text>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.removeFriendButton}
+                        onPress={handleRemoveFriend}
+                        disabled={isRemovingFriend}
+                        activeOpacity={0.7}
+                    >
+                        {isRemovingFriend ? (
+                            <ActivityIndicator size="small" color="#EF4444" />
+                        ) : (
+                            <>
+                                <Ionicons name="person-remove-outline" size={16} color="#EF4444" />
+                                <Text style={styles.removeFriendButtonText}>Remove as Friend</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
                 </View>
             );
         }
@@ -492,6 +540,19 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         color: looviColors.accent.primary,
+    },
+    removeFriendButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: spacing.sm,
+        paddingVertical: spacing.sm,
+        gap: spacing.xs,
+    },
+    removeFriendButtonText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#EF4444',
     },
 });
 

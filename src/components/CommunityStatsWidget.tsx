@@ -1,45 +1,23 @@
-/**
- * CommunityStatsWidget
- * 
- * Displays comprehensive community statistics including:
- * - Key metrics (active users, streaks)
- * - Mood distribution visualization
- * - Goal achievement rate
- */
-
 import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ActivityIndicator,
-    TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { communityStatsService, CommunityStats } from '../services/communityStatsService';
 import { GlassCard } from './GlassCard';
-import { MoodDonutChart } from './MoodDonutChart';
 
 interface CommunityStatsWidgetProps {
     onStatsLoaded?: (stats: CommunityStats) => void;
 }
 
-// Mock extended stats (will be replaced with real data as user base grows)
-const MOCK_MOOD_DATA = {
-    great: 28,
-    good: 42,
-    okay: 20,
-    struggling: 10,
-};
-
-const MOCK_GOAL_ACHIEVEMENT = 72; // 72% of users achieved their weekly goal
-
 export function CommunityStatsWidget({ onStatsLoaded }: CommunityStatsWidgetProps) {
     const [stats, setStats] = useState<CommunityStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [showExpanded, setShowExpanded] = useState(false);
 
     useEffect(() => {
         loadStats();
@@ -79,10 +57,10 @@ export function CommunityStatsWidget({ onStatsLoaded }: CommunityStatsWidgetProp
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
                         <View style={styles.statIconWrapper}>
-                            <Ionicons name="people" size={16} color={looviColors.accent.primary} />
+                            <Ionicons name="heart" size={16} color="#F87171" />
                         </View>
-                        <Text style={styles.statValue}>{stats.activeUsers}</Text>
-                        <Text style={styles.statLabel}>Active</Text>
+                        <Text style={styles.statValue}>{stats.averageHealthScore || 0}</Text>
+                        <Text style={styles.statLabel}>Avg Health</Text>
                     </View>
 
                     <View style={styles.divider} />
@@ -105,72 +83,7 @@ export function CommunityStatsWidget({ onStatsLoaded }: CommunityStatsWidgetProp
                         <Text style={styles.statLabel}>Top Streak</Text>
                     </View>
                 </View>
-
-                {/* Expand/Collapse Toggle */}
-                <TouchableOpacity
-                    style={styles.expandToggle}
-                    onPress={() => setShowExpanded(!showExpanded)}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.expandToggleText}>
-                        {showExpanded ? 'Less' : 'More insights'}
-                    </Text>
-                    <Ionicons
-                        name={showExpanded ? 'chevron-up' : 'chevron-down'}
-                        size={14}
-                        color={looviColors.accent.primary}
-                    />
-                </TouchableOpacity>
             </GlassCard>
-
-            {/* Expanded Stats Section */}
-            {showExpanded && (
-                <View style={styles.expandedSection}>
-                    {/* Mood Distribution Card */}
-                    <GlassCard variant="light" padding="md" style={styles.moodCard}>
-                        <Text style={styles.cardTitle}>How's the Community Feeling?</Text>
-                        <MoodDonutChart data={MOCK_MOOD_DATA} size={90} />
-                    </GlassCard>
-
-                    {/* Goal Achievement Card */}
-                    <GlassCard variant="light" padding="md" style={styles.achievementCard}>
-                        <View style={styles.achievementRow}>
-                            <View style={styles.achievementIconBg}>
-                                <Ionicons name="flag" size={20} color={looviColors.accent.success} />
-                            </View>
-                            <View style={styles.achievementContent}>
-                                <Text style={styles.achievementValue}>{MOCK_GOAL_ACHIEVEMENT}%</Text>
-                                <Text style={styles.achievementLabel}>
-                                    achieved their weekly goal
-                                </Text>
-                            </View>
-                        </View>
-                        {/* Progress Bar */}
-                        <View style={styles.progressBarBg}>
-                            <View
-                                style={[
-                                    styles.progressBarFill,
-                                    { width: `${MOCK_GOAL_ACHIEVEMENT}%` }
-                                ]}
-                            />
-                        </View>
-                    </GlassCard>
-
-                    {/* Extra Stats Row */}
-                    <View style={styles.extraStatsRow}>
-                        <GlassCard variant="light" padding="sm" style={styles.miniStatCard}>
-                            <Ionicons name="calendar" size={18} color={looviColors.accent.primary} />
-                            <Text style={styles.miniStatValue}>{stats.totalDaysSugarFree}</Text>
-                            <Text style={styles.miniStatLabel}>Days Sugar-Free</Text>
-                        </GlassCard>
-                        <GlassCard variant="light" padding="sm" style={styles.miniStatCard}>
-                            <Ionicons name="heart" size={18} color="#F87171" />
-                            <Text style={styles.miniStatValue}>{stats.averageHealthScore || 75}</Text>
-                            <Text style={styles.miniStatLabel}>Avg Health</Text>
-                        </GlassCard>
-                    </View>
-                </View>
-            )}
         </View>
     );
 }
@@ -280,27 +193,25 @@ const styles = StyleSheet.create({
         backgroundColor: looviColors.accent.success,
         borderRadius: 3,
     },
-    extraStatsRow: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-    },
     miniStatCard: {
-        flex: 1,
         alignItems: 'center',
         paddingVertical: spacing.md,
+    },
+    miniStatRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
     },
     miniStatValue: {
         fontSize: 18,
         fontWeight: '700',
         color: looviColors.text.primary,
-        marginTop: spacing.xs,
     },
     miniStatLabel: {
-        fontSize: 10,
+        fontSize: 11,
         color: looviColors.text.tertiary,
         textTransform: 'uppercase',
-        textAlign: 'center',
-        marginTop: 2,
     },
 });
 

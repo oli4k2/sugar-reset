@@ -444,6 +444,7 @@ export default function AnalyticsScreen() {
     const [showFoodScanner, setShowFoodScanner] = useState(false);
     const [showWellnessModal, setShowWellnessModal] = useState(false);
     const [showInsightModal, setShowInsightModal] = useState<InsightType | null>(null);
+    const [dailySugarLimit, setDailySugarLimit] = useState<number>(25); // Default to 25g
     const { onboardingData, addJournalEntry, refreshStreakFromFoodLogs } = useUserData();
 
     // Load wellness logs and food data
@@ -455,6 +456,11 @@ export default function AnalyticsScreen() {
                     if (refreshStreakFromFoodLogs) {
                         refreshStreakFromFoodLogs();
                     }
+
+                    // Get daily sugar limit based on gender
+                    const { getDailyAddedSugarLimit } = await import('../services/streakService');
+                    const limit = await getDailyAddedSugarLimit();
+                    setDailySugarLimit(limit);
 
                     const [storedWellness, foodItems] = await Promise.all([
                         AsyncStorage.getItem('wellness_logs'),
@@ -876,7 +882,7 @@ export default function AnalyticsScreen() {
                                     <View style={styles.nutritionStat}>
                                         <Text style={[
                                             styles.nutritionStatValue,
-                                            { color: nutritionInsights.avgAddedSugar <= 25 ? '#22C55E' : nutritionInsights.avgAddedSugar <= 50 ? '#F59E0B' : '#EF4444' }
+                                            { color: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444' }
                                         ]}>
                                             {nutritionInsights.avgAddedSugar}g
                                         </Text>
@@ -894,7 +900,7 @@ export default function AnalyticsScreen() {
                                     <View style={styles.sugarMeterHeader}>
                                         <Text style={styles.sugarMeterLabel}>Daily Sugar</Text>
                                         <Text style={styles.sugarMeterValue}>
-                                            {nutritionInsights.avgAddedSugar}g / 25g recommended
+                                            {nutritionInsights.avgAddedSugar}g / {dailySugarLimit}g recommended
                                         </Text>
                                     </View>
                                     <View style={styles.sugarMeterTrack}>
@@ -902,8 +908,8 @@ export default function AnalyticsScreen() {
                                             style={[
                                                 styles.sugarMeterFill,
                                                 {
-                                                    width: `${Math.min((nutritionInsights.avgAddedSugar / 50) * 100, 100)}%`,
-                                                    backgroundColor: nutritionInsights.avgAddedSugar <= 25 ? '#22C55E' : nutritionInsights.avgAddedSugar <= 50 ? '#F59E0B' : '#EF4444'
+                                                    width: `${Math.min((nutritionInsights.avgAddedSugar / (dailySugarLimit * 2)) * 100, 100)}%`,
+                                                    backgroundColor: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444'
                                                 }
                                             ]}
                                         />
@@ -911,7 +917,7 @@ export default function AnalyticsScreen() {
                                     </View>
                                     <View style={styles.sugarMeterLabels}>
                                         <Text style={styles.sugarMeterMarkerLabel}>0g</Text>
-                                        <Text style={[styles.sugarMeterMarkerLabel, { position: 'absolute', left: '50%' }]}>25g</Text>
+                                        <Text style={[styles.sugarMeterMarkerLabel, { position: 'absolute', left: '50%' }]}>{dailySugarLimit}g</Text>
                                         <Text style={styles.sugarMeterMarkerLabel}>50g+</Text>
                                     </View>
                                 </View>

@@ -20,6 +20,7 @@ import {
     Easing,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Slider from '@react-native-community/slider';
@@ -255,7 +256,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
 
     // Track question entry
     useEffect(() => {
-        if (!showResult && !showUserInfo) {
+        if (!showResult && !showUserInfo && currentQuestion >= 0 && currentQuestion < QUESTIONS.length) {
             posthog?.capture('onboarding_quiz_question_viewed', {
                 question_index: currentQuestion,
                 question_id: QUESTIONS[currentQuestion].id,
@@ -432,7 +433,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         Keyboard.dismiss();
 
         if (currentQuestion < QUESTIONS.length - 1) {
-            animateTransition(() => setCurrentQuestion(prev => prev + 1), 'forward');
+            animateTransition(() => setCurrentQuestion(prev => Math.min(prev + 1, QUESTIONS.length - 1)), 'forward');
         } else {
             console.log('Final question reached, checking canProceed...');
             if (canProceed()) {
@@ -846,31 +847,31 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         return question.options;
     };
 
+    // Handle swipe on JS thread to avoid Worklets serialization warning with refs
+    const handleSwipe = (translationX: number, velocityX: number) => {
+        const swipeThreshold = 50;
+        const velocityThreshold = 400;
+
+        // Swipe right (backward) - only if not on first question
+        if ((translationX > swipeThreshold || velocityX > velocityThreshold) && currentQuestion > 0 && !isAnimating.current) {
+            goPrevious();
+        }
+        // Swipe left (forward) - only if not on last question and not animating
+        else if ((translationX < -swipeThreshold || velocityX < -velocityThreshold) && currentQuestion < QUESTIONS.length - 1 && !isAnimating.current) {
+            if (canProceed() && question.type !== 'multi' && question.type !== 'slider' && question.type !== 'text' && question.type !== 'triggers') {
+                goNext();
+            }
+        }
+    };
+
     // Gesture handler for swipe gestures
     const swipeGesture = Gesture.Pan()
-        .minDistance(10) // Minimum distance before activation
-        .activeOffsetX([-20, 20]) // Only activate if horizontal movement exceeds 20px
-        .failOffsetY([-15, 15]) // Fail if vertical movement exceeds 15px (allows scrolling)
+        .minDistance(10)
+        .activeOffsetX([-20, 20])
+        .failOffsetY([-15, 15])
         .onEnd((event) => {
-            const { translationX, velocityX } = event;
-            const swipeThreshold = 50; // Minimum swipe distance
-            const velocityThreshold = 400; // Minimum swipe velocity
-
-            console.log('Swipe detected:', { translationX, velocityX, currentQuestion, isAnimating: isAnimating.current });
-
-            // Swipe right (backward) - only if not on first question
-            if ((translationX > swipeThreshold || velocityX > velocityThreshold) && currentQuestion > 0 && !isAnimating.current) {
-                console.log('Going previous');
-                goPrevious();
-            }
-            // Swipe left (forward) - only if not on last question and not animating
-            else if ((translationX < -swipeThreshold || velocityX < -velocityThreshold) && currentQuestion < QUESTIONS.length - 1 && !isAnimating.current) {
-                // Only auto-advance if question is already answered
-                if (canProceed() && question.type !== 'multi' && question.type !== 'slider' && question.type !== 'text' && question.type !== 'triggers') {
-                    console.log('Going next via swipe');
-                    goNext();
-                }
-            }
+            'worklet';
+            runOnJS(handleSwipe)(event.translationX, event.velocityX);
         });
 
     const renderQuestion = () => {

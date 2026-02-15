@@ -57,6 +57,7 @@ export default function App() {
   useEffect(() => {
     GoogleSignin.configure({
       webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+      iosClientId: '68240123690-a3vhmp88g4ng97npdpgkvkbgrspj4hfr.apps.googleusercontent.com',
       offlineAccess: true,
     });
   }, []);

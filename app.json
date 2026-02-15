@@ -19,6 +19,7 @@
       "bundleIdentifier": "com.sugarreset.app",
       "appleTeamId": "LX5566JXPP",
       "infoPlist": {
+        "NSHealthShareUsageDescription": "Craveless needs access to read your health data to provide personalized insights and track your wellness journey.",
         "NSHealthUpdateUsageDescription": "Craveless needs access to update your health data with your logged nutrition.",
         "ITSAppUsesNonExemptEncryption": false
       }

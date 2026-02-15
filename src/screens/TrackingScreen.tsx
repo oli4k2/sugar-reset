@@ -145,7 +145,10 @@ export default function TrackingScreen() {
         setShowFoodItemModal(true);
     };
 
-    const handleFoodItemUpdate = () => {
+    const handleFoodItemUpdate = (updatedItem?: ScannedItem) => {
+        if (updatedItem) {
+            setSelectedItem(updatedItem);
+        }
         loadFoodCounts();
         loadSelectedDayFoods();
     };

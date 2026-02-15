@@ -102,15 +102,17 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         if (viewableItems.length > 0) {
-            const index = viewableItems[0].index;
+            const index = viewableItems[0].index ?? 0;
             setCurrentIndex(index);
 
             // Track slide view
-            posthog?.capture('onboarding_science_slide_viewed', {
-                slide_index: index,
-                slide_id: scienceSlides[index].id,
-                slide_title: scienceSlides[index].title
-            });
+            if (index >= 0 && index < scienceSlides.length) {
+                posthog?.capture('onboarding_science_slide_viewed', {
+                    slide_index: index,
+                    slide_id: scienceSlides[index].id,
+                    slide_title: scienceSlides[index].title
+                });
+            }
         }
     }).current;
 

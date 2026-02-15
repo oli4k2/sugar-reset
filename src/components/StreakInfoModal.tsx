@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -8,10 +8,12 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserData } from '../context/UserDataContext';
 import { getCurrentWeek, getPlanDetails, PlanType } from '../utils/planUtils';
 import { looviColors } from './LooviBackground';
+import LooviBackground from './LooviBackground';
 import { spacing } from '../theme';
 
 interface StreakInfoModalProps {
@@ -21,6 +23,7 @@ interface StreakInfoModalProps {
 
 export default function StreakInfoModal({ visible, onClose }: StreakInfoModalProps) {
   const { onboardingData, streakData, streakResult } = useUserData();
+  const [dailyLimit, setDailyLimit] = useState<number>(25); // Default to 25g
 
   const planType = (onboardingData?.plan || 'cold_turkey') as PlanType;
   const startDate = onboardingData?.startDate ? new Date(onboardingData.startDate) : new Date();
@@ -29,11 +32,25 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
   
   // Use todayStatus from streakResult instead of useStreak hook
   const todayStatus = streakResult?.todayStatus || null;
+
+  // Get actual daily limit (not the 999 placeholder)
+  useEffect(() => {
+    const loadDailyLimit = async () => {
+      try {
+        const { getDailyAddedSugarLimit } = await import('../services/streakService');
+        const limit = await getDailyAddedSugarLimit();
+        setDailyLimit(limit);
+      } catch (error) {
+        console.warn('Could not load daily limit:', error);
+      }
+    };
+    loadDailyLimit();
+  }, []);
   
   // Calculate plan progress (with safety checks)
   const now = new Date();
   const daysSinceStart = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-  const planDuration = planType === 'cold_turkey' ? 30 : 90;
+  const planDuration = 90; // All plans are now 90 days
   const planProgressPercent = Math.min(100, Math.max(0, Math.round((daysSinceStart / planDuration) * 100)));
   const daysRemaining = Math.max(0, planDuration - daysSinceStart);
 
@@ -46,9 +63,16 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
 
   const getStatusText = () => {
     if (!todayStatus) return 'Loading...';
-    if (todayStatus.isStreakDay) return '✅ Sugar-free today!';
-    if (!todayStatus.hasLogs) return '⏳ Log your food to continue';
-    return '❌ Over sugar limit today';
+    if (todayStatus.isStreakDay) return 'Sugar-free today!';
+    if (!todayStatus.hasLogs) return 'Log your food to continue';
+    return 'Over sugar limit today';
+  };
+
+  const getStatusIcon = () => {
+    if (!todayStatus) return 'time-outline';
+    if (todayStatus.isStreakDay) return 'checkmark-circle';
+    if (!todayStatus.hasLogs) return 'hourglass-outline';
+    return 'close-circle';
   };
   
   // Get current week's limit for gradual plan
@@ -58,10 +82,22 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
     return weekLimit?.dailyGrams ?? 0;
   };
 
+  // Calculate current phase (same as PlanProgressBar)
+  const progressPercent = Math.min(100, Math.max(0, Math.round((daysSinceStart / planDuration) * 100)));
+  const PHASES = [
+    { minPercent: 0, maxPercent: 25, name: 'Phase 1: Detox', feeling: 'experiencing cravings and adjustment', endFeeling: 'cravings will start to decrease' },
+    { minPercent: 25, maxPercent: 50, name: 'Phase 2: Adaptation', feeling: 'adapting to lower sugar intake', endFeeling: 'energy levels will stabilize' },
+    { minPercent: 50, maxPercent: 75, name: 'Phase 3: Momentum', feeling: 'building healthy habits', endFeeling: 'taste preferences will change' },
+    { minPercent: 75, maxPercent: 100, name: 'Phase 4: Mastery', feeling: 'mastering your sugar-free lifestyle', endFeeling: 'feel in complete control' },
+  ];
+  const currentPhase = PHASES.find(
+    phase => progressPercent >= phase.minPercent && progressPercent < phase.maxPercent
+  ) || PHASES[PHASES.length - 1];
+
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={true}
       animationType="fade"
       onRequestClose={onClose}
     >
@@ -80,21 +116,59 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
                 </View>
                 <View style={styles.headerTextContainer}>
                   <Text style={styles.title}>Your Sugar-Free Journey</Text>
-                  <Text style={styles.subtitle}>Track your progress and stay motivated</Text>
                 </View>
               </View>
 
-              <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Current Status */}
+              <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Today's Status */}
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Today's Status</Text>
                   <View style={[styles.statusCard, { borderLeftColor: getStatusColor() }]}>
-                    <Text style={styles.statusText}>{getStatusText()}</Text>
+                    <View style={styles.statusRow}>
+                      <Ionicons name={getStatusIcon()} size={20} color={getStatusColor()} style={styles.statusIcon} />
+                      <Text style={styles.statusText}>{getStatusText()}</Text>
+                    </View>
                     {todayStatus && (
                       <Text style={styles.detailText}>
-                        Added sugar: {todayStatus.totalAddedSugar}g / {todayStatus.dailyTarget}g
+                        Added sugar: {todayStatus.totalAddedSugar}g / {todayStatus.dailyTarget === 999 ? dailyLimit : todayStatus.dailyTarget}g
                       </Text>
                     )}
+                  </View>
+                </View>
+
+                {/* Stats Grid - Compact */}
+                <View style={styles.statsGrid}>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>{streakData?.currentStreak || 0}</Text>
+                    <Text style={styles.statLabel}>Current Streak</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>{streakData?.longestStreak || 0}</Text>
+                    <Text style={styles.statLabel}>Longest Streak</Text>
+                  </View>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statNumber}>{streakData?.totalDaysSugarFree || 0}</Text>
+                    <Text style={styles.statLabel}>Total Days</Text>
+                  </View>
+                </View>
+
+                {/* Plan Progress */}
+                <View style={[styles.section, styles.planProgressSection]}>
+                  <Text style={styles.sectionTitle}>Plan Progress</Text>
+                  <View style={styles.planCard}>
+                    <View style={styles.planHeader}>
+                      <Text style={styles.planPhaseTitle}>{currentPhase.name}</Text>
+                      <Text style={styles.planProgressPercent}>{planProgressPercent}%</Text>
+                    </View>
+                    <View style={styles.progressBarContainer}>
+                      <View style={[styles.progressBar, { width: `${planProgressPercent}%` }]} />
+                    </View>
+                    <Text style={styles.planDetail}>
+                      Week {currentWeek} of 13{daysRemaining > 0 && ` • ${daysRemaining} days remaining`}
+                    </Text>
+                    <Text style={styles.phaseDescription}>
+                      {currentPhase.feeling.charAt(0).toUpperCase() + currentPhase.feeling.slice(1)} → {currentPhase.endFeeling}
+                    </Text>
                   </View>
                 </View>
 
@@ -125,56 +199,6 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
                   <Text style={styles.infoText}>
                     • Limits based on WHO recommendations: 25g (women) / 36g (men)
                   </Text>
-                </View>
-
-                {/* Current Stats */}
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Your Progress</Text>
-                  <View style={styles.statsGrid}>
-                    <View style={styles.statCard}>
-                      <Text style={styles.statNumber}>{streakData?.currentStreak || 0}</Text>
-                      <Text style={styles.statLabel}>Current Streak</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                      <Text style={styles.statNumber}>{streakData?.longestStreak || 0}</Text>
-                      <Text style={styles.statLabel}>Longest Streak</Text>
-                    </View>
-                    <View style={styles.statCard}>
-                      <Text style={styles.statNumber}>{streakData?.totalDaysSugarFree || 0}</Text>
-                      <Text style={styles.statLabel}>Total Days</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Plan Progress */}
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Your Plan Progress</Text>
-                  <View style={styles.planCard}>
-                    <View style={styles.planHeader}>
-                      <Text style={styles.planText}>
-                        {planDetails.name}
-                      </Text>
-                      <Text style={styles.planProgressPercent}>{planProgressPercent}%</Text>
-                    </View>
-                    <View style={styles.progressBarContainer}>
-                      <View style={[styles.progressBar, { width: `${planProgressPercent}%` }]} />
-                    </View>
-                    <Text style={styles.planDetail}>
-                      Week {currentWeek} of {planType === 'cold_turkey' ? '4' : '13'}
-                      {daysRemaining > 0 && ` • ${daysRemaining} days remaining`}
-                    </Text>
-                    {planType === 'gradual' && currentWeek > 0 && currentWeek <= planDetails.weeklyLimits.length && (
-                      <View style={styles.weekLimitCard}>
-                        <Text style={styles.weekLimitLabel}>This Week's Target</Text>
-                        <Text style={styles.weekLimitValue}>{getCurrentWeekLimit()}g added sugar/day</Text>
-                        {planDetails.weeklyLimits[currentWeek - 1] && (
-                          <Text style={styles.weekLimitDescription}>
-                            {planDetails.weeklyLimits[currentWeek - 1].description}
-                          </Text>
-                        )}
-                      </View>
-                    )}
-                  </View>
                 </View>
 
                 {/* Tips */}
@@ -216,6 +240,14 @@ const styles = StyleSheet.create({
     maxHeight: '100%',
     overflow: 'hidden',
   },
+  scrollView: {
+    maxHeight: 600,
+  },
+  scrollContent: {
+    padding: spacing.lg,
+    paddingTop: 0,
+    paddingBottom: spacing.md,
+  },
   closeButton: {
     position: 'absolute',
     top: spacing.md,
@@ -231,39 +263,32 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.xl,
-    paddingTop: spacing.xl + 8,
-    marginBottom: spacing.md,
+    padding: spacing.lg,
+    paddingTop: spacing.lg + 8,
+    marginBottom: spacing.sm,
   },
   headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(232, 168, 124, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
   },
   headerTextContainer: {
     flex: 1,
   },
   title: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
     color: looviColors.text.primary,
   },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: looviColors.text.secondary,
-    marginTop: 2,
-  },
-  scrollContent: {
-    padding: spacing.xl,
-    paddingTop: 0,
-  },
   section: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  planProgressSection: {
+    marginTop: spacing.lg,
   },
   sectionTitle: {
     fontSize: 16,
@@ -277,11 +302,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderLeftWidth: 4,
   },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  statusIcon: {
+    marginRight: spacing.xs,
+  },
   statusText: {
     fontSize: 16,
     fontWeight: '600',
     color: looviColors.text.primary,
-    marginBottom: 4,
   },
   detailText: {
     fontSize: 14,
@@ -328,19 +360,20 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.03)',
-    padding: spacing.md,
+    padding: spacing.sm,
+    paddingVertical: spacing.xs + 4,
     borderRadius: 12,
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: looviColors.accent.primary,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: looviColors.text.secondary,
-    marginTop: 4,
+    marginTop: 2,
   },
   planCard: {
     backgroundColor: 'rgba(232, 168, 124, 0.1)',
@@ -355,7 +388,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
-  planText: {
+  planPhaseTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: looviColors.text.primary,
@@ -382,6 +415,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: looviColors.text.secondary,
     marginTop: spacing.xs,
+  },
+  phaseDescription: {
+    fontSize: 13,
+    color: looviColors.text.secondary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+    lineHeight: 18,
   },
   weekLimitCard: {
     marginTop: spacing.sm,

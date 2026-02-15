@@ -110,6 +110,7 @@ export default function HomeScreen() {
     const [todayWellnessData, setTodayWellnessData] = useState<WellnessLog | null>(null);
     const [hasInnerCircleFriends, setHasInnerCircleFriends] = useState(false);
     const [hasCommunityTipDoneToday, setHasCommunityTipDoneToday] = useState(false);
+    const [hasCheckedCircleToday, setHasCheckedCircleToday] = useState(false);
     const [showStreakInfoModal, setShowStreakInfoModal] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const fallbackDateRef = useRef(new Date().toISOString()); // Stable fallback
@@ -512,7 +513,7 @@ export default function HomeScreen() {
                         {/* Growth Animation Section */}
                         <View style={styles.timerSection}>
                             {/* Streak Badge - Above Animation */}
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.streakBadge}
                                 onPress={() => setShowStreakInfoModal(true)}
                                 activeOpacity={0.7}
@@ -525,7 +526,7 @@ export default function HomeScreen() {
                             </TouchableOpacity>
 
                             {/* Growth Animation instead of number */}
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={styles.animationWrapper}
                                 onPress={() => setShowStreakInfoModal(true)}
                                 activeOpacity={0.7}
@@ -548,9 +549,8 @@ export default function HomeScreen() {
                         {/* Plan Progress Bar */}
                         <PlanProgressBar
                             daysSinceStart={daysSugarFree}
-                            planDuration={planType === 'cold_turkey' ? 30 : 42}
-                            endDate={new Date(startDate.getTime() + (planType === 'cold_turkey' ? 30 : 42) * 24 * 60 * 60 * 1000)}
-                            onInfoPress={() => setShowStreakInfoModal(true)}
+                            planDuration={90}
+                            endDate={new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000)}
                         />
 
                         {/* Action Buttons: Pledge, Logging, Journal - Daily Journey */}
@@ -706,6 +706,7 @@ export default function HomeScreen() {
                             healthScore={0}
                             hasCommunityTipDoneToday={hasCommunityTipDoneToday}
                             onCommunityTipDone={() => setHasCommunityTipDoneToday(true)}
+                            hasCheckedCircleToday={hasCheckedCircleToday}
                             onTipPress={(action, friendId) => {
                                 switch (action) {
                                     case 'pledge':
@@ -718,7 +719,8 @@ export default function HomeScreen() {
                                         setShowWellnessModal(true);
                                         break;
                                     case 'inner_circle':
-                                        navigation.navigate('Social', { openAddFriends: true });
+                                        setHasCheckedCircleToday(true);
+                                        navigation.navigate('Social', { initialTab: 'circle' });
                                         break;
                                     case 'analytics':
                                         navigation.navigate('Analytics');

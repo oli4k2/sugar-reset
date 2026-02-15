@@ -325,21 +325,31 @@ const styles = StyleSheet.create({
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
+        justifyContent: 'flex-end', // Changed to flex-end to align modal to bottom
         alignItems: 'center',
-        padding: spacing.lg,
+    },
+    container: {
+        flex: 1,
+    },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
     modalContent: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 24,
-        maxHeight: '90%',
-        width: '100%',
-        maxWidth: 400,
+        borderTopLeftRadius: borderRadius.xl,
+        borderTopRightRadius: borderRadius.xl,
+        marginTop: 60, // Start from top with margin
+        flex: 1, // Fill remaining space
+        paddingTop: spacing.md,
+        width: '100%', // Ensure it takes full width
+        maxWidth: 400, // Keep max width constraint
         overflow: 'hidden',
+        marginHorizontal: spacing.lg,
     },
     closeButton: {
         position: 'absolute',
-        top: spacing.md,
+        top: spacing.md + 8, // Extra padding for status bar
         right: spacing.md,
         width: 32,
         height: 32,

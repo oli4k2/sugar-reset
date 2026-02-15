@@ -441,15 +441,23 @@ export const friendService = {
 
         try {
             const snapshot = await getDocs(q);
+            const now = new Date();
             const stats = snapshot.docs.map(doc => {
                 const data = doc.data();
+                const updatedAt = toDate(data.updatedAt) as Date;
+                // Zero-out streak if user hasn't updated in 2+ days (grace period exceeded)
+                let adjustedStreak = data.currentStreak || 0;
+                if (updatedAt) {
+                    const daysSince = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                    if (daysSince > 2) adjustedStreak = 0;
+                }
                 return {
                     userId: doc.id,
-                    currentStreak: data.currentStreak || 0,
+                    currentStreak: adjustedStreak,
                     healthScore: data.healthScore || 0,
                     goalAchieved: data.goalAchieved || false,
                     pledgedToday: data.pledgedToday || false,
-                    updatedAt: toDate(data.updatedAt) as Date,
+                    updatedAt,
                 };
             });
 
@@ -469,17 +477,101 @@ export const friendService = {
             );
 
             const fallbackSnapshot = await getDocs(fallbackQ);
-            return fallbackSnapshot.docs.map(doc => {
+            const now2 = new Date();
+            const fallbackStats = fallbackSnapshot.docs.map(doc => {
                 const data = doc.data();
+                const updatedAt = toDate(data.updatedAt) as Date;
+                let adjustedStreak = data.currentStreak || 0;
+                if (updatedAt) {
+                    const daysSince = Math.floor((now2.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                    if (daysSince > 2) adjustedStreak = 0;
+                }
                 return {
                     userId: doc.id,
-                    currentStreak: data.currentStreak || 0,
+                    currentStreak: adjustedStreak,
                     healthScore: data.healthScore || 0,
                     goalAchieved: data.goalAchieved || false,
                     pledgedToday: data.pledgedToday || false,
-                    updatedAt: toDate(data.updatedAt) as Date,
+                    updatedAt,
                 };
             });
+            return fallbackStats;
+        }
+    },
+
+    /**
+     * Get leaderboard data by sugar-free streak
+     * Only includes users who have been active in the past week
+     */
+    async getLeaderboardByStreak(limitCount: number = 10): Promise<UserStats[]> {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+        const statsRef = collection(db, 'userStats');
+        const q = query(
+            statsRef,
+            where('updatedAt', '>=', oneWeekAgo),
+            orderBy('updatedAt', 'desc'),
+            orderBy('currentStreak', 'desc'),
+            limit(limitCount * 2)
+        );
+
+        try {
+            const snapshot = await getDocs(q);
+            const now = new Date();
+            const stats = snapshot.docs.map(doc => {
+                const data = doc.data();
+                const updatedAt = toDate(data.updatedAt) as Date;
+                // Zero-out streak if user hasn't updated in 2+ days (grace period exceeded)
+                let adjustedStreak = data.currentStreak || 0;
+                if (updatedAt) {
+                    const daysSince = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                    if (daysSince > 2) adjustedStreak = 0;
+                }
+                return {
+                    userId: doc.id,
+                    currentStreak: adjustedStreak,
+                    healthScore: data.healthScore || 0,
+                    goalAchieved: data.goalAchieved || false,
+                    pledgedToday: data.pledgedToday || false,
+                    updatedAt,
+                };
+            });
+
+            // Re-sort by adjusted streak
+            stats.sort((a, b) => b.currentStreak - a.currentStreak);
+
+            return stats.slice(0, limitCount);
+        } catch (error: any) {
+            console.warn('Streak leaderboard query with filters failed, using fallback:', error?.code);
+
+            const fallbackQ = query(
+                statsRef,
+                orderBy('currentStreak', 'desc'),
+                limit(limitCount)
+            );
+
+            const fallbackSnapshot = await getDocs(fallbackQ);
+            const now2 = new Date();
+            const fallbackStats = fallbackSnapshot.docs.map(doc => {
+                const data = doc.data();
+                const updatedAt = toDate(data.updatedAt) as Date;
+                let adjustedStreak = data.currentStreak || 0;
+                if (updatedAt) {
+                    const daysSince = Math.floor((now2.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                    if (daysSince > 2) adjustedStreak = 0;
+                }
+                return {
+                    userId: doc.id,
+                    currentStreak: adjustedStreak,
+                    healthScore: data.healthScore || 0,
+                    goalAchieved: data.goalAchieved || false,
+                    pledgedToday: data.pledgedToday || false,
+                    updatedAt,
+                };
+            });
+            fallbackStats.sort((a, b) => b.currentStreak - a.currentStreak);
+            return fallbackStats;
         }
     },
 

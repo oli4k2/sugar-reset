@@ -308,7 +308,7 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
 
                 {/* Unified Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, { paddingTop: 12 }]}>
                         <Feather name="x" size={24} color={THEME.textMuted} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>MY WHY</Text>

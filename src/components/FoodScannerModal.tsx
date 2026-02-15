@@ -70,20 +70,32 @@ export default function FoodScannerModal({
     const [isEditing, setIsEditing] = useState(false);
     const [recentFoods, setRecentFoods] = useState<ScannedItem[]>([]);
     const [pinnedFoods, setPinnedFoods] = useState<ScannedItem[]>([]);
+
+    // Manual entry state
+    const [manualCalories, setManualCalories] = useState('');
+    const [manualSugar, setManualSugar] = useState('');
+    const [manualCarbs, setManualCarbs] = useState('');
+    const [manualProtein, setManualProtein] = useState('');
+    const [manualFat, setManualFat] = useState('');
+    const [manualImageUri, setManualImageUri] = useState<string | null>(null);
+
     const { refreshStreakFromFoodLogs } = useUserData();
 
     useEffect(() => {
         if (visible) {
             console.log('FoodScannerModal visible');
             loadRecentFoods();
-            // If free user, skip to text input step
-            if (!isPremium) {
-                setStep('text-input');
-            } else {
-                setStep('select');
-            }
+            // Always start at select step
+            setStep('select');
         }
     }, [visible, isPremium]);
+
+    // Load recent foods when entering text-input step
+    useEffect(() => {
+        if (step === 'text-input') {
+            loadRecentFoods();
+        }
+    }, [step]);
 
     const loadRecentFoods = async () => {
         try {
@@ -113,6 +125,26 @@ export default function FoodScannerModal({
         setPortionPercent(100);
         setEditedName('');
         setIsEditing(false);
+        // Reset manual fields
+        setManualCalories('');
+        setManualSugar('');
+        setManualCarbs('');
+        setManualProtein('');
+        setManualFat('');
+        setManualImageUri(null);
+    };
+
+    const pickImageForManual = async () => {
+        const res = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        });
+
+        if (!res.canceled && res.assets[0]) {
+            setManualImageUri(res.assets[0].uri);
+        }
     };
 
     const quickAddRecent = async (item: ScannedItem) => {
@@ -190,6 +222,47 @@ export default function FoodScannerModal({
 
     const processTextOnly = async () => {
         if (!textOnlyInput.trim()) return;
+
+        // If we have manual values, skip analysis and go straight to result or save
+        if (manualCalories || manualSugar) {
+            const manualResult: AnalysisResult = {
+                foodName: textOnlyInput.trim(),
+                calories: parseInt(manualCalories) || 0,
+                protein: parseFloat(manualProtein) || 0,
+                carbs: parseFloat(manualCarbs) || 0,
+                carbsSugars: parseFloat(manualSugar) || 0,
+                fat: parseFloat(manualFat) || 0,
+                fatSaturated: 0,
+                fiber: 0,
+                sugar: parseFloat(manualSugar) || 0,
+                sodium: 0,
+                healthScore: 0, // Will be calculated
+                confidence: 1.0,
+                suggestion: 'Manually entered'
+            };
+
+            // Calculate health score for manual entry
+            const tempItem: ScannedItem = {
+                id: 'temp',
+                imageUri: manualImageUri || '',
+                name: manualResult.foodName,
+                timestamp: '',
+                portionPercent: 100,
+                ...manualResult,
+                healthScore: 0,
+                confidence: 1.0
+            };
+
+            // Calculate health score
+            const { calculateFoodHealthScore } = await import('../services/healthScoringService');
+            manualResult.healthScore = calculateFoodHealthScore(tempItem);
+
+            setResult(manualResult);
+            setEditedName(manualResult.foodName);
+            setStep('result');
+            return;
+        }
+
         setStep('analyzing');
         try {
             const res = await analyzeFood('', textOnlyInput.trim());
@@ -209,7 +282,7 @@ export default function FoodScannerModal({
 
         const scannedItem: ScannedItem = {
             id: generateScanId(),
-            imageUri: imageUri || '',
+            imageUri: imageUri || manualImageUri || '',
             name: editedName || result.foodName,
             timestamp,
             portionPercent,
@@ -229,9 +302,9 @@ export default function FoodScannerModal({
 
         await saveScannedItem(scannedItem);
 
-        // Refresh streak immediately to reflect new sugar totals
+        // Refresh streak immediately to reflect new sugar totals - await to ensure it completes
         if (refreshStreakFromFoodLogs) {
-            refreshStreakFromFoodLogs();
+            await refreshStreakFromFoodLogs();
         }
 
         onScanComplete(scannedItem);
@@ -242,7 +315,12 @@ export default function FoodScannerModal({
         switch (step) {
             case 'select':
                 return (
-                    <View style={styles.selectContainer}>
+                    <ScrollView 
+                        style={styles.scrollContainer}
+                        contentContainerStyle={styles.selectContainer}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                    >
                         <View style={styles.header}>
                             <Text style={styles.headerTitle}>Analyze Food</Text>
                             <Text style={styles.headerSubtitle}>Identify sugars & macros instantly</Text>
@@ -261,16 +339,16 @@ export default function FoodScannerModal({
                                 </View>
                             </TouchableOpacity>
                         ) : (
-                            <TouchableOpacity 
-                                style={[styles.heroButton, { opacity: 0.6 }]} 
+                            <TouchableOpacity
+                                style={[styles.heroButton, { opacity: 0.6 }]}
                                 onPress={() => {
                                     Alert.alert(
                                         'Premium Feature',
                                         'Food scanning with camera is a premium feature. Upgrade to unlock instant food analysis!',
                                         [
                                             { text: 'Cancel', style: 'cancel' },
-                                            { 
-                                                text: 'Upgrade', 
+                                            {
+                                                text: 'Upgrade',
                                                 onPress: () => {
                                                     handleClose();
                                                     onShowPaywall?.();
@@ -300,16 +378,16 @@ export default function FoodScannerModal({
                                     <Text style={styles.secondaryText}>Gallery</Text>
                                 </TouchableOpacity>
                             ) : (
-                                <TouchableOpacity 
-                                    style={[styles.secondaryButton, { opacity: 0.6 }]} 
+                                <TouchableOpacity
+                                    style={[styles.secondaryButton, { opacity: 0.6 }]}
                                     onPress={() => {
                                         Alert.alert(
                                             'Premium Feature',
                                             'Image analysis is a premium feature. You can still add food manually by typing.',
                                             [
                                                 { text: 'OK' },
-                                                { 
-                                                    text: 'Upgrade', 
+                                                {
+                                                    text: 'Upgrade',
                                                     onPress: () => {
                                                         handleClose();
                                                         onShowPaywall?.();
@@ -323,10 +401,10 @@ export default function FoodScannerModal({
                                     <Text style={styles.secondaryText}>Gallery</Text>
                                 </TouchableOpacity>
                             )}
-                            {/* Text Input - Available for All */}
+                            {/* Text Input / Manual Entry - Available for All */}
                             <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep('text-input')}>
                                 <Feather name="edit-2" size={20} color={looviColors.text.primary} />
-                                <Text style={styles.secondaryText}>Type</Text>
+                                <Text style={styles.secondaryText}>{isPremium ? 'Type' : 'Manual Entry'}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -389,7 +467,7 @@ export default function FoodScannerModal({
                                 ))}
                             </View>
                         )}
-                    </View>
+                    </ScrollView>
                 );
 
             case 'describe':
@@ -419,63 +497,188 @@ export default function FoodScannerModal({
 
             case 'text-input':
                 return (
-                    <View style={styles.stepContainer}>
-                        <View style={styles.header}>
-                            <Text style={styles.headerTitle}>
-                                {isPremium ? 'Type Entry' : 'AI Prompt (Coming Soon)'}
-                            </Text>
-                            {!isPremium && (
-                                <Text style={styles.headerSubtitle}>
-                                    AI-powered food analysis will be available soon
-                                </Text>
+                    <ScrollView 
+                        style={styles.scrollContainer}
+                        keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={styles.scrollContent}
+                    >
+                        <View style={styles.stepContainer}>
+                            <View style={styles.header}>
+                                <Text style={styles.headerTitle}>Manual Entry</Text>
+                            </View>
+
+                            {/* Food Name */}
+                            <View style={styles.foodNameSection}>
+                                <Text style={styles.sectionTitle}>Food Name</Text>
+                                <TextInput
+                                    style={styles.foodNameInput}
+                                    placeholder="e.g. Banana, Sandwich..."
+                                    value={textOnlyInput}
+                                    onChangeText={setTextOnlyInput}
+                                    autoFocus
+                                />
+                            </View>
+
+                            {/* Image Picker */}
+                            <View style={styles.imageSection}>
+                                <Text style={styles.sectionTitle}>Photo (Optional)</Text>
+                                {manualImageUri ? (
+                                    <View style={styles.imagePreviewContainer}>
+                                        <Image source={{ uri: manualImageUri }} style={styles.imagePreview} />
+                                        <TouchableOpacity 
+                                            style={styles.removeImageButton}
+                                            onPress={() => setManualImageUri(null)}
+                                        >
+                                            <Feather name="x" size={16} color="#FFF" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity 
+                                        style={styles.addImageButton}
+                                        onPress={pickImageForManual}
+                                    >
+                                        <Feather name="image" size={20} color={looviColors.text.secondary} />
+                                        <Text style={styles.addImageText}>Add Photo</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {/* Nutrition Facts */}
+                            <View style={styles.nutritionSection}>
+                                <Text style={styles.sectionTitle}>Nutrition Facts</Text>
+                                <View style={styles.nutritionCard}>
+                                    <View style={styles.nutritionRow}>
+                                        <Text style={styles.nutritionLabel}>Calories</Text>
+                                        <View style={styles.nutritionInputContainer}>
+                                            <TextInput
+                                                style={styles.nutritionInput}
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={manualCalories}
+                                                onChangeText={setManualCalories}
+                                            />
+                                            <Text style={styles.nutritionUnit}>kcal</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.nutritionRow}>
+                                        <Text style={styles.nutritionLabel}>Sugar (Total)</Text>
+                                        <View style={styles.nutritionInputContainer}>
+                                            <TextInput
+                                                style={styles.nutritionInput}
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={manualSugar}
+                                                onChangeText={setManualSugar}
+                                            />
+                                            <Text style={styles.nutritionUnit}>g</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.nutritionRow}>
+                                        <Text style={styles.nutritionLabel}>Protein</Text>
+                                        <View style={styles.nutritionInputContainer}>
+                                            <TextInput
+                                                style={styles.nutritionInput}
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={manualProtein}
+                                                onChangeText={setManualProtein}
+                                            />
+                                            <Text style={styles.nutritionUnit}>g</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.nutritionRow}>
+                                        <Text style={styles.nutritionLabel}>Carbohydrates</Text>
+                                        <View style={styles.nutritionInputContainer}>
+                                            <TextInput
+                                                style={styles.nutritionInput}
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={manualCarbs}
+                                                onChangeText={setManualCarbs}
+                                            />
+                                            <Text style={styles.nutritionUnit}>g</Text>
+                                        </View>
+                                    </View>
+                                    <View style={[styles.nutritionRow, styles.nutritionRowLast]}>
+                                        <Text style={styles.nutritionLabel}>Fat</Text>
+                                        <View style={styles.nutritionInputContainer}>
+                                            <TextInput
+                                                style={styles.nutritionInput}
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={manualFat}
+                                                onChangeText={setManualFat}
+                                            />
+                                            <Text style={styles.nutritionUnit}>g</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Recent Foods */}
+                            {pinnedFoods.length > 0 && (
+                                <View style={styles.recentSection}>
+                                    <Text style={styles.recentHeader}>PINNED FOODS</Text>
+                                    {pinnedFoods.map((item) => (
+                                        <View key={item.id} style={styles.recentRow}>
+                                            <TouchableOpacity
+                                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                                                onPress={() => quickAddRecent(item)}
+                                            >
+                                                <View style={styles.recentIconWrapper}><Text>📌</Text></View>
+                                                <View style={styles.recentInfo}>
+                                                    <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
+                                                    <Text style={styles.recentDetails}>{item.calories}Cal • {item.sugar}g Sugar</Text>
+                                                </View>
+                                                <Feather name="plus-circle" size={20} color={looviColors.coralOrange} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </View>
                             )}
-                        </View>
-                        <TextInput
-                            style={styles.textOnlyInput}
-                            placeholder={isPremium ? "What did you eat?" : "Type your food description here..."}
-                            value={textOnlyInput}
-                            onChangeText={setTextOnlyInput}
-                            multiline
-                            autoFocus
-                            editable={true}
-                        />
-                        <View style={styles.bottomActions}>
-                            <TouchableOpacity onPress={() => setStep('select')}>
-                                <Text style={styles.ghostButtonText}>Back</Text>
-                            </TouchableOpacity>
-                            {isPremium ? (
+
+                            {recentFoods.length > 0 && (
+                                <View style={styles.recentSection}>
+                                    <Text style={styles.recentHeader}>Recently Logged</Text>
+                                    {recentFoods.map((item) => (
+                                        <View key={item.id} style={styles.recentRow}>
+                                            <TouchableOpacity
+                                                style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+                                                onPress={() => quickAddRecent(item)}
+                                            >
+                                                <View style={styles.recentIconWrapper}><Feather name="clock" size={14} color={looviColors.text.tertiary} /></View>
+                                                <View style={styles.recentInfo}>
+                                                    <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
+                                                    <Text style={styles.recentDetails}>{item.calories}Cal • {item.sugar}g Sugar</Text>
+                                                </View>
+                                                <Feather name="plus-circle" size={20} color={looviColors.coralOrange} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            <View style={styles.bottomActions}>
+                                <TouchableOpacity onPress={() => {
+                                    if (isPremium) {
+                                        setStep('select');
+                                    } else {
+                                        // Free users go back to select step (which shows locked features)
+                                        setStep('select');
+                                    }
+                                }}>
+                                    <Text style={styles.ghostButtonText}>Back</Text>
+                                </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.primaryButton, !textOnlyInput.trim() && { opacity: 0.5 }]}
                                     onPress={processTextOnly}
                                     disabled={!textOnlyInput.trim()}
                                 >
-                                    <Text style={styles.primaryButtonText}>Analyze</Text>
+                                    <Text style={styles.primaryButtonText}>Review & Save</Text>
                                 </TouchableOpacity>
-                            ) : (
-                                <TouchableOpacity
-                                    style={[styles.primaryButton, { opacity: 0.6 }]}
-                                    onPress={() => {
-                                        Alert.alert(
-                                            'Coming Soon',
-                                            'AI-powered food analysis is coming soon! Upgrade to Premium to unlock instant food scanning and analysis.',
-                                            [
-                                                { text: 'OK' },
-                                                {
-                                                    text: 'Upgrade',
-                                                    onPress: () => {
-                                                        handleClose();
-                                                        onShowPaywall?.();
-                                                    }
-                                                }
-                                            ]
-                                        );
-                                    }}
-                                >
-                                    <Text style={styles.primaryButtonText}>Coming Soon</Text>
-                                </TouchableOpacity>
-                            )}
+                            </View>
                         </View>
-                    </View>
+                    </ScrollView>
                 );
 
             case 'analyzing':
@@ -529,28 +732,33 @@ export default function FoodScannerModal({
 
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-            <View style={styles.modalRoot}>
-                <TouchableWithoutFeedback onPress={handleClose}><View style={styles.backdrop} /></TouchableWithoutFeedback>
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
-                    <View style={styles.modalCard}>
-                        <View style={styles.dragHandle} />
-                        {step === 'select' && <TouchableOpacity style={styles.closeBtn} onPress={handleClose}><Feather name="x" size={20} color={looviColors.text.secondary} /></TouchableOpacity>}
-                        {renderContent()}
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+                style={styles.keyboardAvoidingView}
+            >
+                <TouchableWithoutFeedback onPress={handleClose}>
+                    <View style={styles.overlay}>
+                        <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                            <View style={styles.modalCard}>
+                                <View style={styles.dragHandle} />
+                                {step === 'select' && <TouchableOpacity style={styles.closeBtn} onPress={handleClose}><Feather name="x" size={20} color={looviColors.text.secondary} /></TouchableOpacity>}
+                                {renderContent()}
+                            </View>
+                        </TouchableWithoutFeedback>
                     </View>
-                </KeyboardAvoidingView>
-            </View>
+                </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
-    modalRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-    keyboardView: { width: '100%', alignItems: 'center' },
-    modalCard: { width: '100%', maxWidth: 450, backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden', paddingBottom: spacing.xl },
+    keyboardAvoidingView: { flex: 1 },
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center' },
+    modalCard: { width: '100%', maxWidth: 450, backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden', paddingBottom: spacing.xl, marginTop: 60, flex: 1, marginHorizontal: spacing.lg },
     dragHandle: { width: 40, height: 4, backgroundColor: '#E0E0E0', borderRadius: 2, alignSelf: 'center', marginVertical: 12 },
     closeBtn: { position: 'absolute', top: 16, right: 20, zIndex: 10, padding: 8, backgroundColor: '#F5F5F5', borderRadius: 20 },
-    selectContainer: { padding: spacing.lg, paddingTop: spacing.sm },
+    selectContainer: { padding: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl },
     header: { marginBottom: spacing.lg, alignItems: 'center' },
     headerTitle: { fontSize: 20, fontWeight: '800', color: looviColors.text.primary, marginBottom: 4 },
     headerSubtitle: { fontSize: 13, color: looviColors.text.tertiary },
@@ -571,7 +779,7 @@ const styles = StyleSheet.create({
     recentInfo: { flex: 1 },
     recentName: { fontSize: 15, fontWeight: '600', color: looviColors.text.primary },
     recentDetails: { fontSize: 12, color: looviColors.text.tertiary },
-    stepContainer: { width: '100%', minHeight: 400 }, // increased minHeight
+    stepContainer: { width: '100%', minHeight: 400, padding: spacing.lg },
     reviewImage: { width: '100%', height: 250 },
     reviewContent: { padding: spacing.lg },
     stepTitle: { fontSize: 20, fontWeight: '700', color: looviColors.text.primary, marginBottom: 12 },
@@ -582,10 +790,10 @@ const styles = StyleSheet.create({
     primaryButton: { backgroundColor: looviColors.coralOrange, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24, flexDirection: 'row', alignItems: 'center' },
     primaryButtonText: { color: '#FFF', fontSize: 16, fontWeight: '700', marginRight: 8 },
     textOnlyInput: { backgroundColor: '#F9F9F9', borderRadius: 16, padding: spacing.md, fontSize: 18, minHeight: 120, marginHorizontal: spacing.lg, marginBottom: spacing.lg },
-    bottomActions: { flexDirection: 'row', justifyContent: 'space-between', padding: spacing.lg },
+    bottomActions: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.lg, marginTop: spacing.md },
     centerContainer: { padding: 60, alignItems: 'center' },
     analyzingTitle: { fontSize: 18, fontWeight: '600', marginTop: 16 },
-    resultContainer: { width: '100%' },
+    resultContainer: { width: '100%', flex: 1 },
     resultHeader: { width: '100%', height: 200 },
     resultImage: { width: '100%', height: '100%' },
     resultPlaceholder: { width: '100%', height: '100%', backgroundColor: '#EEE', alignItems: 'center', justifyContent: 'center' },
@@ -601,7 +809,14 @@ const styles = StyleSheet.create({
     sugarValue: { fontSize: 18, fontWeight: '700', color: looviColors.text.primary },
     sugarLabel: { fontSize: 12, color: looviColors.text.muted },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    sectionTitle: { fontSize: 15, fontWeight: '600' },
+    sectionTitle: { 
+        fontSize: 14, 
+        fontWeight: '600', 
+        color: looviColors.text.tertiary, 
+        textTransform: 'uppercase', 
+        letterSpacing: 0.5, 
+        marginBottom: spacing.sm 
+    },
     sectionValue: { fontSize: 15, fontWeight: '700', color: looviColors.coralOrange },
     slider: { width: '100%', height: 40, marginBottom: 20 },
     macrosGrid: { flexDirection: 'row', justifyContent: 'space-between' },
@@ -612,4 +827,113 @@ const styles = StyleSheet.create({
     retryButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
     saveButtonFull: { flex: 1, backgroundColor: looviColors.coralOrange, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
     saveButtonText: { color: '#FFF', fontSize: 16, fontWeight: '700', marginRight: 8 },
+    // Manual Entry Styles
+    scrollContainer: {
+        flex: 1,
+        width: '100%',
+    },
+    scrollContent: {
+        paddingBottom: spacing.xl + 100, // Extra padding for keyboard
+    },
+    foodNameSection: {
+        marginBottom: spacing.xl,
+    },
+    imageSection: {
+        marginBottom: spacing.xl,
+    },
+    imagePreviewContainer: {
+        position: 'relative',
+        marginTop: spacing.sm,
+    },
+    imagePreview: {
+        width: '100%',
+        height: 200,
+        borderRadius: borderRadius.lg,
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    removeImageButton: {
+        position: 'absolute',
+        top: spacing.sm,
+        right: spacing.sm,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    addImageButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: spacing.md,
+        borderRadius: borderRadius.lg,
+        backgroundColor: 'rgba(0, 0, 0, 0.02)',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.05)',
+        borderStyle: 'dashed',
+        marginTop: spacing.sm,
+        gap: spacing.xs,
+    },
+    addImageText: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
+    },
+    foodNameInput: {
+        backgroundColor: 'rgba(0, 0, 0, 0.02)',
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        fontSize: 16,
+        color: looviColors.text.primary,
+        marginTop: spacing.sm,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    nutritionSection: {
+        marginBottom: spacing.xl,
+    },
+    nutritionCard: {
+        backgroundColor: 'rgba(0, 0, 0, 0.02)',
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        marginTop: spacing.sm,
+    },
+    nutritionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: spacing.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    nutritionRowLast: {
+        borderBottomWidth: 0,
+    },
+    nutritionLabel: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: looviColors.text.primary,
+    },
+    nutritionInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    nutritionInput: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+        minWidth: 50,
+        textAlign: 'right',
+        paddingVertical: 0,
+        paddingHorizontal: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.1)',
+    },
+    nutritionUnit: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: looviColors.text.tertiary,
+        marginLeft: 4,
+    },
 });

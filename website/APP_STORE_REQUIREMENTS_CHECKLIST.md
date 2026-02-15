@@ -108,7 +108,7 @@ This document outlines all the crucial components needed on your website and in 
 
 ### Required Information:
 1. **Privacy Policy URL** ✅ - Must be provided during app submission
-2. **Support URL** - Link to support/contact page
+2. **Support URL** ✅ - Link to support page at `/support`
 3. **Marketing URL** - Your main website
 4. **App Privacy Details** - Detailed breakdown in App Store Connect:
    - Data types collected
@@ -131,7 +131,7 @@ This document outlines all the crucial components needed on your website and in 
 ### Required Information:
 1. **Privacy Policy URL** ✅ - Must be provided during app submission
 2. **Support Email** ✅ - hello@scriptcollective.com
-3. **Support URL** - Link to support/contact page
+3. **Support URL** ✅ - Link to support page at `/support`
 4. **Data Safety Section** - Detailed breakdown in Play Console:
    - Data types collected
    - Data shared with third parties
@@ -182,6 +182,8 @@ This document outlines all the crucial components needed on your website and in 
 - [x] Privacy Policy page created with URL
 - [x] Terms of Service page created with URL
 - [x] Contact email updated to hello@scriptcollective.com
+- [x] Support page created at `/support`
+- [x] Account Deletion page created at `/account-deletion`
 - [ ] Website is live and accessible
 - [ ] All links work correctly
 - [ ] Mobile-responsive design
@@ -233,7 +235,8 @@ This document outlines all the crucial components needed on your website and in 
 
 - **Support Email**: hello@scriptcollective.com ✅
 - **Website**: [Your domain]
-- **Support URL**: [Link to support page or contact form]
+- **Support URL**: `/support`
+- **Account Deletion URL**: `/account-deletion`
 
 ## 📅 Next Steps
 

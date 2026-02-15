@@ -124,11 +124,17 @@ export default function CancellationOfferScreen({
                     activeOpacity={0.8}
                 >
                     <Text style={styles.dealLabel}>YEARLY DEAL</Text>
-                    <Text style={styles.dealOriginalPrice}>$14.99</Text>
-                    <Text style={styles.dealNewPrice}>$12.99</Text>
+                    <Text style={styles.dealOriginalPrice}>$29.99</Text>
+                    <Text
+                        style={styles.dealNewPrice}
+                        adjustsFontSizeToFit
+                        numberOfLines={1}
+                    >
+                        $14.99
+                    </Text>
                     <Text style={styles.dealPeriod}>per year</Text>
                     <View style={styles.savingsBadge}>
-                        <Text style={styles.savingsText}>Save 13%</Text>
+                        <Text style={styles.savingsText}>Save 50%</Text>
                     </View>
                 </TouchableOpacity>
 
@@ -142,11 +148,17 @@ export default function CancellationOfferScreen({
                         <Text style={styles.bestValueText}>BEST VALUE</Text>
                     </View>
                     <Text style={styles.dealLabel}>LIFETIME</Text>
-                    <Text style={styles.dealOriginalPrice}>$24.99</Text>
-                    <Text style={styles.dealNewPrice}>$24.99</Text>
+                    {/* Removed strikethrough price */}
+                    <Text
+                        style={styles.dealNewPrice}
+                        adjustsFontSizeToFit
+                        numberOfLines={1}
+                    >
+                        $24.99
+                    </Text>
                     <Text style={styles.dealPeriod}>one-time</Text>
                     <View style={[styles.savingsBadge, styles.savingsBadgeGold]}>
-                        <Text style={styles.savingsText}>Best Deal</Text>
+                        <Text style={styles.savingsText}>90% OFF</Text>
                     </View>
                 </TouchableOpacity>
             </View>

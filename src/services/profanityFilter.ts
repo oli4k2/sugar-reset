@@ -39,6 +39,17 @@ const PROFANITY_LIST = [
 
     // Drug references that might be inappropriate
     'cocaine', 'heroin', 'meth', 'crack',
+
+    // Insults and demeaning language
+    'idiot', 'idiots', 'idiotic',
+    'moron', 'morons', 'moronic',
+    'stupid', 'dumb',
+    'loser', 'losers',
+    'pathetic',
+    'scum', 'scumbag', 'scumbags',
+    'creep', 'creepy', 'pervert', 'perverts', 'pedo', 'pedos',
+    'suck', 'sucks',
+    'stfu', 'gtfo', 'kys',
 ];
 
 // Create regex patterns for each word (word boundary matching)

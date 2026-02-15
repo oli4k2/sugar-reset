@@ -83,7 +83,7 @@ export default function EmergencyCallScreen() {
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
                 {/* Unified Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, { paddingTop: 12 }]}>
                         <Feather name="x" size={24} color={THEME.textDim} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>EMERGENCY</Text>

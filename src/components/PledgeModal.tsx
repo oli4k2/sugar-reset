@@ -83,6 +83,23 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
     const sensorLightDriver = useRef(new Animated.Value(0)).current;
     const glowFlicker = useRef(new Animated.Value(0)).current;
     const lensBloomDriver = useRef(new Animated.Value(0)).current;
+    
+    // Swipe to dismiss
+    const swipePanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => false,
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                // Only respond to downward swipes from top
+                return gestureState.dy > 10 && Math.abs(gestureState.dx) < Math.abs(gestureState.dy);
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                // If swiped down more than 100px, dismiss
+                if (gestureState.dy > 100 && !isCompleted) {
+                    onClose();
+                }
+            },
+        })
+    ).current;
 
     // Success Animations
     const flashAnim = useRef(new Animated.Value(0)).current;
@@ -267,12 +284,15 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
             presentationStyle="fullScreen"
             onRequestClose={onClose}
         >
-            <View style={styles.container}>
+            <View style={styles.container} {...swipePanResponder.panHandlers}>
                 <LooviBackground variant="coralTop">
-                    <SafeAreaView style={styles.safeArea}>
+                    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
                         {/* Close Button */}
                         {!isCompleted && (
-                            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                            <TouchableOpacity 
+                                style={[styles.closeBtn, { paddingTop: 8 }]} 
+                                onPress={onClose}
+                            >
                                 <Feather name="x" size={20} color={looviColors.text.primary} />
                             </TouchableOpacity>
                         )}
@@ -529,7 +549,7 @@ const styles = StyleSheet.create({
     },
     closeBtn: {
         position: 'absolute',
-        top: Platform.OS === 'android' ? 24 : 12,
+        top: Platform.OS === 'android' ? 24 : 8, // Reduced for SafeAreaView
         right: 24,
         zIndex: 50,
         width: 40,

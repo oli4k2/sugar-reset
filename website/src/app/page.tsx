@@ -124,7 +124,8 @@ export default function Home() {
             <Link href="/privacy-policy" className="hover:text-loovi-text-primary transition-colors">Privacy Policy</Link>
             <Link href="/terms-of-service" className="hover:text-loovi-text-primary transition-colors">Terms of Service</Link>
             <Link href="/refund-policy" className="hover:text-loovi-text-primary transition-colors">Refund Policy</Link>
-            <a href="mailto:hello@scriptcollective.com" className="hover:text-loovi-text-primary transition-colors">Contact</a>
+            <Link href="/account-deletion" className="hover:text-loovi-text-primary transition-colors">Account Deletion</Link>
+            <Link href="/support" className="hover:text-loovi-text-primary transition-colors">Support</Link>
           </div>
           <p className="text-sm">© {new Date().getFullYear()} Craveless. All rights reserved.</p>
         </footer>

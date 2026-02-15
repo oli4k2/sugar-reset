@@ -4,7 +4,7 @@
  * Dedicated screen for distraction activities during cravings
  */
 
-import React from 'react';
+import React, { useRef } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import {
     ScrollView,
     Alert,
     Dimensions,
+    PanResponder,
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -88,6 +89,23 @@ const THEME = {
 
 export default function DistractMeScreen() {
     const navigation = useNavigation<any>();
+    
+    // Swipe to dismiss
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => false,
+            onMoveShouldSetPanResponder: (_, gestureState) => {
+                // Only respond to downward swipes from top
+                return gestureState.dy > 10 && Math.abs(gestureState.dx) < Math.abs(gestureState.dy);
+            },
+            onPanResponderRelease: (_, gestureState) => {
+                // If swiped down more than 100px, dismiss
+                if (gestureState.dy > 100) {
+                    navigation.goBack();
+                }
+            },
+        })
+    ).current;
 
     const handleDistractionSelect = (distraction: typeof distractions[0]) => {
         if (distraction.screen) {
@@ -99,7 +117,7 @@ export default function DistractMeScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={styles.container} {...panResponder.panHandlers}>
             <LinearGradient
                 colors={THEME.bgColors as any}
                 style={StyleSheet.absoluteFillObject}
@@ -108,7 +126,7 @@ export default function DistractMeScreen() {
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
                 {/* Unified Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, { paddingTop: 8 }]}>
                         <Feather name="x" size={24} color={THEME.textDim} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>DISTRACT ME</Text>

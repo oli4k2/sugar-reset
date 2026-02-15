@@ -14,6 +14,8 @@ import {
     TouchableOpacity,
     ScrollView,
     Linking,
+    Platform,
+    StatusBar,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
@@ -563,21 +565,18 @@ export const InsightDetailModal: React.FC<InsightDetailModalProps> = ({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
+        backgroundColor: '#FFFFFF',
     },
     container: {
+        flex: 1,
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        minHeight: 400,
-        maxHeight: '85%',
         paddingBottom: 40,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         padding: spacing.lg,
+        paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 40) + spacing.md,
         paddingBottom: spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0,0,0,0.05)',
