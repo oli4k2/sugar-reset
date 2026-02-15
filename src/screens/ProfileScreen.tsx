@@ -87,6 +87,7 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
             { id: 'resetOnboarding', emoji: '🔄', label: 'Reset Onboarding' },
             { id: 'clearData', emoji: '🗑️', label: 'Clear All Data' },
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
+            { id: 'migrateUsernames', emoji: '👤', label: 'Migrate Usernames (GDPR)' },
         ],
     }] : []),
     {
@@ -303,6 +304,65 @@ export default function ProfileScreen() {
                             );
                         } catch (error: any) {
                             Alert.alert('Error', 'Cleanup failed: ' + error.message);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleMigrateUsernames = async () => {
+        Alert.alert(
+            'Migrate Usernames',
+            'This will generate Reddit-style usernames for all existing users.\n\n⚠️ This requires server-side access with admin privileges.\n\nTo run the migration:\n1. Set ADMIN_SECRET in Vercel environment variables\n2. Call the API endpoint:\n\ncurl -X POST https://craveless.info/api/admin/migrate-usernames \\\n  -H "Authorization: Bearer YOUR_ADMIN_SECRET"\n\nOr use the website admin panel if available.',
+            [
+                { text: 'OK', style: 'default' },
+                {
+                    text: 'Try Client-Side (Limited)',
+                    style: 'default',
+                    onPress: async () => {
+                        try {
+                            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            Alert.alert(
+                                'Note',
+                                'Client-side migration will only update users you have permission to modify (your own account). For full migration, use the server API endpoint.',
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                        text: 'Continue',
+                                        onPress: async () => {
+                                            // This will only work for the current user's own account
+                                            // Full migration requires server-side API
+                                            Alert.alert(
+                                                'Migration Started',
+                                                'Attempting client-side migration...',
+                                                [{ text: 'OK' }]
+                                            );
+                                            
+                                            // Try to update current user if they don't have username
+                                            if (user?.id && !user.username) {
+                                                try {
+                                                    const { generateUniqueUsername } = await import('../utils/usernameGenerator');
+                                                    const username = await generateUniqueUsername(db);
+                                                    await userService.updateDisplayName(user.id, user.displayName || '');
+                                                    // Note: We can't update username via client due to security rules
+                                                    // This is just a placeholder - real migration needs server API
+                                                    Alert.alert(
+                                                        'Limited Migration',
+                                                        'Client-side migration is limited by security rules. Please use the server API endpoint for full migration.'
+                                                    );
+                                                } catch (error: any) {
+                                                    Alert.alert('Error', 'Migration failed: ' + (error.message || 'Unknown error'));
+                                                }
+                                            } else {
+                                                Alert.alert('Already Complete', 'Your account already has a username.');
+                                            }
+                                        }
+                                    }
+                                ]
+                            );
+                        } catch (error: any) {
+                            Alert.alert('Error', 'Failed to start migration: ' + (error.message || 'Unknown error'));
                         }
                     },
                 },
@@ -784,6 +844,7 @@ export default function ProfileScreen() {
                                                         break;
                                                     case 'clearData': handleClearAllData(); break;
                                                     case 'cleanupCommunity': handleCleanupCommunityData(); break;
+                                                    case 'migrateUsernames': handleMigrateUsernames(); break;
                                                     case 'privacy': navigation.navigate('PrivacyPolicy'); break;
                                                     case 'terms': navigation.navigate('TermsOfService'); break;
                                                 }
@@ -915,6 +976,17 @@ export default function ProfileScreen() {
                                         <Text style={styles.readOnlyHint}>Managed by {authProvider === 'google' ? 'Google' : 'Apple'}</Text>
                                     )}
                                 </View>
+
+                                {/* Username (Read-only) */}
+                                {user?.username && (
+                                    <>
+                                        <Text style={styles.inputLabel}>Username</Text>
+                                        <View style={styles.readOnlyField}>
+                                            <Text style={styles.readOnlyText}>@{user.username}</Text>
+                                            <Text style={styles.readOnlyHint}>This helps friends find you. Cannot be changed.</Text>
+                                        </View>
+                                    </>
+                                )}
 
                                 {/* Display Name */}
                                 <Text style={styles.inputLabel}>Your Name</Text>

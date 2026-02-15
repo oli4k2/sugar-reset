@@ -7,6 +7,7 @@ export interface User {
     id: string;
     email: string;
     displayName?: string;
+    username?: string; // Reddit-style random username for friend search (GDPR compliant)
     photoURL?: string;
     avatarType?: 'photo' | 'emoji' | 'initial' | null;
     avatarValue?: string | null;

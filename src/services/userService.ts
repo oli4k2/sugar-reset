@@ -24,6 +24,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseReady } from '../config/firebase';
 import { User, UserStats, UserPreferences, StreakData, DailyCheckIn, Friend } from '../types';
+import { generateUniqueUsername } from '../utils/usernameGenerator';
 
 /**
  * Convert Firestore timestamp to Date
@@ -90,6 +91,7 @@ export const userService = {
                 id: docSnap.id,
                 email: data.email,
                 displayName: data.displayName,
+                username: data.username,
                 photoURL: data.photoURL,
                 avatarType: data.avatarType || null,
                 avatarValue: data.avatarValue || null,
@@ -140,9 +142,14 @@ export const userService = {
                 totalDaysSugarFree: 0,
             };
 
+            // Generate unique Reddit-style username for GDPR compliance
+            const username = await generateUniqueUsername(db);
+            console.log('✅ Generated username for new user:', username);
+
             const newUser: Omit<User, 'id'> = {
                 email,
                 displayName,
+                username,
                 createdAt: now,
                 updatedAt: now,
                 preferences: defaultPreferences,
@@ -154,6 +161,7 @@ export const userService = {
                 // Store lowercase versions for search
                 displayNameLower: displayName?.toLowerCase() || '',
                 emailLower: email.toLowerCase(),
+                usernameLower: username.toLowerCase(), // For search
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
                 streak: {
@@ -547,14 +555,13 @@ export const userService = {
     },
 
     /**
-     * Search users by display name or email
+     * Search users by display name or username (GDPR compliant - no email search)
      * Phase 2: Friend System
      *
      * Searches multiple fields for flexibility:
      * - displayNameLower (indexed, lowercase)
-     * - email (always searched, not just when @ present)
+     * - usernameLower (indexed, lowercase) - Reddit-style username for privacy
      */
-
     async searchUsers(queryText: string): Promise<User[]> {
         if (!isFirebaseReady()) {
             console.log('🔍 searchUsers: Firebase not ready, returning empty');
@@ -579,6 +586,7 @@ export const userService = {
                     id: docSnapshot.id,
                     email: data.email,
                     displayName: data.displayName,
+                    username: data.username,
                     photoURL: data.photoURL,
                     createdAt: toDate(data.createdAt) as Date,
                     updatedAt: toDate(data.updatedAt) as Date,
@@ -610,31 +618,19 @@ export const userService = {
                 return { docs: [] };
             }));
 
-            // 2. Always search by emailLower (prefix match)
-            const emailQuery = query(
+            // 2. Search by usernameLower (prefix match) - GDPR compliant alternative to email
+            const usernameQuery = query(
                 usersRef,
-                where('emailLower', '>=', searchText),
-                where('emailLower', '<=', searchText + '\uf8ff'),
+                where('usernameLower', '>=', searchText),
+                where('usernameLower', '<=', searchText + '\uf8ff'),
                 limit(10)
             );
-            queries.push(getDocs(emailQuery).catch(e => {
-                console.log('⚠️ emailLower query failed:', e?.code);
+            queries.push(getDocs(usernameQuery).catch(e => {
+                console.log('⚠️ usernameLower query failed:', e?.code);
                 return { docs: [] };
             }));
 
-            // 3. Fallback: Search by original email (for legacy users without emailLower)
-            const emailFallbackQuery = query(
-                usersRef,
-                where('email', '>=', searchText),
-                where('email', '<=', searchText + '\uf8ff'),
-                limit(10)
-            );
-            queries.push(getDocs(emailFallbackQuery).catch(e => {
-                console.log('⚠️ email fallback query failed:', e?.code);
-                return { docs: [] };
-            }));
-
-            // 4. Fallback: Search by original displayName (for legacy users without displayNameLower)
+            // 3. Fallback: Search by original displayName (for legacy users without displayNameLower)
             const nameFallbackQuery = query(
                 usersRef,
                 where('displayName', '>=', queryText.trim()),
@@ -646,25 +642,93 @@ export const userService = {
                 return { docs: [] };
             }));
 
+            // 4. Fallback: Search by original username (for legacy users without usernameLower)
+            const usernameFallbackQuery = query(
+                usersRef,
+                where('username', '>=', searchText),
+                where('username', '<=', searchText + '\uf8ff'),
+                limit(10)
+            );
+            queries.push(getDocs(usernameFallbackQuery).catch(e => {
+                console.log('⚠️ username fallback query failed:', e?.code);
+                return { docs: [] };
+            }));
+
             // Execute all queries in parallel
-            const [nameSnapshot, emailSnapshot, emailFallbackSnapshot, nameFallbackSnapshot] = await Promise.all(queries);
+            const [nameSnapshot, usernameSnapshot, nameFallbackSnapshot, usernameFallbackSnapshot] = await Promise.all(queries);
 
             console.log('🔍 Results - nameLower:', nameSnapshot.docs.length,
-                'emailLower:', emailSnapshot.docs.length,
-                'emailFallback:', emailFallbackSnapshot.docs.length,
-                'nameFallback:', nameFallbackSnapshot.docs.length);
+                'usernameLower:', usernameSnapshot.docs.length,
+                'nameFallback:', nameFallbackSnapshot.docs.length,
+                'usernameFallback:', usernameFallbackSnapshot.docs.length);
 
             // Add results from all queries
             nameSnapshot.docs.forEach(addUserToResults);
-            emailSnapshot.docs.forEach(addUserToResults);
-            emailFallbackSnapshot.docs.forEach(addUserToResults);
+            usernameSnapshot.docs.forEach(addUserToResults);
             nameFallbackSnapshot.docs.forEach(addUserToResults);
+            usernameFallbackSnapshot.docs.forEach(addUserToResults);
 
             console.log('🔍 Total unique results:', results.length);
             return results;
         } catch (error) {
             handleFirestoreError(error, 'searchUsers');
             return [];
+        }
+    },
+
+    /**
+     * Migration: Add usernames to existing users who don't have one
+     * This calls a server-side API endpoint that uses Firebase Admin SDK
+     * to bypass security rules and update all users.
+     * 
+     * Note: Requires ADMIN_SECRET environment variable on the server.
+     * This should be run once to backfill usernames for GDPR compliance.
+     */
+    async migrateUsernamesForExistingUsers(adminSecret?: string): Promise<{ success: number; failed: number; skipped: number; errors: string[] }> {
+        try {
+            console.log('🔄 Starting username migration via server API...');
+            
+            // Get admin secret from environment or parameter
+            // In production, this should be stored securely and passed from the client
+            const secret = adminSecret || process.env.EXPO_PUBLIC_ADMIN_SECRET || 'change-me-in-production';
+            
+            // Call server-side API endpoint
+            const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'https://craveless.info';
+            const response = await fetch(`${apiUrl}/api/admin/migrate-usernames`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${secret}`,
+                },
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Migration failed');
+            }
+
+            console.log(`✅ Username migration complete: ${data.results.success} succeeded, ${data.results.failed} failed, ${data.results.skipped} skipped`);
+            
+            return {
+                success: data.results.success,
+                failed: data.results.failed,
+                skipped: data.results.skipped || 0,
+                errors: data.results.errors || [],
+            };
+        } catch (error: any) {
+            console.error('❌ Username migration failed:', error);
+            return {
+                success: 0,
+                failed: 0,
+                skipped: 0,
+                errors: [error.message || 'Unknown error'],
+            };
         }
     },
 };

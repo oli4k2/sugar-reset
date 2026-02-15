@@ -125,7 +125,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
         setSubmitting(true);
         try {
             // Use onboarding nickname first, then user displayName, then email, fallback            
-            const authorName = onboardingData?.nickname || user.displayName || user.email || 'Anonymous';
+            const authorName = onboardingData?.nickname || user.displayName || user.username || 'Anonymous';
 
             await postService.addComment(
                 post.id,

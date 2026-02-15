@@ -64,7 +64,7 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
         try {
             console.log('🔍 FriendSearchModal: Searching for:', trimmedQuery);
             const results = await friendService.searchUsers(trimmedQuery);
-            console.log('🔍 FriendSearchModal: Got results:', results.length, results.map(r => r.email));
+            console.log('🔍 FriendSearchModal: Got results:', results.length, results.map(r => r.username || r.displayName));
             // Filter out current user
             const filtered = results.filter(u => u.id !== user?.id);
             console.log('🔍 FriendSearchModal: After filtering self:', filtered.length);
@@ -154,12 +154,12 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
             await friendService.sendFriendRequest(
                 user.id,
                 onboardingData.nickname || user.displayName || user.email,
-                undefined, // username - will be fetched from profile
+                user.username, // Pass username for GDPR compliance
                 toUser.id,
                 toUser.displayName, // recipient's name
-                toUser.email // recipient's email
+                toUser.email // recipient's email (not displayed, but kept for compatibility)
             );
-            Alert.alert('Success', `Friend request sent to ${toUser.displayName || toUser.email}!`);
+            Alert.alert('Success', `Friend request sent to ${toUser.displayName || toUser.username || 'user'}!`);
             onRequestSent?.();
 
             // Remove from results to prevent duplicate sends
@@ -195,15 +195,15 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                 <View style={styles.userRow}>
                     <View style={[styles.avatar, { backgroundColor: looviColors.accent.primary }]}>
                         <Text style={styles.avatarText}>
-                            {(item.displayName || item.email)?.[0]?.toUpperCase() || '?'}
+                            {(item.displayName || item.username || '?')?.[0]?.toUpperCase() || '?'}
                         </Text>
                     </View>
                     <View style={styles.userInfo}>
                         <Text style={styles.userName}>
                             {item.displayName || 'Anonymous'}
                         </Text>
-                        {item.email && (
-                            <Text style={styles.userEmail}>{item.email}</Text>
+                        {item.username && (
+                            <Text style={styles.userEmail}>@{item.username}</Text>
                         )}
                     </View>
                     {isFriend ? (
@@ -264,7 +264,7 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                                 <Ionicons name="search" size={20} color={looviColors.text.muted} />
                                 <TextInput
                                     style={styles.searchInput}
-                                    placeholder="Search by name or email..."
+                                    placeholder="Search by name or username..."
                                     placeholderTextColor={looviColors.text.muted}
                                     value={searchQuery}
                                     onChangeText={setSearchQuery}
@@ -295,11 +295,11 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
                                     <View style={styles.noResultsContainer}>
                                         <Text style={styles.noResults}>No users found</Text>
                                         <Text style={styles.noResultsHint}>
-                                            Search matches the start of names or emails.
-                                            Try typing the first few letters of their email.
+                                            Search matches the start of names or usernames.
+                                            Try typing the first few letters of their name or username.
                                         </Text>
                                         <Text style={styles.noResultsTip}>
-                                            Example: "john" finds "john@email.com"
+                                            Example: "john" finds "John" or "johnstar45"
                                         </Text>
                                     </View>
                                 )}
@@ -315,7 +315,7 @@ export function FriendSearchModal({ visible, onClose, onRequestSent }: FriendSea
 
                             {/* Hint */}
                             <Text style={styles.hint}>
-                                Enter the beginning of their name or email address
+                                Enter the beginning of their name or username
                             </Text>
                         </View>
                     </KeyboardAvoidingView>

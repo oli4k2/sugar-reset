@@ -30,7 +30,12 @@ service cloud.firestore {
       
       // Only the user can write their own profile
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      // Allow update but prevent username changes (username is immutable for GDPR compliance)
+      allow update: if isOwner(userId) && 
+        (!('username' in request.resource.data) || 
+         request.resource.data.username == resource.data.username) &&
+        (!('usernameLower' in request.resource.data) || 
+         request.resource.data.usernameLower == resource.data.usernameLower);
       allow delete: if isOwner(userId);
       
       // Friends subcollection

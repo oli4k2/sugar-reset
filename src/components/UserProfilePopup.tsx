@@ -150,7 +150,7 @@ export function UserProfilePopup({
             await friendService.sendFriendRequest(
                 user.id,
                 user.displayName || 'User',
-                undefined, // username
+                user.username, // Pass username for GDPR compliance
                 userId,
                 displayName
             );
