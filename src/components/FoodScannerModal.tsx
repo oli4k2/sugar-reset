@@ -5,7 +5,7 @@
  * Prioritizes the "Scan" action while keeping other options accessible.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -21,7 +21,20 @@ import {
     Platform,
     Keyboard,
     TouchableWithoutFeedback,
+    Animated,
+    PanResponder,
+    Dimensions,
 } from 'react-native';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+// The sheet is always rendered at full height.
+// We control visibility by translating it down.
+// TRANSLATE_PEEK = how far down to push it so only 65% is visible
+// TRANSLATE_FULL = 0 = sheet is fully visible (top at 8% from top of screen)
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.92;  // total sheet height
+const TRANSLATE_PEEK = SHEET_HEIGHT * 0.27; // push down so 65% shows (0.27 ≈ 1 - 0.65/0.92)
+const TRANSLATE_FULL = 0;                   // fully expanded
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.55; // translateY value above which we dismiss
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Slider from '@react-native-community/slider';
@@ -315,7 +328,7 @@ export default function FoodScannerModal({
         switch (step) {
             case 'select':
                 return (
-                    <ScrollView 
+                    <ScrollView
                         style={styles.scrollContainer}
                         contentContainerStyle={styles.selectContainer}
                         keyboardShouldPersistTaps="handled"
@@ -497,7 +510,7 @@ export default function FoodScannerModal({
 
             case 'text-input':
                 return (
-                    <ScrollView 
+                    <ScrollView
                         style={styles.scrollContainer}
                         keyboardShouldPersistTaps="handled"
                         contentContainerStyle={styles.scrollContent}
@@ -525,7 +538,7 @@ export default function FoodScannerModal({
                                 {manualImageUri ? (
                                     <View style={styles.imagePreviewContainer}>
                                         <Image source={{ uri: manualImageUri }} style={styles.imagePreview} />
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={styles.removeImageButton}
                                             onPress={() => setManualImageUri(null)}
                                         >
@@ -533,7 +546,7 @@ export default function FoodScannerModal({
                                         </TouchableOpacity>
                                     </View>
                                 ) : (
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.addImageButton}
                                         onPress={pickImageForManual}
                                     >
@@ -730,33 +743,148 @@ export default function FoodScannerModal({
         }
     };
 
+    // ── Bottom-sheet gesture logic ──────────────────────────────────────────
+    // translateY: 0 = fully open, TRANSLATE_PEEK = peeking, > DISMISS_THRESHOLD = dismiss
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+    const currentSnap = useRef(TRANSLATE_PEEK);
+
+    // Use refs for callbacks to avoid stale closures in PanResponder
+    const handleCloseRef = useRef(handleClose);
+    useEffect(() => { handleCloseRef.current = handleClose; });
+
+    const snapTo = useCallback((toValue: number, onDone?: () => void) => {
+        currentSnap.current = toValue;
+        Animated.spring(translateY, {
+            toValue,
+            useNativeDriver: true,
+            bounciness: 4,
+            speed: 14,
+        }).start(onDone);
+    }, [translateY]);
+    const snapToRef = useRef(snapTo);
+    useEffect(() => { snapToRef.current = snapTo; });
+
+    // Slide in from off-screen when modal becomes visible
+    useEffect(() => {
+        if (visible) {
+            translateY.setValue(SHEET_HEIGHT); // start below screen
+            currentSnap.current = TRANSLATE_PEEK;
+            Animated.spring(translateY, {
+                toValue: TRANSLATE_PEEK,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [visible, translateY]);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(currentSnap.current);
+                translateY.setValue(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                // Clamp upward: can't go above TRANSLATE_FULL (0)
+                // Clamp downward: allow dragging to dismiss
+                const clamped = Math.max(TRANSLATE_FULL, gs.dy);
+                translateY.setValue(clamped);
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                const projectedY = currentSnap.current + gs.dy;
+                const velocity = gs.vy;
+
+                // Dismiss: dragged past threshold or fast flick down
+                if (projectedY > DISMISS_THRESHOLD || velocity > 1.5) {
+                    Animated.timing(translateY, {
+                        toValue: SHEET_HEIGHT,
+                        duration: 220,
+                        useNativeDriver: true,
+                    }).start(() => handleCloseRef.current());
+                    return;
+                }
+
+                // Snap up to full if: dragged above midpoint OR fast flick up
+                const midpoint = (TRANSLATE_FULL + TRANSLATE_PEEK) / 2;
+                if (projectedY < midpoint || velocity < -0.8) {
+                    snapToRef.current(TRANSLATE_FULL);
+                } else {
+                    snapToRef.current(TRANSLATE_PEEK);
+                }
+            },
+        })
+    ).current;
+    // ────────────────────────────────────────────────────────────────────────
+
     return (
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-            <KeyboardAvoidingView 
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-                style={styles.keyboardAvoidingView}
-            >
+        <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+            <View style={styles.overlay}>
+                {/* Backdrop tap to dismiss */}
                 <TouchableWithoutFeedback onPress={handleClose}>
-                    <View style={styles.overlay}>
-                        <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                            <View style={styles.modalCard}>
-                                <View style={styles.dragHandle} />
-                                {step === 'select' && <TouchableOpacity style={styles.closeBtn} onPress={handleClose}><Feather name="x" size={20} color={looviColors.text.secondary} /></TouchableOpacity>}
-                                {renderContent()}
-                            </View>
-                        </TouchableWithoutFeedback>
-                    </View>
+                    <View style={StyleSheet.absoluteFill} />
                 </TouchableWithoutFeedback>
-            </KeyboardAvoidingView>
+
+                <Animated.View
+                    style={[
+                        styles.modalCard,
+                        { transform: [{ translateY }] },
+                    ]}
+                >
+                    {/* Drag handle — responds to pan gestures */}
+                    <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+                        <View style={styles.dragHandle} />
+                    </View>
+
+                    {step === 'select' && (
+                        <TouchableOpacity style={styles.closeBtn} onPress={handleClose}>
+                            <Feather name="x" size={20} color={looviColors.text.secondary} />
+                        </TouchableOpacity>
+                    )}
+
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
+                    >
+                        {renderContent()}
+                    </KeyboardAvoidingView>
+                </Animated.View>
+            </View>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
-    keyboardAvoidingView: { flex: 1 },
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', alignItems: 'center' },
-    modalCard: { width: '100%', maxWidth: 450, backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, overflow: 'hidden', paddingBottom: spacing.xl, marginTop: 60, flex: 1, marginHorizontal: spacing.lg },
-    dragHandle: { width: 40, height: 4, backgroundColor: '#E0E0E0', borderRadius: 2, alignSelf: 'center', marginVertical: 12 },
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalCard: {
+        width: '100%',
+        // Full height always — translateY controls how much is visible.
+        // No overflow:hidden so content isn't clipped when dragging up.
+        height: SHEET_HEIGHT,
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        paddingBottom: spacing.xl,
+    },
+    dragHandleArea: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 40,
+    },
+    dragHandle: {
+        width: 44,
+        height: 5,
+        backgroundColor: '#CCCCCC',
+        borderRadius: 3,
+    },
     closeBtn: { position: 'absolute', top: 16, right: 20, zIndex: 10, padding: 8, backgroundColor: '#F5F5F5', borderRadius: 20 },
     selectContainer: { padding: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl },
     header: { marginBottom: spacing.lg, alignItems: 'center' },
@@ -809,13 +937,13 @@ const styles = StyleSheet.create({
     sugarValue: { fontSize: 18, fontWeight: '700', color: looviColors.text.primary },
     sugarLabel: { fontSize: 12, color: looviColors.text.muted },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    sectionTitle: { 
-        fontSize: 14, 
-        fontWeight: '600', 
-        color: looviColors.text.tertiary, 
-        textTransform: 'uppercase', 
-        letterSpacing: 0.5, 
-        marginBottom: spacing.sm 
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: looviColors.text.tertiary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: spacing.sm
     },
     sectionValue: { fontSize: 15, fontWeight: '700', color: looviColors.coralOrange },
     slider: { width: '100%', height: 40, marginBottom: 20 },

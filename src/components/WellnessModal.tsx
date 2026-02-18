@@ -1,11 +1,11 @@
 /**
  * WellnessModal - Shared wellness tracking component
- * 
- * Full-screen modal for logging mood, energy, focus, sleep, and thoughts.
- * Uses the same slider pattern as JournalEntryModal (which works without glitching).
+ *
+ * Full bottom-sheet modal for logging mood, energy, focus, sleep, and thoughts.
+ * Gesture-driven: drag handle to dismiss.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -20,12 +20,19 @@ import {
     Platform,
     Keyboard,
     InputAccessoryView,
+    Animated,
+    PanResponder,
+    Dimensions,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { healthService } from '../services/healthService';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.92;
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.3;
 
 export interface WellnessLog {
     date: string;
@@ -60,7 +67,6 @@ export function WellnessModal({
     const [thoughts, setThoughts] = useState('');
     const [syncing, setSyncing] = useState(false);
 
-    // Reset or prefill values when modal opens
     useEffect(() => {
         if (visible) {
             if (existingData) {
@@ -75,37 +81,82 @@ export function WellnessModal({
                 setFocus(0);
                 setSleepHours(0);
                 setThoughts('');
-
-                // Auto-sync sleep data from Apple Health when opening fresh
                 const autoSyncSleep = async () => {
                     try {
                         const sleepHrs = await healthService.getTodaySleep();
-                        if (sleepHrs > 0) {
-                            const rounded = Math.round(sleepHrs);
-                            setSleepHours(rounded);
-                            console.log('✅ Auto-synced sleep data:', rounded, 'hours');
-                        }
-                    } catch (e) {
-                        // Silently fail - user can still manually sync
-                        console.log('Auto-sync sleep failed:', e);
-                    }
+                        if (sleepHrs > 0) setSleepHours(Math.round(sleepHrs));
+                    } catch (e) { }
                 };
                 autoSyncSleep();
             }
         }
     }, [visible, existingData]);
 
+    // ── Bottom-sheet gesture ──────────────────────────────────────────────────
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+    const currentSnap = useRef(0);
+    const handleCloseRef = useRef(onClose);
+    useEffect(() => { handleCloseRef.current = onClose; });
+
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => handleCloseRef.current());
+    }, [translateY]);
+
+    useEffect(() => {
+        if (visible) {
+            translateY.setValue(SHEET_HEIGHT);
+            currentSnap.current = 0;
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [visible, translateY]);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(currentSnap.current);
+                translateY.setValue(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.5) {
+                    Animated.timing(translateY, {
+                        toValue: SHEET_HEIGHT,
+                        duration: 220,
+                        useNativeDriver: true,
+                    }).start(() => handleCloseRef.current());
+                } else {
+                    currentSnap.current = 0;
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+    // ─────────────────────────────────────────────────────────────────────────
+
     const handleSave = () => {
         Keyboard.dismiss();
-        onSave({
-            date: selectedDate,
-            mood,
-            energy,
-            focus,
-            sleepHours,
-            thoughts: thoughts.trim() || undefined,
-        });
-        onClose();
+        onSave({ date: selectedDate, mood, energy, focus, sleepHours, thoughts: thoughts.trim() || undefined });
+        dismiss();
     };
 
     const handleSyncSleep = async () => {
@@ -113,9 +164,8 @@ export function WellnessModal({
         try {
             const sleepHrs = await healthService.getTodaySleep();
             if (sleepHrs > 0) {
-                const rounded = Math.round(sleepHrs);
-                setSleepHours(rounded);
-                Alert.alert('Synced!', `Sleep data: ${rounded} hours`);
+                setSleepHours(Math.round(sleepHrs));
+                Alert.alert('Synced!', `Sleep data: ${Math.round(sleepHrs)} hours`);
             } else {
                 Alert.alert('No Data', 'No sleep data found in Health app.');
             }
@@ -128,7 +178,6 @@ export function WellnessModal({
     const isToday = selectedDate === new Date().toISOString().split('T')[0];
     const isFutureDate = selectedDate > new Date().toISOString().split('T')[0];
 
-    // Render a scale slider (same pattern as JournalEntryModal)
     const renderScaleSlider = (
         value: number,
         setValue: (v: number) => void,
@@ -162,7 +211,6 @@ export function WellnessModal({
         </View>
     );
 
-    // Render sleep slider
     const renderSleepSlider = () => (
         <View style={styles.scaleContainer}>
             <View style={styles.sliderHeader}>
@@ -175,16 +223,8 @@ export function WellnessModal({
                         {sleepHours === 0 ? 'Slide to set' : `${sleepHours}h`}
                     </Text>
                 </View>
-                <TouchableOpacity
-                    style={styles.syncButton}
-                    onPress={handleSyncSleep}
-                    disabled={syncing}
-                >
-                    <Ionicons
-                        name={syncing ? "hourglass" : "sync"}
-                        size={14}
-                        color={looviColors.skyBlueDark}
-                    />
+                <TouchableOpacity style={styles.syncButton} onPress={handleSyncSleep} disabled={syncing}>
+                    <Ionicons name={syncing ? 'hourglass' : 'sync'} size={14} color={looviColors.skyBlueDark} />
                     <Text style={[styles.syncText, { color: looviColors.skyBlueDark }]}>Sync</Text>
                 </TouchableOpacity>
             </View>
@@ -207,108 +247,94 @@ export function WellnessModal({
     );
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="fade"
-            onRequestClose={onClose}
-        >
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardAvoidingView}
-            >
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <View style={styles.overlay}>
-                        <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                            <View style={styles.modalContent}>
-                                {/* Close Button */}
-                                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                                    <Feather name="x" size={20} color={looviColors.text.secondary} />
-                                </TouchableOpacity>
-
-                                <ScrollView
-                                    style={styles.scrollView}
-                                    contentContainerStyle={styles.scrollContent}
-                                    showsVerticalScrollIndicator={false}
-                                    keyboardShouldPersistTaps="handled"
-                                >
-                                    {/* Header */}
-                                    <View style={styles.header}>
-                                        <View style={styles.headerIcon}>
-                                            <Ionicons name="heart" size={26} color={looviColors.coralOrange} />
-                                        </View>
-                                        <View style={styles.headerTextContainer}>
-                                            <Text style={styles.title}>Daily Check-in</Text>
-                                            <Text style={styles.subtitle}>
-                                                {isFutureDate ? "Can't log future" : isToday ? 'How are you feeling today?' : 'Past entry'}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Mood Slider */}
-                                    {renderScaleSlider(mood, setMood, 'happy-outline', 'Mood', looviColors.coralOrange)}
-
-                                    {/* Energy Slider */}
-                                    {renderScaleSlider(energy, setEnergy, 'flash-outline', 'Energy', '#F5B461')}
-
-                                    {/* Focus Slider */}
-                                    {renderScaleSlider(focus, setFocus, 'bulb-outline', 'Focus', looviColors.coralDark)}
-
-                                    {/* Sleep Slider */}
-                                    {renderSleepSlider()}
-
-                                    {/* Journal Thoughts Section */}
-                                    <View style={styles.thoughtsSection}>
-                                        <View style={styles.thoughtsHeader}>
-                                            <Ionicons name="create-outline" size={16} color={looviColors.text.secondary} />
-                                            <Text style={styles.thoughtsLabel}>Your Thoughts</Text>
-                                            <Text style={styles.thoughtsOptional}>(optional)</Text>
-                                        </View>
-                                        <TextInput
-                                            style={styles.thoughtsInput}
-                                            placeholder="Any reflections on today..."
-                                            placeholderTextColor="rgba(0,0,0,0.4)"
-                                            value={thoughts}
-                                            onChangeText={setThoughts}
-                                            multiline
-                                            maxLength={300}
-                                            textAlignVertical="top"
-                                            returnKeyType="done"
-                                            blurOnSubmit={true}
-                                            inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
-                                        />
-                                    </View>
-
-                                    {/* Save Button */}
-                                    <TouchableOpacity
-                                        style={[styles.saveButton, isFutureDate && styles.saveButtonDisabled]}
-                                        onPress={handleSave}
-                                        disabled={isFutureDate}
-                                    >
-                                        <Text style={styles.saveButtonText}>
-                                            {isFutureDate ? "Can't Save" : 'Save Check-in'}
-                                        </Text>
-                                    </TouchableOpacity>
-
-                                    {/* Cancel Button */}
-                                    <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-                                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                                    </TouchableOpacity>
-                                </ScrollView>
-                            </View>
-                        </TouchableWithoutFeedback>
-                    </View>
+        <Modal visible={visible} transparent animationType="none" onRequestClose={dismiss}>
+            <View style={styles.overlay}>
+                <TouchableWithoutFeedback onPress={dismiss}>
+                    <View style={StyleSheet.absoluteFill} />
                 </TouchableWithoutFeedback>
-            </KeyboardAvoidingView>
 
-            {/* iOS Keyboard Done Button */}
+                <Animated.View style={[styles.modalContent, { transform: [{ translateY }] }]}>
+                    {/* Drag handle */}
+                    <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+                        <View style={styles.dragHandle} />
+                    </View>
+
+                    {/* Close button */}
+                    <TouchableOpacity style={styles.closeButton} onPress={dismiss}>
+                        <Feather name="x" size={20} color={looviColors.text.secondary} />
+                    </TouchableOpacity>
+
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
+                    >
+                        <ScrollView
+                            style={styles.scrollView}
+                            contentContainerStyle={styles.scrollContent}
+                            showsVerticalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            {/* Header */}
+                            <View style={styles.header}>
+                                <View style={styles.headerIcon}>
+                                    <Ionicons name="heart" size={26} color={looviColors.coralOrange} />
+                                </View>
+                                <View style={styles.headerTextContainer}>
+                                    <Text style={styles.title}>Daily Check-in</Text>
+                                    <Text style={styles.subtitle}>
+                                        {isFutureDate ? "Can't log future" : isToday ? 'How are you feeling today?' : 'Past entry'}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {renderScaleSlider(mood, setMood, 'happy-outline', 'Mood', looviColors.coralOrange)}
+                            {renderScaleSlider(energy, setEnergy, 'flash-outline', 'Energy', '#F5B461')}
+                            {renderScaleSlider(focus, setFocus, 'bulb-outline', 'Focus', looviColors.coralDark)}
+                            {renderSleepSlider()}
+
+                            <View style={styles.thoughtsSection}>
+                                <View style={styles.thoughtsHeader}>
+                                    <Ionicons name="create-outline" size={16} color={looviColors.text.secondary} />
+                                    <Text style={styles.thoughtsLabel}>Your Thoughts</Text>
+                                    <Text style={styles.thoughtsOptional}>(optional)</Text>
+                                </View>
+                                <TextInput
+                                    style={styles.thoughtsInput}
+                                    placeholder="Any reflections on today..."
+                                    placeholderTextColor="rgba(0,0,0,0.4)"
+                                    value={thoughts}
+                                    onChangeText={setThoughts}
+                                    multiline
+                                    maxLength={300}
+                                    textAlignVertical="top"
+                                    returnKeyType="done"
+                                    blurOnSubmit={true}
+                                    inputAccessoryViewID={Platform.OS === 'ios' ? INPUT_ACCESSORY_ID : undefined}
+                                />
+                            </View>
+
+                            <TouchableOpacity
+                                style={[styles.saveButton, isFutureDate && styles.saveButtonDisabled]}
+                                onPress={handleSave}
+                                disabled={isFutureDate}
+                            >
+                                <Text style={styles.saveButtonText}>
+                                    {isFutureDate ? "Can't Save" : 'Save Check-in'}
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.cancelButton} onPress={dismiss}>
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </KeyboardAvoidingView>
+                </Animated.View>
+            </View>
+
             {Platform.OS === 'ios' && (
                 <InputAccessoryView nativeID={INPUT_ACCESSORY_ID}>
                     <View style={styles.keyboardAccessory}>
-                        <TouchableOpacity
-                            style={styles.doneButton}
-                            onPress={() => Keyboard.dismiss()}
-                        >
+                        <TouchableOpacity style={styles.doneButton} onPress={() => Keyboard.dismiss()}>
                             <Text style={styles.doneButtonText}>Done</Text>
                         </TouchableOpacity>
                     </View>
@@ -319,54 +345,49 @@ export function WellnessModal({
 }
 
 const styles = StyleSheet.create({
-    keyboardAvoidingView: {
-        flex: 1,
-    },
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end', // Changed to flex-end to align modal to bottom
-        alignItems: 'center',
-    },
-    container: {
-        flex: 1,
-    },
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
     },
     modalContent: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: borderRadius.xl,
-        borderTopRightRadius: borderRadius.xl,
-        marginTop: 60, // Start from top with margin
-        flex: 1, // Fill remaining space
-        paddingTop: spacing.md,
-        width: '100%', // Ensure it takes full width
-        maxWidth: 400, // Keep max width constraint
-        overflow: 'hidden',
-        marginHorizontal: spacing.lg,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        height: SHEET_HEIGHT,
+        width: '100%',
+    },
+    dragHandleArea: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 40,
+    },
+    dragHandle: {
+        width: 44,
+        height: 5,
+        backgroundColor: '#CCCCCC',
+        borderRadius: 3,
     },
     closeButton: {
         position: 'absolute',
-        top: spacing.md + 8, // Extra padding for status bar
-        right: spacing.md,
+        top: 16,
+        right: 20,
+        zIndex: 10,
         width: 32,
         height: 32,
         borderRadius: 16,
         backgroundColor: 'rgba(0, 0, 0, 0.05)',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10,
     },
     scrollView: {
         flexGrow: 0,
     },
     scrollContent: {
         padding: spacing.xl,
-        paddingTop: spacing.xl + 8,
+        paddingTop: spacing.md,
     },
-    // Header
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -395,7 +416,6 @@ const styles = StyleSheet.create({
         color: looviColors.text.secondary,
         marginTop: 2,
     },
-    // Wellness Slider Styles (same as JournalEntryModal)
     scaleContainer: {
         marginBottom: spacing.lg,
     },
@@ -442,7 +462,6 @@ const styles = StyleSheet.create({
         color: looviColors.text.tertiary,
         fontWeight: '500',
     },
-    // Sync button
     syncButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -456,7 +475,6 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '600',
     },
-    // Thoughts Section
     thoughtsSection: {
         marginTop: spacing.sm,
         marginBottom: spacing.lg,
@@ -485,7 +503,6 @@ const styles = StyleSheet.create({
         color: looviColors.text.primary,
         minHeight: 80,
     },
-    // Buttons
     saveButton: {
         backgroundColor: looviColors.coralOrange,
         paddingVertical: 14,
@@ -509,7 +526,6 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: looviColors.text.tertiary,
     },
-    // Keyboard Accessory
     keyboardAccessory: {
         backgroundColor: '#F8F8F8',
         borderTopWidth: 1,

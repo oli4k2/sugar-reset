@@ -1,11 +1,11 @@
 /**
  * SimpleJournalModal Component
- * 
+ *
  * Simple modal for adding/editing journal text entries only.
- * No wellness tracking sliders - just a text field.
+ * Gesture-driven bottom sheet: drag handle to dismiss.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -16,11 +16,19 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    Animated,
+    PanResponder,
+    Dimensions,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { JournalEntry } from '../context/UserDataContext';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.85;
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.35;
 
 interface SimpleJournalModalProps {
     visible: boolean;
@@ -40,27 +48,80 @@ export default function SimpleJournalModal({
     const [notes, setNotes] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
-    // Pre-populate when editing
     useEffect(() => {
         if (visible) {
-            if (existingEntry) {
-                setNotes(existingEntry.notes || '');
-            } else {
-                setNotes('');
-            }
+            setNotes(existingEntry ? existingEntry.notes || '' : '');
         }
     }, [visible, existingEntry]);
 
-    const handleSave = async () => {
-        if (!notes.trim()) {
-            return;
-        }
+    // ── Bottom-sheet gesture ──────────────────────────────────────────────────
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+    const currentSnap = useRef(0);
+    const handleCloseRef = useRef(onClose);
+    useEffect(() => { handleCloseRef.current = onClose; });
 
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => handleCloseRef.current());
+    }, [translateY]);
+
+    useEffect(() => {
+        if (visible) {
+            translateY.setValue(SHEET_HEIGHT);
+            currentSnap.current = 0;
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [visible, translateY]);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(currentSnap.current);
+                translateY.setValue(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.5) {
+                    Animated.timing(translateY, {
+                        toValue: SHEET_HEIGHT,
+                        duration: 220,
+                        useNativeDriver: true,
+                    }).start(() => handleCloseRef.current());
+                } else {
+                    currentSnap.current = 0;
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const handleSave = async () => {
+        if (!notes.trim()) return;
         setIsSaving(true);
         try {
             await onSave(notes.trim());
             setNotes('');
-            onClose();
+            dismiss();
         } catch (error) {
             console.error('Error saving journal:', error);
         } finally {
@@ -70,7 +131,7 @@ export default function SimpleJournalModal({
 
     const handleClose = () => {
         setNotes('');
-        onClose();
+        dismiss();
     };
 
     const isEditing = !!existingEntry;
@@ -81,44 +142,44 @@ export default function SimpleJournalModal({
     });
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="slide"
-            onRequestClose={handleClose}
-        >
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardAvoidingView}
-            >
-                <View style={styles.overlay}>
-                    <View style={styles.container}>
-                        {/* Header */}
-                        <View style={styles.header}>
-                            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                                <Ionicons name="close" size={24} color={looviColors.text.secondary} />
-                            </TouchableOpacity>
-                            <View style={styles.headerCenter}>
-                                <Text style={styles.title}>
-                                    {isEditing ? 'Edit Entry' : 'New Journal Entry'}
-                                </Text>
-                                <Text style={styles.dateText}>{dateFormatted}</Text>
-                            </View>
-                            <TouchableOpacity
-                                onPress={handleSave}
-                                style={[styles.saveButton, (!notes.trim() || isSaving) && styles.saveButtonDisabled]}
-                                disabled={!notes.trim() || isSaving}
-                            >
-                                <Text style={[
-                                    styles.saveButtonText,
-                                    (!notes.trim() || isSaving) && styles.saveButtonTextDisabled
-                                ]}>
-                                    {isSaving ? 'Saving...' : 'Save'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+        <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+            <View style={styles.overlay}>
+                <TouchableWithoutFeedback onPress={handleClose}>
+                    <View style={StyleSheet.absoluteFill} />
+                </TouchableWithoutFeedback>
 
-                        {/* Content */}
+                <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
+                    {/* Drag handle */}
+                    <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+                        <View style={styles.dragHandle} />
+                    </View>
+
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                            <Ionicons name="close" size={24} color={looviColors.text.secondary} />
+                        </TouchableOpacity>
+                        <View style={styles.headerCenter}>
+                            <Text style={styles.title}>
+                                {isEditing ? 'Edit Entry' : 'New Journal Entry'}
+                            </Text>
+                            <Text style={styles.dateText}>{dateFormatted}</Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={handleSave}
+                            style={[styles.saveButton, (!notes.trim() || isSaving) && styles.saveButtonDisabled]}
+                            disabled={!notes.trim() || isSaving}
+                        >
+                            <Text style={[styles.saveButtonText, (!notes.trim() || isSaving) && styles.saveButtonTextDisabled]}>
+                                {isSaving ? 'Saving...' : 'Save'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
+                    >
                         <ScrollView
                             style={styles.scrollView}
                             contentContainerStyle={styles.scrollContent}
@@ -139,7 +200,6 @@ export default function SimpleJournalModal({
                                 />
                             </View>
 
-                            {/* Tips */}
                             <View style={styles.tipsContainer}>
                                 <Text style={styles.tipsTitle}>💡 Journal Ideas</Text>
                                 <Text style={styles.tip}>• How did you handle cravings today?</Text>
@@ -148,39 +208,44 @@ export default function SimpleJournalModal({
                                 <Text style={styles.tip}>• What are you grateful for?</Text>
                             </View>
                         </ScrollView>
-                    </View>
-                </View>
-            </KeyboardAvoidingView>
+                    </KeyboardAvoidingView>
+                </Animated.View>
+            </View>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
-    keyboardAvoidingView: {
-        flex: 1,
-    },
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'flex-end',
-        alignItems: 'center',
     },
     container: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        marginTop: 60,
-        flex: 1,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        height: SHEET_HEIGHT,
         width: '100%',
-        maxWidth: 400,
-        overflow: 'hidden',
-        marginHorizontal: spacing.lg,
+    },
+    dragHandleArea: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 40,
+    },
+    dragHandle: {
+        width: 44,
+        height: 5,
+        backgroundColor: '#CCCCCC',
+        borderRadius: 3,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0,0,0,0.05)',
     },
@@ -221,7 +286,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: spacing.lg,
-        paddingBottom: spacing.xl + 40, // Extra padding for keyboard
+        paddingBottom: spacing.xl + 40,
     },
     inputContainer: {
         marginBottom: spacing.lg,

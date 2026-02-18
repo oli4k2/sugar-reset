@@ -1,28 +1,36 @@
 /**
  * FoodItemModal
- * 
+ *
  * Modal showing full macro breakdown for a food item.
- * Allows editing and deleting.
+ * Gesture-driven bottom sheet: drag handle to dismiss.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     Modal,
     TouchableOpacity,
+    TouchableWithoutFeedback,
     ScrollView,
     TextInput,
     Image,
     Alert,
     KeyboardAvoidingView,
     Platform,
+    Animated,
+    PanResponder,
+    Dimensions,
 } from 'react-native';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { ScannedItem, getHealthScoreColor, updateScannedItem, deleteScannedItem } from '../services/scannerService';
 import Slider from '@react-native-community/slider';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.88;
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.3;
 
 interface FoodItemModalProps {
     visible: boolean;
@@ -59,7 +67,6 @@ function MacroRow({ label, value, unit, subValue, isEditing, onChangeText }: Mac
             </View>
         );
     }
-
     return (
         <View style={styles.macroRow}>
             <Text style={styles.macroLabel}>{label}</Text>
@@ -77,10 +84,69 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
     const [editedItem, setEditedItem] = useState<ScannedItem | null>(null);
 
     useEffect(() => {
-        if (item) {
-            setEditedItem({ ...item });
-        }
+        if (item) setEditedItem({ ...item });
     }, [item]);
+
+    // ── Bottom-sheet gesture ──────────────────────────────────────────────────
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+    const currentSnap = useRef(0);
+    const handleCloseRef = useRef(onClose);
+    useEffect(() => { handleCloseRef.current = onClose; });
+
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => handleCloseRef.current());
+    }, [translateY]);
+
+    useEffect(() => {
+        if (visible) {
+            translateY.setValue(SHEET_HEIGHT);
+            currentSnap.current = 0;
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [visible, translateY]);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(currentSnap.current);
+                translateY.setValue(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.5) {
+                    Animated.timing(translateY, {
+                        toValue: SHEET_HEIGHT,
+                        duration: 220,
+                        useNativeDriver: true,
+                    }).start(() => handleCloseRef.current());
+                } else {
+                    currentSnap.current = 0;
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (!item || !editedItem) return null;
 
@@ -106,7 +172,7 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
                     onPress: async () => {
                         await deleteScannedItem(item.id);
                         onUpdate();
-                        onClose();
+                        dismiss();
                     }
                 },
             ]
@@ -114,62 +180,56 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
     };
 
     const updateField = (field: keyof ScannedItem, value: number | string) => {
-        if (editedItem) {
-            setEditedItem({ ...editedItem, [field]: value });
-        }
+        if (editedItem) setEditedItem({ ...editedItem, [field]: value });
     };
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="slide"
-            onRequestClose={onClose}
-        >
+        <Modal visible={visible} transparent animationType="none" onRequestClose={dismiss}>
             <View style={styles.overlay}>
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={styles.keyboardAvoidingView}
-                >
-                    <View style={styles.container}>
-                        {/* Header */}
-                        <View style={styles.header}>
-                            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                                <Text style={styles.closeText}>✕</Text>
-                            </TouchableOpacity>
-                            {isEditing ? (
-                                <TextInput
-                                    style={styles.titleInput}
-                                    value={editedItem.name}
-                                    onChangeText={(val) => updateField('name', val)}
-                                    autoFocus
-                                />
-                            ) : (
-                                <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
-                            )}
-                            <TouchableOpacity
-                                onPress={() => setIsEditing(!isEditing)}
-                                style={styles.editButton}
-                            >
-                                <Text style={styles.editText}>{isEditing ? 'Cancel' : 'Edit'}</Text>
-                            </TouchableOpacity>
-                        </View>
+                <TouchableWithoutFeedback onPress={dismiss}>
+                    <View style={StyleSheet.absoluteFill} />
+                </TouchableWithoutFeedback>
 
+                <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
+                    {/* Drag handle */}
+                    <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+                        <View style={styles.dragHandle} />
+                    </View>
+
+                    {/* Header */}
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={dismiss} style={styles.closeButton}>
+                            <Text style={styles.closeText}>✕</Text>
+                        </TouchableOpacity>
+                        {isEditing ? (
+                            <TextInput
+                                style={styles.titleInput}
+                                value={editedItem.name}
+                                onChangeText={(val) => updateField('name', val)}
+                                autoFocus
+                            />
+                        ) : (
+                            <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
+                        )}
+                        <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={styles.editButton}>
+                            <Text style={styles.editText}>{isEditing ? 'Cancel' : 'Edit'}</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        style={{ flex: 1 }}
+                    >
                         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                            {/* Image */}
                             {item.imageUri && (
                                 <Image source={{ uri: item.imageUri }} style={styles.image} />
                             )}
 
-                            {/* Health Score */}
                             <View style={[styles.healthScoreCard, { backgroundColor: `${healthColor}15` }]}>
-                                <Text style={[styles.healthScoreValue, { color: healthColor }]}>
-                                    {item.healthScore}
-                                </Text>
+                                <Text style={[styles.healthScoreValue, { color: healthColor }]}>{item.healthScore}</Text>
                                 <Text style={styles.healthScoreLabel}>/ 10 Health Score</Text>
                             </View>
 
-                            {/* Portion */}
                             <View style={styles.portionSection}>
                                 <Text style={styles.sectionTitle}>Portion Eaten</Text>
                                 {isEditing ? (
@@ -191,71 +251,24 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
                                 )}
                             </View>
 
-                            {/* Macros */}
                             <View style={styles.macrosSection}>
                                 <Text style={styles.sectionTitle}>Nutrition Facts</Text>
                                 <View style={styles.macroCard}>
-                                    <MacroRow
-                                        label="Calories"
-                                        value={isEditing ? editedItem.calories.toString() : item.calories.toString()}
-                                        unit="kcal"
-                                        isEditing={isEditing}
-                                        onChangeText={(val) => updateField('calories', parseFloat(val) || 0)}
-                                    />
-                                    <MacroRow
-                                        label="Protein"
-                                        value={isEditing ? editedItem.protein.toString() : item.protein.toString()}
-                                        unit="g"
-                                        isEditing={isEditing}
-                                        onChangeText={(val) => updateField('protein', parseFloat(val) || 0)}
-                                    />
-                                    <MacroRow
-                                        label="Carbohydrates"
-                                        value={isEditing ? editedItem.carbs.toString() : item.carbs.toString()}
-                                        unit="g"
-                                        subValue={`(${item.carbsSugars}g sugars)`}
-                                        isEditing={isEditing}
-                                        onChangeText={(val) => updateField('carbs', parseFloat(val) || 0)}
-                                    />
-                                    <MacroRow
-                                        label="Fat"
-                                        value={isEditing ? editedItem.fat.toString() : item.fat.toString()}
-                                        unit="g"
-                                        subValue={`(${item.fatSaturated}g sat)`}
-                                        isEditing={isEditing}
-                                        onChangeText={(val) => updateField('fat', parseFloat(val) || 0)}
-                                    />
-                                    <MacroRow
-                                        label="Fiber"
-                                        value={isEditing ? editedItem.fiber.toString() : item.fiber.toString()}
-                                        unit="g"
-                                        isEditing={isEditing}
-                                        onChangeText={(val) => updateField('fiber', parseFloat(val) || 0)}
-                                    />
-                                    <MacroRow
-                                        label="Sugar (Total)"
-                                        value={isEditing ? editedItem.sugar.toString() : item.sugar.toString()}
-                                        unit="g"
-                                        isEditing={isEditing}
-                                        onChangeText={(val) => updateField('sugar', parseFloat(val) || 0)}
-                                    />
-                                    <MacroRow
-                                        label="Sodium"
-                                        value={isEditing ? editedItem.sodium.toString() : item.sodium.toString()}
-                                        unit="mg"
-                                        isEditing={isEditing}
-                                        onChangeText={(val) => updateField('sodium', parseFloat(val) || 0)}
-                                    />
+                                    <MacroRow label="Calories" value={isEditing ? editedItem.calories.toString() : item.calories.toString()} unit="kcal" isEditing={isEditing} onChangeText={(val) => updateField('calories', parseFloat(val) || 0)} />
+                                    <MacroRow label="Protein" value={isEditing ? editedItem.protein.toString() : item.protein.toString()} unit="g" isEditing={isEditing} onChangeText={(val) => updateField('protein', parseFloat(val) || 0)} />
+                                    <MacroRow label="Carbohydrates" value={isEditing ? editedItem.carbs.toString() : item.carbs.toString()} unit="g" subValue={`(${item.carbsSugars}g sugars)`} isEditing={isEditing} onChangeText={(val) => updateField('carbs', parseFloat(val) || 0)} />
+                                    <MacroRow label="Fat" value={isEditing ? editedItem.fat.toString() : item.fat.toString()} unit="g" subValue={`(${item.fatSaturated}g sat)`} isEditing={isEditing} onChangeText={(val) => updateField('fat', parseFloat(val) || 0)} />
+                                    <MacroRow label="Fiber" value={isEditing ? editedItem.fiber.toString() : item.fiber.toString()} unit="g" isEditing={isEditing} onChangeText={(val) => updateField('fiber', parseFloat(val) || 0)} />
+                                    <MacroRow label="Sugar (Total)" value={isEditing ? editedItem.sugar.toString() : item.sugar.toString()} unit="g" isEditing={isEditing} onChangeText={(val) => updateField('sugar', parseFloat(val) || 0)} />
+                                    <MacroRow label="Sodium" value={isEditing ? editedItem.sodium.toString() : item.sodium.toString()} unit="mg" isEditing={isEditing} onChangeText={(val) => updateField('sodium', parseFloat(val) || 0)} />
                                 </View>
                             </View>
 
-                            {/* Timestamp */}
                             <Text style={styles.timestamp}>
                                 Logged {new Date(item.timestamp).toLocaleString()}
                             </Text>
                         </ScrollView>
 
-                        {/* Actions */}
                         <View style={styles.actions}>
                             {isEditing ? (
                                 <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
@@ -267,8 +280,8 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
                                 </TouchableOpacity>
                             )}
                         </View>
-                    </View>
-                </KeyboardAvoidingView>
+                    </KeyboardAvoidingView>
+                </Animated.View>
             </View>
         </Modal>
     );
@@ -282,16 +295,29 @@ const styles = StyleSheet.create({
     },
     container: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: borderRadius['2xl'],
-        borderTopRightRadius: borderRadius['2xl'],
-        maxHeight: '90%',
-        marginHorizontal: spacing.lg,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        height: SHEET_HEIGHT,
+        width: '100%',
+    },
+    dragHandleArea: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 40,
+    },
+    dragHandle: {
+        width: 44,
+        height: 5,
+        backgroundColor: '#CCCCCC',
+        borderRadius: 3,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: spacing.lg,
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0, 0, 0, 0.05)',
     },
@@ -470,10 +496,5 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0,0,0,0.1)',
-    },
-    keyboardAvoidingView: {
-        width: '100%',
-        justifyContent: 'flex-end',
-        flex: 1,
     },
 });
