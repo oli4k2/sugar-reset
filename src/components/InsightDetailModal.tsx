@@ -2,10 +2,10 @@
  * InsightDetailModal
  * 
  * Modal that shows detailed, actionable content for each insight type.
- * Includes tips, suggestions, and specific recommendations.
+ * Refactored to a gesture-driven bottom sheet.
  */
 
-import React from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -13,13 +13,19 @@ import {
     Modal,
     TouchableOpacity,
     ScrollView,
-    Linking,
+    Animated,
+    PanResponder,
+    Dimensions,
+    TouchableWithoutFeedback,
     Platform,
-    StatusBar,
 } from 'react-native';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.85;
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.4;
 
 export type InsightType =
     | 'energy'
@@ -43,7 +49,6 @@ interface InsightContent {
     icon: string;
     iconColor: string;
     tips: { icon: string; title: string; description: string }[];
-    quickActions?: { label: string; action: () => void }[];
 }
 
 const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
@@ -53,31 +58,11 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'flash',
         iconColor: '#F59E0B',
         tips: [
-            {
-                icon: 'nutrition-outline',
-                title: 'Eat protein with every meal',
-                description: 'Eggs, Greek yogurt, lean meats, or legumes provide steady energy without the crash.',
-            },
-            {
-                icon: 'water-outline',
-                title: 'Stay hydrated',
-                description: 'Even mild dehydration can cause fatigue. Aim for 8 glasses of water daily.',
-            },
-            {
-                icon: 'walk-outline',
-                title: 'Take a 10-minute walk',
-                description: 'Light movement boosts blood flow and can increase energy for up to 2 hours.',
-            },
-            {
-                icon: 'sunny-outline',
-                title: 'Get natural light',
-                description: 'Morning sunlight helps regulate your circadian rhythm and improves alertness.',
-            },
-            {
-                icon: 'cafe-outline',
-                title: 'Time your caffeine',
-                description: 'Best consumed 90 minutes after waking. Avoid after 2pm for better sleep.',
-            },
+            { icon: 'nutrition-outline', title: 'Eat protein with every meal', description: 'Eggs, Greek yogurt, lean meats, or legumes provide steady energy without the crash.' },
+            { icon: 'water-outline', title: 'Stay hydrated', description: 'Even mild dehydration can cause fatigue. Aim for 8 glasses of water daily.' },
+            { icon: 'walk-outline', title: 'Take a 10-minute walk', description: 'Light movement boosts blood flow and can increase energy for up to 2 hours.' },
+            { icon: 'sunny-outline', title: 'Get natural light', description: 'Morning sunlight helps regulate your circadian rhythm and improves alertness.' },
+            { icon: 'cafe-outline', title: 'Time your caffeine', description: 'Best consumed 90 minutes after waking. Avoid after 2pm for better sleep.' },
         ],
     },
     sleep: {
@@ -86,31 +71,11 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'moon',
         iconColor: '#8B5CF6',
         tips: [
-            {
-                icon: 'time-outline',
-                title: 'Set a consistent bedtime',
-                description: 'Going to bed at the same time trains your body to feel sleepy on schedule.',
-            },
-            {
-                icon: 'phone-portrait-outline',
-                title: 'No screens 1 hour before bed',
-                description: 'Blue light suppresses melatonin. Try reading or gentle stretching instead.',
-            },
-            {
-                icon: 'thermometer-outline',
-                title: 'Keep your room cool',
-                description: 'The ideal sleeping temperature is 65-68°F (18-20°C).',
-            },
-            {
-                icon: 'cafe-outline',
-                title: 'Limit caffeine after noon',
-                description: 'Caffeine has a half-life of 5-6 hours and can affect sleep quality.',
-            },
-            {
-                icon: 'leaf-outline',
-                title: 'Try a calming ritual',
-                description: 'Herbal tea, deep breathing, or journaling can signal your body it\'s time to rest.',
-            },
+            { icon: 'time-outline', title: 'Set a consistent bedtime', description: 'Going to bed at the same time trains your body to feel sleepy on schedule.' },
+            { icon: 'phone-portrait-outline', title: 'No screens 1 hour before bed', description: 'Blue light suppresses melatonin. Try reading or gentle stretching instead.' },
+            { icon: 'thermometer-outline', title: 'Keep your room cool', description: 'The ideal sleeping temperature is 65-68°F (18-20°C).' },
+            { icon: 'cafe-outline', title: 'Limit caffeine after noon', description: 'Caffeine has a half-life of 5-6 hours and can affect sleep quality.' },
+            { icon: 'leaf-outline', title: 'Try a calming ritual', description: 'Herbal tea, deep breathing, or journaling can signal your body it\'s time to rest.' },
         ],
     },
     hydration: {
@@ -119,31 +84,11 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'water',
         iconColor: '#3B82F6',
         tips: [
-            {
-                icon: 'water-outline',
-                title: 'Drink a large glass of water',
-                description: 'Water helps your body process sugar and reduces that sluggish feeling.',
-            },
-            {
-                icon: 'walk-outline',
-                title: 'Take a 15-minute walk',
-                description: 'Light movement helps your body use up the glucose and stabilize levels.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Eat protein or healthy fat',
-                description: 'A handful of nuts or cheese can help balance your blood sugar.',
-            },
-            {
-                icon: 'timer-outline',
-                title: 'Wait before eating more',
-                description: 'Give your body 2-3 hours to stabilize before your next meal.',
-            },
-            {
-                icon: 'heart-outline',
-                title: 'Don\'t beat yourself up',
-                description: 'One moment doesn\'t define your journey. Focus on your next healthy choice.',
-            },
+            { icon: 'water-outline', title: 'Drink a large glass of water', description: 'Water helps your body process sugar and reduces that sluggish feeling.' },
+            { icon: 'walk-outline', title: 'Take a 15-minute walk', description: 'Light movement helps your body use up the glucose and stabilize levels.' },
+            { icon: 'nutrition-outline', title: 'Eat protein or healthy fat', description: 'A handful of nuts or cheese can help balance your blood sugar.' },
+            { icon: 'timer-outline', title: 'Wait before eating more', description: 'Give your body 2-3 hours to stabilize before your next meal.' },
+            { icon: 'heart-outline', title: 'Don\'t beat yourself up', description: 'One moment doesn\'t define your journey. Focus on your next healthy choice.' },
         ],
     },
     mood: {
@@ -152,36 +97,12 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'heart',
         iconColor: '#EC4899',
         tips: [
-            {
-                icon: 'musical-notes-outline',
-                title: 'Listen to uplifting music',
-                description: 'Music can shift your mood in minutes. Create a feel-good playlist.',
-            },
-            {
-                icon: 'people-outline',
-                title: 'Connect with someone',
-                description: 'A quick call or text to a friend can provide a meaningful boost.',
-            },
-            {
-                icon: 'sunny-outline',
-                title: 'Get outside',
-                description: '20 minutes of nature time is proven to reduce stress hormones.',
-            },
-            {
-                icon: 'fitness-outline',
-                title: 'Move your body',
-                description: 'Even gentle stretching releases endorphins and improves mood.',
-            },
-            {
-                icon: 'journal-outline',
-                title: 'Write 3 things you\'re grateful for',
-                description: 'Gratitude journaling rewires your brain for positivity over time.',
-            },
-            {
-                icon: 'paw-outline',
-                title: 'Spend time with pets',
-                description: 'Interacting with animals reduces cortisol and increases oxytocin.',
-            },
+            { icon: 'musical-notes-outline', title: 'Listen to uplifting music', description: 'Music can shift your mood in minutes. Create a feel-good playlist.' },
+            { icon: 'people-outline', title: 'Connect with someone', description: 'A quick call or text to a friend can provide a meaningful boost.' },
+            { icon: 'sunny-outline', title: 'Get outside', description: '20 minutes of nature time is proven to reduce stress hormones.' },
+            { icon: 'fitness-outline', title: 'Move your body', description: 'Even gentle stretching releases endorphins and improves mood.' },
+            { icon: 'journal-outline', title: 'Write 3 things you\'re grateful for', description: 'Gratitude journaling rewires your brain for positivity over time.' },
+            { icon: 'paw-outline', title: 'Spend time with pets', description: 'Interacting with animals reduces cortisol and increases oxytocin.' },
         ],
     },
     protein: {
@@ -190,36 +111,12 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'fitness',
         iconColor: '#3B82F6',
         tips: [
-            {
-                icon: 'egg-outline',
-                title: 'Eggs (6g protein each)',
-                description: 'Versatile and quick. Try scrambled, boiled, or in an omelet with veggies.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Greek yogurt (17g per cup)',
-                description: 'Add berries and a sprinkle of nuts for a satisfying snack.',
-            },
-            {
-                icon: 'fish-outline',
-                title: 'Salmon or chicken (25-30g per serving)',
-                description: 'Prep on Sunday for easy weekday meals.',
-            },
-            {
-                icon: 'leaf-outline',
-                title: 'Lentils & beans (15g per cup)',
-                description: 'Great for soups, salads, or as a side dish. Budget-friendly too!',
-            },
-            {
-                icon: 'pizza-outline',
-                title: 'Cottage cheese (14g per half cup)',
-                description: 'Pair with fruit for breakfast or add to smoothies.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Almonds (6g per handful)',
-                description: 'Keep a small container at your desk for afternoon hunger.',
-            },
+            { icon: 'egg-outline', title: 'Eggs (6g protein each)', description: 'Versatile and quick. Try scrambled, boiled, or in an omelet with veggies.' },
+            { icon: 'nutrition-outline', title: 'Greek yogurt (17g per cup)', description: 'Add berries and a sprinkle of nuts for a satisfying snack.' },
+            { icon: 'fish-outline', title: 'Salmon or chicken (25-30g per serving)', description: 'Prep on Sunday for easy weekday meals.' },
+            { icon: 'leaf-outline', title: 'Lentils & beans (15g per cup)', description: 'Great for soups, salads, or as a side dish. Budget-friendly too!' },
+            { icon: 'pizza-outline', title: 'Cottage cheese (14g per half cup)', description: 'Pair with fruit for breakfast or add to smoothies.' },
+            { icon: 'nutrition-outline', title: 'Almonds (6g per handful)', description: 'Keep a small container at your desk for afternoon hunger.' },
         ],
     },
     sugar_high: {
@@ -228,31 +125,11 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'trending-down',
         iconColor: '#EF4444',
         tips: [
-            {
-                icon: 'nutrition-outline',
-                title: 'Eat regular, balanced meals',
-                description: 'Skipping meals leads to blood sugar drops that trigger cravings.',
-            },
-            {
-                icon: 'water-outline',
-                title: 'Drink water first',
-                description: 'Thirst is often mistaken for hunger or cravings. Hydrate and wait 10 minutes.',
-            },
-            {
-                icon: 'timer-outline',
-                title: 'Wait 15 minutes',
-                description: 'Most cravings pass within 15-20 minutes. Distract yourself with an activity.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Choose fruit instead',
-                description: 'Natural sugars with fiber are processed more slowly by your body.',
-            },
-            {
-                icon: 'bed-outline',
-                title: 'Prioritize sleep',
-                description: 'Sleep deprivation increases hunger hormones and sugar cravings.',
-            },
+            { icon: 'nutrition-outline', title: 'Eat regular, balanced meals', description: 'Skipping meals leads to blood sugar drops that trigger cravings.' },
+            { icon: 'water-outline', title: 'Drink water first', description: 'Thirst is often mistaken for hunger or cravings. Hydrate and wait 10 minutes.' },
+            { icon: 'timer-outline', title: 'Wait 15 minutes', description: 'Most cravings pass within 15-20 minutes. Distract yourself with an activity.' },
+            { icon: 'nutrition-outline', title: 'Choose fruit instead', description: 'Natural sugars with fiber are processed more slowly by your body.' },
+            { icon: 'bed-outline', title: 'Prioritize sleep', description: 'Sleep deprivation increases hunger hormones and sugar cravings.' },
         ],
     },
     sugar_low: {
@@ -261,26 +138,10 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'checkmark-circle',
         iconColor: '#22C55E',
         tips: [
-            {
-                icon: 'trophy-outline',
-                title: 'Celebrate your wins',
-                description: 'You\'re doing amazing! Acknowledge how far you\'ve come.',
-            },
-            {
-                icon: 'bookmark-outline',
-                title: 'Notice how you feel',
-                description: 'Pay attention to your energy, mood, and sleep. These are your rewards!',
-            },
-            {
-                icon: 'people-outline',
-                title: 'Share your success',
-                description: 'Inspire others in the community or tell a friend about your progress.',
-            },
-            {
-                icon: 'flag-outline',
-                title: 'Set a new goal',
-                description: 'Now that you\'ve mastered sugar, what\'s next? More protein? Better sleep?',
-            },
+            { icon: 'trophy-outline', title: 'Celebrate your wins', description: 'You\'re doing amazing! Acknowledge how far you\'ve come.' },
+            { icon: 'bookmark-outline', title: 'Notice how you feel', description: 'Pay attention to your energy, mood, and sleep. These are your rewards!' },
+            { icon: 'people-outline', title: 'Share your success', description: 'Inspire others in the community or tell a friend about your progress.' },
+            { icon: 'flag-outline', title: 'Set a new goal', description: 'Now that you\'ve mastered sugar, what\'s next? More protein? Better sleep?' },
         ],
     },
     correlation: {
@@ -289,26 +150,10 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'git-compare',
         iconColor: '#EC4899',
         tips: [
-            {
-                icon: 'analytics-outline',
-                title: 'Track patterns',
-                description: 'Notice how you feel 2-3 hours after different meals. Sugar often leads to crashes.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Balance your plate',
-                description: 'Protein + fiber + healthy fat = stable energy and steady mood.',
-            },
-            {
-                icon: 'flask-outline',
-                title: 'Blood sugar matters',
-                description: 'Spikes and crashes affect your brain. Steady glucose = steady mood.',
-            },
-            {
-                icon: 'leaf-outline',
-                title: 'Gut-brain connection',
-                description: 'Your gut produces 90% of serotonin. Healthy eating = happier brain.',
-            },
+            { icon: 'analytics-outline', title: 'Track patterns', description: 'Notice how you feel 2-3 hours after different meals. Sugar often leads to crashes.' },
+            { icon: 'nutrition-outline', title: 'Balance your plate', description: 'Protein + fiber + healthy fat = stable energy and steady mood.' },
+            { icon: 'flask-outline', title: 'Blood sugar matters', description: 'Spikes and crashes affect your brain. Steady glucose = steady mood.' },
+            { icon: 'leaf-outline', title: 'Gut-brain connection', description: 'Your gut produces 90% of serotonin. Healthy eating = happier brain.' },
         ],
     },
     streak: {
@@ -317,26 +162,10 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'flame',
         iconColor: '#F59E0B',
         tips: [
-            {
-                icon: 'time-outline',
-                title: 'Same time, same place',
-                description: 'Log at consistent times to make it automatic.',
-            },
-            {
-                icon: 'notifications-outline',
-                title: 'Set reminders',
-                description: 'Don\'t rely on memory. Let your phone help you stay consistent.',
-            },
-            {
-                icon: 'trophy-outline',
-                title: 'Celebrate milestones',
-                description: '7 days, 14 days, 30 days - each one is an achievement!',
-            },
-            {
-                icon: 'people-outline',
-                title: 'Find accountability',
-                description: 'Share your streak with friends or the community.',
-            },
+            { icon: 'time-outline', title: 'Same time, same place', description: 'Log at consistent times to make it automatic.' },
+            { icon: 'notifications-outline', title: 'Set reminders', description: 'Don\'t rely on memory. Let your phone help you stay consistent.' },
+            { icon: 'trophy-outline', title: 'Celebrate milestones', description: '7 days, 14 days, 30 days - each one is an achievement!' },
+            { icon: 'people-outline', title: 'Find accountability', description: 'Share your streak with friends or the community.' },
         ],
     },
     fiber: {
@@ -345,31 +174,11 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'leaf',
         iconColor: '#22C55E',
         tips: [
-            {
-                icon: 'nutrition-outline',
-                title: 'Vegetables (3-5g per serving)',
-                description: 'Broccoli, carrots, Brussels sprouts are fiber superstars.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Berries (4g per cup)',
-                description: 'Raspberries and blackberries have the most fiber of any fruit.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Oatmeal (4g per cup)',
-                description: 'A warm, filling breakfast that keeps you satisfied for hours.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Chia seeds (10g per ounce)',
-                description: 'Add to yogurt, smoothies, or make chia pudding.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Avocado (10g per fruit)',
-                description: 'Healthy fats plus fiber. Great on toast or in salads.',
-            },
+            { icon: 'nutrition-outline', title: 'Vegetables (3-5g per serving)', description: 'Broccoli, carrots, Brussels sprouts are fiber superstars.' },
+            { icon: 'nutrition-outline', title: 'Berries (4g per cup)', description: 'Raspberries and blackberries have the most fiber of any fruit.' },
+            { icon: 'nutrition-outline', title: 'Oatmeal (4g per cup)', description: 'A warm, filling breakfast that keeps you satisfied for hours.' },
+            { icon: 'nutrition-outline', title: 'Chia seeds (10g per ounce)', description: 'Add to yogurt, smoothies, or make chia pudding.' },
+            { icon: 'nutrition-outline', title: 'Avocado (10g per fruit)', description: 'Healthy fats plus fiber. Great on toast or in salads.' },
         ],
     },
     breakfast: {
@@ -378,26 +187,10 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'sunny',
         iconColor: '#F5B461',
         tips: [
-            {
-                icon: 'egg-outline',
-                title: 'Eggs + avocado toast',
-                description: 'Protein + healthy fat + fiber = stable energy all morning.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Greek yogurt parfait',
-                description: 'Layer with berries, nuts, and a drizzle of honey.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Protein smoothie',
-                description: 'Blend protein powder, banana, spinach, and almond milk.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Overnight oats',
-                description: 'Prep the night before with chia seeds and nut butter.',
-            },
+            { icon: 'egg-outline', title: 'Eggs + avocado toast', description: 'Protein + healthy fat + fiber = stable energy all morning.' },
+            { icon: 'nutrition-outline', title: 'Greek yogurt parfait', description: 'Layer with berries, nuts, and a drizzle of honey.' },
+            { icon: 'nutrition-outline', title: 'Protein smoothie', description: 'Blend protein powder, banana, spinach, and almond milk.' },
+            { icon: 'nutrition-outline', title: 'Overnight oats', description: 'Prep the night before with chia seeds and nut butter.' },
         ],
     },
     snacking: {
@@ -406,31 +199,11 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'nutrition',
         iconColor: '#22C55E',
         tips: [
-            {
-                icon: 'nutrition-outline',
-                title: 'Apple + almond butter',
-                description: 'Sweet, crunchy, and satisfying. Perfect afternoon snack.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Cheese + crackers',
-                description: 'Choose whole grain crackers for added fiber.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Hummus + veggies',
-                description: 'Carrots, cucumbers, and bell peppers are great dippers.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Hard-boiled eggs',
-                description: 'Prep a batch on Sunday for grab-and-go protein.',
-            },
-            {
-                icon: 'nutrition-outline',
-                title: 'Trail mix (homemade)',
-                description: 'Nuts, seeds, and a few dark chocolate chips.',
-            },
+            { icon: 'nutrition-outline', title: 'Apple + almond butter', description: 'Sweet, crunchy, and satisfying. Perfect afternoon snack.' },
+            { icon: 'nutrition-outline', title: 'Cheese + crackers', description: 'Choose whole grain crackers for added fiber.' },
+            { icon: 'nutrition-outline', title: 'Hummus + veggies', description: 'Carrots, cucumbers, and bell peppers are great dippers.' },
+            { icon: 'nutrition-outline', title: 'Hard-boiled eggs', description: 'Prep a batch on Sunday for grab-and-go protein.' },
+            { icon: 'nutrition-outline', title: 'Trail mix (homemade)', description: 'Nuts, seeds, and a few dark chocolate chips.' },
         ],
     },
     consistency: {
@@ -439,26 +212,10 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'calendar',
         iconColor: '#8B5CF6',
         tips: [
-            {
-                icon: 'alarm-outline',
-                title: 'Start with one habit',
-                description: 'Master one thing before adding more. Progress over perfection.',
-            },
-            {
-                icon: 'link-outline',
-                title: 'Stack your habits',
-                description: 'Attach new habits to existing ones. "After I brush my teeth, I\'ll..."',
-            },
-            {
-                icon: 'trending-up-outline',
-                title: 'Track your progress',
-                description: 'What gets measured gets managed. Log daily in this app!',
-            },
-            {
-                icon: 'refresh-outline',
-                title: 'Don\'t break the chain',
-                description: 'Focus on not missing two days in a row. One slip is okay!',
-            },
+            { icon: 'alarm-outline', title: 'Start with one habit', description: 'Master one thing before adding more. Progress over perfection.' },
+            { icon: 'link-outline', title: 'Stack your habits', description: 'Attach new habits to existing ones. "After I brush my teeth, I\'ll..."' },
+            { icon: 'trending-up-outline', title: 'Track your progress', description: 'What gets measured gets managed. Log daily in this app!' },
+            { icon: 'refresh-outline', title: 'Don\'t break the chain', description: 'Focus on not missing two days in a row. One slip is okay!' },
         ],
     },
     celebration: {
@@ -467,26 +224,10 @@ const INSIGHT_CONTENT: Record<InsightType, InsightContent> = {
         icon: 'star',
         iconColor: '#F59E0B',
         tips: [
-            {
-                icon: 'trophy-outline',
-                title: 'You\'ve earned this',
-                description: 'Your dedication is paying off. Be proud of yourself!',
-            },
-            {
-                icon: 'heart-outline',
-                title: 'Non-food rewards',
-                description: 'Treat yourself to a massage, new book, or relaxing activity.',
-            },
-            {
-                icon: 'share-outline',
-                title: 'Share your success',
-                description: 'Post in the community to inspire others on their journey.',
-            },
-            {
-                icon: 'flag-outline',
-                title: 'Set your next goal',
-                description: 'What will you accomplish next? The sky\'s the limit!',
-            },
+            { icon: 'trophy-outline', title: 'You\'ve earned this', description: 'Your dedication is paying off. Be proud of yourself!' },
+            { icon: 'heart-outline', title: 'Non-food rewards', description: 'Treat yourself to a massage, new book, or relaxing activity.' },
+            { icon: 'share-outline', title: 'Share your success', description: 'Post in the community to inspire others on their journey.' },
+            { icon: 'flag-outline', title: 'Set your next goal', description: 'What will you accomplish next? The sky\'s the limit!' },
         ],
     },
 };
@@ -495,30 +236,82 @@ interface InsightDetailModalProps {
     visible: boolean;
     insightType: InsightType | null;
     onClose: () => void;
-    onAction?: (actionType: string) => void;
 }
 
 export const InsightDetailModal: React.FC<InsightDetailModalProps> = ({
     visible,
     insightType,
     onClose,
-    onAction,
 }) => {
-    if (!insightType) return null;
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
 
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => onClose());
+    }, [translateY, onClose]);
+
+    useEffect(() => {
+        if (visible) {
+            translateY.setValue(SHEET_HEIGHT);
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [visible]);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.0) {
+                    dismiss();
+                } else {
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    if (!insightType || !INSIGHT_CONTENT[insightType]) return null;
     const content = INSIGHT_CONTENT[insightType];
-    if (!content) return null;
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="slide"
-            onRequestClose={onClose}
-        >
+        <Modal visible={visible} transparent animationType="none" onRequestClose={dismiss}>
             <View style={styles.overlay}>
-                <View style={styles.container}>
-                    {/* Header */}
+                <TouchableWithoutFeedback onPress={dismiss}>
+                    <View style={StyleSheet.absoluteFill} />
+                </TouchableWithoutFeedback>
+
+                <Animated.View
+                    style={[
+                        styles.sheet,
+                        { transform: [{ translateY }] }
+                    ]}
+                >
+                    <View {...panResponder.panHandlers} style={styles.handleContainer}>
+                        <View style={styles.handle} />
+                    </View>
+
                     <View style={styles.header}>
                         <View style={[styles.iconCircle, { backgroundColor: `${content.iconColor}20` }]}>
                             <Ionicons name={content.icon as any} size={28} color={content.iconColor} />
@@ -527,36 +320,32 @@ export const InsightDetailModal: React.FC<InsightDetailModalProps> = ({
                             <Text style={styles.title}>{content.title}</Text>
                             <Text style={styles.subtitle}>{content.subtitle}</Text>
                         </View>
-                        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                            <Feather name="x" size={22} color={looviColors.text.secondary} />
+                    </View>
+
+                    <ScrollView
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.scrollContent}
+                    >
+                        {content.tips.map((tip, index) => (
+                            <View key={index} style={styles.tipCard}>
+                                <View style={[styles.tipIcon, { backgroundColor: `${content.iconColor}15` }]}>
+                                    <Ionicons name={tip.icon as any} size={20} color={content.iconColor} />
+                                </View>
+                                <View style={styles.tipContent}>
+                                    <Text style={styles.tipTitle}>{tip.title}</Text>
+                                    <Text style={styles.tipDescription}>{tip.description}</Text>
+                                </View>
+                            </View>
+                        ))}
+                        <View style={{ height: 40 }} />
+                    </ScrollView>
+
+                    <View style={styles.footer}>
+                        <TouchableOpacity style={styles.doneButton} onPress={dismiss}>
+                            <Text style={styles.doneButtonText}>Got it!</Text>
                         </TouchableOpacity>
                     </View>
-
-                    {/* Tips List - wrapped in flex container */}
-                    <View style={styles.scrollContainer}>
-                        <ScrollView
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={styles.scrollContent}
-                        >
-                            {content.tips.map((tip, index) => (
-                                <View key={index} style={styles.tipCard}>
-                                    <View style={[styles.tipIcon, { backgroundColor: `${content.iconColor}15` }]}>
-                                        <Ionicons name={tip.icon as any} size={20} color={content.iconColor} />
-                                    </View>
-                                    <View style={styles.tipContent}>
-                                        <Text style={styles.tipTitle}>{tip.title}</Text>
-                                        <Text style={styles.tipDescription}>{tip.description}</Text>
-                                    </View>
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-
-                    {/* Close Button */}
-                    <TouchableOpacity style={styles.doneButton} onPress={onClose}>
-                        <Text style={styles.doneButtonText}>Got it!</Text>
-                    </TouchableOpacity>
-                </View>
+                </Animated.View>
             </View>
         </Modal>
     );
@@ -565,21 +354,32 @@ export const InsightDetailModal: React.FC<InsightDetailModalProps> = ({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        justifyContent: 'flex-end',
     },
-    container: {
-        flex: 1,
+    sheet: {
         backgroundColor: '#FFFFFF',
-        paddingBottom: 40,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        width: '100%',
+        maxHeight: SHEET_HEIGHT,
+    },
+    handleContainer: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
     },
     header: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        padding: spacing.lg,
-        paddingTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 40) + spacing.md,
-        paddingBottom: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
+        alignItems: 'center',
+        paddingHorizontal: spacing.xl,
+        marginBottom: spacing.lg,
     },
     iconCircle: {
         width: 56,
@@ -593,34 +393,25 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     title: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '700',
         color: looviColors.text.primary,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     subtitle: {
         fontSize: 14,
         color: looviColors.text.secondary,
-        lineHeight: 20,
-    },
-    closeButton: {
-        padding: spacing.xs,
-        marginLeft: spacing.sm,
-    },
-    scrollContainer: {
-        flex: 1,
-        minHeight: 200,
+        lineHeight: 18,
     },
     scrollContent: {
-        padding: spacing.lg,
-        paddingTop: spacing.md,
+        paddingHorizontal: spacing.xl,
         paddingBottom: spacing.lg,
     },
     tipCard: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        backgroundColor: 'rgba(0,0,0,0.02)',
-        borderRadius: borderRadius.md,
+        backgroundColor: 'rgba(0,0,0,0.03)',
+        borderRadius: borderRadius.lg,
         padding: spacing.md,
         marginBottom: spacing.sm,
     },
@@ -646,11 +437,15 @@ const styles = StyleSheet.create({
         color: looviColors.text.secondary,
         lineHeight: 18,
     },
+    footer: {
+        padding: spacing.xl,
+        paddingTop: spacing.md,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    },
     doneButton: {
-        marginHorizontal: spacing.lg,
         backgroundColor: looviColors.accent.primary,
-        borderRadius: borderRadius.lg,
-        paddingVertical: spacing.md,
+        borderRadius: 30,
+        paddingVertical: 16,
         alignItems: 'center',
     },
     doneButtonText: {

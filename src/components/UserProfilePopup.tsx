@@ -2,13 +2,10 @@
  * UserProfilePopup Component
  * 
  * A modal popup that displays user profile information when clicking on any user.
- * Shows: profile picture, name, and summary statistics (streak, health score).
- * Includes option to add user as friend to Inner Circle.
- * 
- * Size matches the "Edit Profile" modal for consistency.
+ * Refactored to a gesture-driven bottom sheet.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -17,6 +14,11 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Animated,
+    PanResponder,
+    Dimensions,
+    TouchableWithoutFeedback,
+    Platform,
 } from 'react-native';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
@@ -28,6 +30,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.65;
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.4;
 
 type FriendStatus = 'loading' | 'self' | 'friend' | 'pending_sent' | 'pending_received' | 'none';
 
@@ -55,26 +61,44 @@ export function UserProfilePopup({
     const [isLoading, setIsLoading] = useState(true);
     const [friendStatus, setFriendStatus] = useState<FriendStatus>('loading');
     const [isAddingFriend, setIsAddingFriend] = useState(false);
+    const [isRemovingFriend, setIsRemovingFriend] = useState(false);
 
-    // Check friend status when popup becomes visible
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => onClose());
+    }, [translateY, onClose]);
+
+    useEffect(() => {
+        if (visible) {
+            translateY.setValue(SHEET_HEIGHT);
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [visible]);
+
     const checkFriendStatus = async () => {
         if (!user || !userId) return;
-
-        // Self check
         if (user.id === userId) {
             setFriendStatus('self');
             return;
         }
 
         try {
-            // Check if already friends
             const friendDoc = await getDoc(doc(db, 'users', user.id, 'friends', userId));
             if (friendDoc.exists()) {
                 setFriendStatus('friend');
                 return;
             }
 
-            // Check for pending outgoing request
             const outgoingQuery = query(
                 collection(db, 'friendRequests'),
                 where('fromUid', '==', user.id),
@@ -87,7 +111,6 @@ export function UserProfilePopup({
                 return;
             }
 
-            // Check for pending incoming request
             const incomingQuery = query(
                 collection(db, 'friendRequests'),
                 where('fromUid', '==', userId),
@@ -107,76 +130,43 @@ export function UserProfilePopup({
         }
     };
 
-    // Fetch user stats when popup becomes visible
     useEffect(() => {
         if (visible && userId) {
             setIsLoading(true);
             setFriendStatus('loading');
-
-            // Fetch stats
             friendService.getFriendStats(userId)
-                .then(fetchedStats => {
-                    setStats(fetchedStats);
-                })
-                .catch(error => {
-                    console.error('Error fetching user stats:', error);
-                })
-                .finally(() => {
-                    setIsLoading(false);
-                });
-
-            // Check friend status
+                .then(fetchedStats => setStats(fetchedStats))
+                .catch(error => console.error('Error fetching user stats:', error))
+                .finally(() => setIsLoading(false));
             checkFriendStatus();
         }
     }, [visible, userId, user?.id]);
 
-    // Reset state when closing
-    useEffect(() => {
-        if (!visible) {
-            setStats(null);
-            setIsLoading(true);
-            setFriendStatus('loading');
-            setIsAddingFriend(false);
-        }
-    }, [visible]);
-
     const handleAddFriend = async () => {
         if (!user || friendStatus !== 'none') return;
-
         setIsAddingFriend(true);
         try {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
             await friendService.sendFriendRequest(
                 user.id,
                 user.displayName || 'User',
-                user.username, // Pass username for GDPR compliance
+                user.username,
                 userId,
                 displayName
             );
-
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             setFriendStatus('pending_sent');
             Alert.alert('Request Sent! 🎉', `Friend request sent to ${displayName}!`);
         } catch (error: any) {
             await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            if (error.message?.includes('Already friends')) {
-                setFriendStatus('friend');
-            } else if (error.message?.includes('already sent')) {
-                setFriendStatus('pending_sent');
-            } else {
-                Alert.alert('Error', error.message || 'Failed to send friend request');
-            }
+            Alert.alert('Error', error.message || 'Failed to send friend request');
         } finally {
             setIsAddingFriend(false);
         }
     };
 
-    const [isRemovingFriend, setIsRemovingFriend] = useState(false);
-
     const handleRemoveFriend = () => {
         if (!user) return;
-
         Alert.alert(
             'Remove Friend',
             `Are you sure you want to remove ${displayName} from your Inner Circle?`,
@@ -203,176 +193,122 @@ export function UserProfilePopup({
         );
     };
 
-    const renderFriendButton = () => {
-        if (friendStatus === 'loading' || friendStatus === 'self') {
-            return null;
-        }
-
-        if (friendStatus === 'friend') {
-            return (
-                <View>
-                    <View style={styles.friendBadge}>
-                        <Ionicons name="people" size={16} color={looviColors.accent.primary} />
-                        <Text style={styles.friendBadgeText}>In Your Inner Circle</Text>
-                    </View>
-                    <TouchableOpacity
-                        style={styles.removeFriendButton}
-                        onPress={handleRemoveFriend}
-                        disabled={isRemovingFriend}
-                        activeOpacity={0.7}
-                    >
-                        {isRemovingFriend ? (
-                            <ActivityIndicator size="small" color="#EF4444" />
-                        ) : (
-                            <>
-                                <Ionicons name="person-remove-outline" size={16} color="#EF4444" />
-                                <Text style={styles.removeFriendButtonText}>Remove as Friend</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            );
-        }
-
-        if (friendStatus === 'pending_sent') {
-            return (
-                <View style={[styles.friendButton, styles.friendButtonPending]}>
-                    <Ionicons name="hourglass-outline" size={18} color={looviColors.text.tertiary} />
-                    <Text style={styles.friendButtonPendingText}>Request Pending</Text>
-                </View>
-            );
-        }
-
-        if (friendStatus === 'pending_received') {
-            return (
-                <View style={[styles.friendButton, styles.friendButtonReceived]}>
-                    <Ionicons name="mail" size={18} color="#F97316" />
-                    <Text style={styles.friendButtonReceivedText}>Has Sent You a Request</Text>
-                </View>
-            );
-        }
-
-        // Can add friend
-        return (
-            <TouchableOpacity
-                style={styles.friendButton}
-                onPress={handleAddFriend}
-                disabled={isAddingFriend}
-                activeOpacity={0.8}
-            >
-                {isAddingFriend ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                    <>
-                        <Ionicons name="person-add" size={18} color="#FFFFFF" />
-                        <Text style={styles.friendButtonText}>Add to Inner Circle</Text>
-                    </>
-                )}
-            </TouchableOpacity>
-        );
-    };
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.0) {
+                    dismiss();
+                } else {
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="fade"
-            onRequestClose={onClose}
-        >
-            <TouchableOpacity
-                style={styles.overlay}
-                activeOpacity={1}
-                onPress={onClose}
-            >
-                <TouchableOpacity activeOpacity={1} style={styles.content}>
-                    {/* Close Button */}
-                    <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                        <Ionicons name="close" size={20} color={looviColors.text.tertiary} />
-                    </TouchableOpacity>
+        <Modal visible={visible} transparent animationType="none" onRequestClose={dismiss}>
+            <View style={styles.overlay}>
+                <TouchableWithoutFeedback onPress={dismiss}>
+                    <View style={StyleSheet.absoluteFill} />
+                </TouchableWithoutFeedback>
 
-                    {/* Avatar */}
-                    <View style={styles.avatarContainer}>
-                        <UserAvatar
-                            size={80}
-                            photoURL={photoURL}
-                            avatarType={avatarType}
-                            avatarValue={avatarValue}
-                            name={displayName}
-                        />
+                <Animated.View
+                    style={[
+                        styles.sheet,
+                        { transform: [{ translateY }] }
+                    ]}
+                >
+                    <View {...panResponder.panHandlers} style={styles.handleContainer}>
+                        <View style={styles.handle} />
                     </View>
 
-                    {/* Name */}
-                    <Text style={styles.userName}>{displayName}</Text>
-
-                    {/* Stats Section */}
-                    {isLoading ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="small" color={looviColors.accent.primary} />
-                            <Text style={styles.loadingText}>Loading stats...</Text>
+                    <View style={styles.content}>
+                        <View style={styles.avatarContainer}>
+                            <UserAvatar
+                                size={100}
+                                photoURL={photoURL}
+                                avatarType={avatarType}
+                                avatarValue={avatarValue}
+                                name={displayName}
+                            />
                         </View>
-                    ) : stats ? (
-                        <View style={styles.statsContainer}>
-                            {/* Streak */}
-                            <View style={styles.statItem}>
-                                <View style={styles.statIconContainer}>
-                                    <Ionicons name="flame" size={20} color="#F97316" />
-                                </View>
-                                <Text style={styles.statValue}>{stats.currentStreak}</Text>
-                                <Text style={styles.statLabel}>Day Streak</Text>
+
+                        <Text style={styles.userName}>{displayName}</Text>
+
+                        {isLoading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="small" color={looviColors.accent.primary} />
+                                <Text style={styles.loadingText}>Loading stats...</Text>
                             </View>
-
-                            {/* Divider */}
-                            <View style={styles.statDivider} />
-
-                            {/* Health Score */}
-                            <View style={styles.statItem}>
-                                <View style={styles.statIconContainer}>
-                                    <Ionicons name="heart" size={20} color={looviColors.accent.primary} />
+                        ) : stats ? (
+                            <View style={styles.statsContainer}>
+                                <View style={styles.statItem}>
+                                    <Ionicons name="flame" size={24} color="#F97316" />
+                                    <Text style={styles.statValue}>{stats.currentStreak}</Text>
+                                    <Text style={styles.statLabel}>Day Streak</Text>
                                 </View>
-                                <Text style={styles.statValue}>{stats.healthScore}</Text>
-                                <Text style={styles.statLabel}>Health Score</Text>
-                            </View>
-
-                            {/* Divider */}
-                            <View style={styles.statDivider} />
-
-                            {/* Pledge */}
-                            <View style={styles.statItem}>
-                                <View style={styles.statIconContainer}>
+                                <View style={styles.statDivider} />
+                                <View style={styles.statItem}>
+                                    <Ionicons name="heart" size={24} color={looviColors.accent.primary} />
+                                    <Text style={styles.statValue}>{stats.healthScore}</Text>
+                                    <Text style={styles.statLabel}>Health Score</Text>
+                                </View>
+                                <View style={styles.statDivider} />
+                                <View style={styles.statItem}>
                                     <Ionicons
                                         name={stats.pledgedToday ? "hand-left" : "hand-left-outline"}
-                                        size={20}
+                                        size={24}
                                         color={stats.pledgedToday ? "#22C55E" : looviColors.text.tertiary}
                                     />
+                                    <Text style={[styles.statValue, { color: stats.pledgedToday ? "#22C55E" : looviColors.text.tertiary }]}>
+                                        {stats.pledgedToday ? 'Yes' : 'No'}
+                                    </Text>
+                                    <Text style={styles.statLabel}>Pledged</Text>
                                 </View>
-                                <Text style={[
-                                    styles.statValue,
-                                    { color: stats.pledgedToday ? "#22C55E" : looviColors.text.tertiary }
-                                ]}>
-                                    {stats.pledgedToday ? 'Yes' : 'No'}
-                                </Text>
-                                <Text style={styles.statLabel}>Pledge</Text>
                             </View>
-                        </View>
-                    ) : (
-                        <View style={styles.noStatsContainer}>
-                            <Ionicons name="stats-chart-outline" size={32} color={looviColors.text.muted} />
-                            <Text style={styles.noStatsText}>Stats not available yet</Text>
-                        </View>
-                    )}
+                        ) : (
+                            <View style={styles.noStatsContainer}>
+                                <Text style={styles.noStatsText}>Stats not available</Text>
+                            </View>
+                        )}
 
-                    {/* Goal Achievement Badge */}
-                    {stats?.goalAchieved && (
-                        <View style={styles.achievementBadge}>
-                            <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
-                            <Text style={styles.achievementText}>Today's goal achieved!</Text>
+                        <View style={styles.buttonContainer}>
+                            {friendStatus === 'friend' ? (
+                                <TouchableOpacity style={styles.removeButton} onPress={handleRemoveFriend} disabled={isRemovingFriend}>
+                                    <Text style={styles.removeButtonText}>Remove Friend</Text>
+                                </TouchableOpacity>
+                            ) : friendStatus === 'pending_sent' ? (
+                                <View style={styles.pendingButton}>
+                                    <Text style={styles.pendingButtonText}>Request Sent</Text>
+                                </View>
+                            ) : friendStatus === 'pending_received' ? (
+                                <View style={styles.receivedButton}>
+                                    <Text style={styles.receivedButtonText}>Check Your Requests</Text>
+                                </View>
+                            ) : friendStatus === 'none' ? (
+                                <TouchableOpacity style={styles.addButton} onPress={handleAddFriend} disabled={isAddingFriend}>
+                                    {isAddingFriend ? <ActivityIndicator color="#FFF" /> : <Text style={styles.addButtonText}>Add to Inner Circle</Text>}
+                                </TouchableOpacity>
+                            ) : null}
                         </View>
-                    )}
-
-                    {/* Add Friend Button */}
-                    {renderFriendButton()}
-                </TouchableOpacity>
-            </TouchableOpacity>
+                    </View>
+                </Animated.View>
+            </View>
         </Modal>
     );
 }
@@ -380,181 +316,134 @@ export function UserProfilePopup({
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        justifyContent: 'flex-end',
+    },
+    sheet: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        width: '100%',
+        minHeight: SHEET_HEIGHT,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    },
+    handleContainer: {
+        width: '100%',
         alignItems: 'center',
-        padding: spacing.screen.horizontal,
+        paddingVertical: 14,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
     },
     content: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: borderRadius['2xl'],
-        padding: spacing.xl,
-        width: '100%',
-        maxWidth: 340,
+        paddingHorizontal: spacing.xl,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    closeButton: {
-        position: 'absolute',
-        top: spacing.md,
-        right: spacing.md,
-        padding: spacing.xs,
-        borderRadius: 20,
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
     },
     avatarContainer: {
-        marginTop: spacing.sm,
         marginBottom: spacing.md,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
     },
     userName: {
-        fontSize: 22,
+        fontSize: 26,
         fontWeight: '700',
         color: looviColors.text.primary,
-        marginBottom: spacing.lg,
-        textAlign: 'center',
-    },
-    loadingContainer: {
-        alignItems: 'center',
-        paddingVertical: spacing.xl,
-    },
-    loadingText: {
-        marginTop: spacing.sm,
-        fontSize: 14,
-        color: looviColors.text.tertiary,
+        marginBottom: spacing.xl,
     },
     statsContainer: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        justifyContent: 'space-around',
         width: '100%',
-        paddingVertical: spacing.md,
-        backgroundColor: 'rgba(0, 0, 0, 0.02)',
-        borderRadius: borderRadius.lg,
+        justifyContent: 'space-around',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        paddingVertical: spacing.lg,
+        borderRadius: borderRadius.xl,
+        marginBottom: spacing.xl,
     },
     statItem: {
         alignItems: 'center',
         flex: 1,
     },
-    statIconContainer: {
-        marginBottom: spacing.xs,
-    },
     statValue: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '700',
         color: looviColors.text.primary,
-        marginBottom: 2,
+        marginVertical: 4,
     },
     statLabel: {
-        fontSize: 11,
-        fontWeight: '500',
+        fontSize: 12,
+        fontWeight: '600',
         color: looviColors.text.tertiary,
         textTransform: 'uppercase',
-        letterSpacing: 0.3,
     },
     statDivider: {
         width: 1,
-        height: 50,
-        backgroundColor: 'rgba(0, 0, 0, 0.08)',
+        height: '80%',
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+        alignSelf: 'center',
     },
-    feelingEmoji: {
-        fontSize: 20,
+    loadingContainer: {
+        paddingVertical: spacing.xl,
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: spacing.sm,
+        color: looviColors.text.tertiary,
     },
     noStatsContainer: {
-        alignItems: 'center',
         paddingVertical: spacing.xl,
     },
     noStatsText: {
-        marginTop: spacing.sm,
-        fontSize: 14,
-        color: looviColors.text.tertiary,
+        color: looviColors.text.muted,
     },
-    achievementBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.full,
-        marginTop: spacing.md,
-        gap: spacing.xs,
-    },
-    achievementText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#22C55E',
-    },
-    // Friend button styles
-    friendButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: looviColors.accent.primary,
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-        borderRadius: borderRadius.xl,
-        marginTop: spacing.lg,
-        gap: spacing.sm,
+    buttonContainer: {
         width: '100%',
+        marginTop: spacing.md,
     },
-    friendButtonText: {
-        fontSize: 15,
-        fontWeight: '600',
+    addButton: {
+        backgroundColor: looviColors.accent.primary,
+        paddingVertical: 16,
+        borderRadius: 30,
+        alignItems: 'center',
+    },
+    addButtonText: {
         color: '#FFFFFF',
-    },
-    friendButtonPending: {
-        backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    },
-    friendButtonPendingText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: looviColors.text.tertiary,
-    },
-    friendButtonReceived: {
-        backgroundColor: 'rgba(249, 115, 22, 0.1)',
-    },
-    friendButtonReceivedText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#F97316',
-    },
-    friendBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.full,
-        marginTop: spacing.lg,
-        gap: spacing.xs,
-    },
-    friendBadgeText: {
-        fontSize: 13,
+        fontSize: 16,
         fontWeight: '600',
-        color: looviColors.accent.primary,
     },
-    removeFriendButton: {
-        flexDirection: 'row',
+    removeButton: {
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        paddingVertical: 16,
+        borderRadius: 30,
         alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: spacing.sm,
-        paddingVertical: spacing.sm,
-        gap: spacing.xs,
     },
-    removeFriendButtonText: {
-        fontSize: 13,
-        fontWeight: '500',
+    removeButtonText: {
         color: '#EF4444',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    pendingButton: {
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        paddingVertical: 16,
+        borderRadius: 30,
+        alignItems: 'center',
+    },
+    pendingButtonText: {
+        color: looviColors.text.tertiary,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    receivedButton: {
+        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+        paddingVertical: 16,
+        borderRadius: 30,
+        alignItems: 'center',
+    },
+    receivedButtonText: {
+        color: '#F97316',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
 
 export default UserProfilePopup;
-
