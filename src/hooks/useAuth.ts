@@ -1,7 +1,7 @@
 /**
  * useAuth Hook
  * 
- * Authentication methods for sign in with Google/Apple/Email Magic Link.
+ * Authentication methods for sign in with Google/Apple/Email OTP.
  */
 
 import { useState, useCallback } from 'react';
@@ -11,15 +11,14 @@ import {
     GoogleAuthProvider,
     signInWithCredential,
     OAuthProvider,
-    sendSignInLinkToEmail,
-    isSignInWithEmailLink,
-    signInWithEmailLink,
+    signInWithCustomToken,
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../config/firebase';
 import { userService } from '../services/userService';
 
 const EMAIL_STORAGE_KEY = '@auth_email_for_sign_in';
+const API_BASE_URL = 'https://www.craveless.info';
 
 interface AuthError {
     code: string;
@@ -32,8 +31,8 @@ interface UseAuthReturn {
     signOut: () => Promise<void>;
     signInWithGoogle: (idToken: string) => Promise<boolean>;
     signInWithApple: (identityToken: string, nonce: string) => Promise<boolean>;
-    sendEmailLink: (email: string) => Promise<boolean>;
-    completeEmailSignIn: (url: string, displayName?: string) => Promise<boolean>;
+    sendOTP: (email: string) => Promise<boolean>;
+    verifyOTP: (email: string, code: string, displayName?: string) => Promise<boolean>;
     getStoredEmail: () => Promise<string | null>;
     reloadUser: () => Promise<void>;
     clearError: () => void;
@@ -44,14 +43,14 @@ interface UseAuthReturn {
  */
 const getErrorMessage = (code: string): string => {
     if (!code) return 'An error occurred. Please try again.';
-    
+
     switch (code) {
         case 'auth/account-exists-with-different-credential':
             return 'An account already exists with this email using a different sign-in method.';
         case 'auth/invalid-credential':
             return 'Invalid credentials. Please try again.';
         case 'auth/operation-not-allowed':
-            return 'Email link sign-in is not enabled. Please contact support.';
+            return 'This sign-in method is not enabled. Please contact support.';
         case 'auth/user-disabled':
             return 'This account has been disabled.';
         case 'auth/user-not-found':
@@ -60,18 +59,16 @@ const getErrorMessage = (code: string): string => {
             return 'Too many attempts. Please try again later.';
         case 'auth/network-request-failed':
             return 'Network error. Please check your connection.';
-        case 'auth/invalid-action-code':
-            return 'This link has expired or already been used.';
-        case 'auth/expired-action-code':
-            return 'This link has expired. Please request a new one.';
+        case 'auth/invalid-custom-token':
+            return 'Authentication failed. Please try again.';
+        case 'auth/custom-token-mismatch':
+            return 'Authentication misconfigured. Please contact support.';
         case 'auth/invalid-email':
             return 'Please enter a valid email address.';
-        case 'auth/missing-continue-uri':
-            return 'Configuration error. Please contact support.';
-        case 'auth/invalid-continue-uri':
-            return 'Invalid redirect URL. Please contact support.';
-        case 'auth/unauthorized-continue-uri':
-            return 'Redirect URL not authorized. Please contact support.';
+        case 'otp-send-failed':
+            return 'Failed to send verification code. Please try again.';
+        case 'otp-verify-failed':
+            return 'Failed to verify code. Please try again.';
         default:
             return `An error occurred: ${code}. Please try again.`;
     }
@@ -104,99 +101,67 @@ export function useAuth(): UseAuthReturn {
     }, []);
 
     /**
-     * Send magic link to email for passwordless sign-in
-     * Uses Resend API for beautiful email design, falls back to Firebase if API fails
+     * Send OTP code to email for verification
+     * Uses Resend API via the Vercel backend
      */
-    const sendEmailLink = useCallback(async (email: string): Promise<boolean> => {
+    const sendOTP = useCallback(async (email: string): Promise<boolean> => {
         setIsLoading(true);
         setError(null);
 
-        const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'sugar-reset.firebaseapp.com';
-        const redirectUrl = `https://${authDomain}/auth/email-signin`;
-
         try {
-            // Use Resend API ONLY for beautiful email design
-            console.log('📧 Sending magic link via Resend API to:', email);
-            console.log('🔗 API Endpoint: https://www.craveless.info/api/auth/send-magic-link');
-            
-            let response;
-            let responseText;
-            
-            try {
-                response = await fetch('https://www.craveless.info/api/auth/send-magic-link', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: email.trim().toLowerCase(),
-                        redirectUrl,
-                    }),
-                });
+            console.log('📧 Sending OTP to:', email);
 
-                // Get response text first to check if it's empty
-                responseText = await response.text();
-                console.log('📡 API Response status:', response.status);
-                console.log('📡 API Response text:', responseText.substring(0, 500)); // Log first 500 chars
+            const response = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email.trim().toLowerCase(),
+                }),
+            });
 
-                // If 405 or 404, the API might not be deployed yet
-                if (response.status === 405 || response.status === 404) {
-                    throw new Error(`API endpoint not available (${response.status}). Please deploy the website API first.`);
-                }
+            const responseText = await response.text();
+            console.log('📡 API Response status:', response.status);
 
-                if (!response.ok) {
-                    let errorMessage = 'Failed to send email';
-                    try {
-                        if (responseText) {
-                            const errorData = JSON.parse(responseText);
-                            errorMessage = errorData.error || errorMessage;
-                        } else {
-                            errorMessage = `Server error (${response.status})`;
-            }
-                    } catch (e) {
-                        errorMessage = responseText || `Server error (${response.status})`;
-                    }
-                    throw new Error(errorMessage);
-                }
-
-                if (!responseText) {
-                    throw new Error('Empty response from server');
-                }
-
-                let result;
+            if (!response.ok) {
+                let errorMessage = 'Failed to send verification code';
                 try {
-                    result = JSON.parse(responseText);
+                    if (responseText) {
+                        const errorData = JSON.parse(responseText);
+                        errorMessage = errorData.error || errorMessage;
+                    }
                 } catch (e) {
-                    console.error('❌ Failed to parse JSON response:', e);
-                    throw new Error('Invalid response from server');
+                    errorMessage = responseText || `Server error (${response.status})`;
                 }
-                
-                if (!result.success) {
-                    throw new Error(result.error || 'Failed to send email');
-                }
-
-                // Store email locally for when user clicks the link
-                await AsyncStorage.setItem(EMAIL_STORAGE_KEY, email);
-                console.log('✅ Magic link sent successfully via Resend');
-            return true;
-            } catch (fetchError: any) {
-                // If it's a network error or the API isn't deployed, provide helpful error
-                if (fetchError.message?.includes('405') || fetchError.message?.includes('404') || fetchError.message?.includes('not available')) {
-                    throw new Error('The email API is not deployed yet. Please deploy the website to Vercel first. See website/DEPLOY.md for instructions.');
-                }
-                throw fetchError;
+                throw new Error(errorMessage);
             }
+
+            if (!responseText) {
+                throw new Error('Empty response from server');
+            }
+
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (e) {
+                throw new Error('Invalid response from server');
+            }
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to send verification code');
+            }
+
+            // Store email locally for the verification step
+            await AsyncStorage.setItem(EMAIL_STORAGE_KEY, email.trim().toLowerCase());
+            console.log('✅ OTP sent successfully');
+            return true;
         } catch (err: any) {
-            console.error('❌ Send email link error:', err);
-            console.error('❌ Error code:', err.code);
-            console.error('❌ Error message:', err.message);
-            
-            const errorCode = err.code || 'email-link-failed';
-            const errorMessage = getErrorMessage(errorCode);
-            
+            console.error('❌ Send OTP error:', err.message);
+
             setError({
-                code: errorCode,
-                message: errorMessage,
+                code: err.code || 'otp-send-failed',
+                message: err.message || getErrorMessage('otp-send-failed'),
             });
             return false;
         } finally {
@@ -205,55 +170,62 @@ export function useAuth(): UseAuthReturn {
     }, []);
 
     /**
-     * Get stored email (for completing sign-in after clicking link)
+     * Verify OTP code and sign in
+     * The backend validates the code and returns a Firebase custom token
      */
-    const getStoredEmail = useCallback(async (): Promise<string | null> => {
-        try {
-            return await AsyncStorage.getItem(EMAIL_STORAGE_KEY);
-        } catch {
-            return null;
-        }
-    }, []);
-
-    /**
-     * Complete email sign-in after user clicks the magic link
-     */
-    const completeEmailSignIn = useCallback(async (
-        url: string,
+    const verifyOTP = useCallback(async (
+        email: string,
+        code: string,
         displayName?: string
     ): Promise<boolean> => {
         setIsLoading(true);
         setError(null);
 
         try {
-            // Check if this is a valid sign-in link
-            if (!isSignInWithEmailLink(auth, url)) {
-                console.log('❌ Not a valid sign-in link');
-                setError({
-                    code: 'invalid-link',
-                    message: 'This is not a valid sign-in link.',
-                });
-                return false;
+            console.log('🔐 Verifying OTP for:', email);
+
+            const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email.trim().toLowerCase(),
+                    code: code.trim(),
+                    displayName,
+                }),
+            });
+
+            const responseText = await response.text();
+            console.log('📡 Verify API Response status:', response.status);
+
+            if (!response.ok) {
+                let errorMessage = 'Failed to verify code';
+                try {
+                    if (responseText) {
+                        const errorData = JSON.parse(responseText);
+                        errorMessage = errorData.error || errorMessage;
+                    }
+                } catch (e) {
+                    errorMessage = responseText || `Server error (${response.status})`;
+                }
+                throw new Error(errorMessage);
             }
 
-            // Get the email from storage
-            const email = await AsyncStorage.getItem(EMAIL_STORAGE_KEY);
-            if (!email) {
-                console.log('❌ No email found in storage');
-                setError({
-                    code: 'no-email',
-                    message: 'Please enter your email to complete sign-in.',
-                });
-                return false;
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (e) {
+                throw new Error('Invalid response from server');
             }
 
-            console.log('🔐 Completing email sign-in for:', email);
+            if (!result.success || !result.token) {
+                throw new Error(result.error || 'Verification failed');
+            }
 
-            // Complete sign-in
-            const { user } = await signInWithEmailLink(auth, email, url);
-            
-            // Clear stored email
-            await AsyncStorage.removeItem(EMAIL_STORAGE_KEY);
+            // Sign in with the custom token
+            console.log('🔑 Signing in with custom token...');
+            const { user } = await signInWithCustomToken(auth, result.token);
 
             // Update display name if provided
             if (displayName) {
@@ -272,17 +244,32 @@ export function useAuth(): UseAuthReturn {
                 console.log('✅ Firestore profile created');
             }
 
-            console.log('✅ Email sign-in complete');
+            // Clear stored email
+            await AsyncStorage.removeItem(EMAIL_STORAGE_KEY);
+
+            console.log('✅ OTP verification and sign-in complete');
             return true;
         } catch (err: any) {
-            console.error('❌ Complete email sign-in error:', err);
+            console.error('❌ Verify OTP error:', err.message);
+
             setError({
-                code: err.code || 'sign-in-failed',
-                message: getErrorMessage(err.code),
+                code: err.code || 'otp-verify-failed',
+                message: err.message || getErrorMessage('otp-verify-failed'),
             });
             return false;
         } finally {
             setIsLoading(false);
+        }
+    }, []);
+
+    /**
+     * Get stored email (for resuming verification)
+     */
+    const getStoredEmail = useCallback(async (): Promise<string | null> => {
+        try {
+            return await AsyncStorage.getItem(EMAIL_STORAGE_KEY);
+        } catch {
+            return null;
         }
     }, []);
 
@@ -390,8 +377,8 @@ export function useAuth(): UseAuthReturn {
         signOut,
         signInWithGoogle,
         signInWithApple,
-        sendEmailLink,
-        completeEmailSignIn,
+        sendOTP,
+        verifyOTP,
         getStoredEmail,
         clearError,
         reloadUser,

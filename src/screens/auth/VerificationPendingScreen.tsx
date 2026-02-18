@@ -10,7 +10,7 @@ import { spacing, borderRadius } from '../../theme';
 
 export default function VerificationPendingScreen() {
     const { user, firebaseUser, refreshUser } = useAuthContext();
-    const { sendVerificationEmail } = useAuth();
+    const { signOut } = useAuth();
     const [sending, setSending] = useState(false);
     const [verifying, setVerifying] = useState(false);
 
@@ -18,7 +18,7 @@ export default function VerificationPendingScreen() {
         if (!firebaseUser) return;
         setSending(true);
         try {
-            await sendVerificationEmail();
+            Alert.alert('Deprecated', 'Please use the OTP verification flow instead.');
             Alert.alert('Email Sent', 'Please check your inbox (and spam folder) for the verification link.');
         } catch (error) {
             Alert.alert('Error', 'Failed to send verification email. Please try again later.');

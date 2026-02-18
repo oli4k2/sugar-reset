@@ -1,10 +1,10 @@
 /**
  * LoginScreen
  * 
- * User login with Google/Apple/Email magic link.
+ * User login with Google/Apple/Email OTP.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -32,29 +32,31 @@ import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { useAuth } from '../../hooks/useAuth';
 import { useAuthContext } from '../../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
-type AuthStep = 'options' | 'email' | 'email-sent' | 'paste-link';
+type AuthStep = 'options' | 'email' | 'otp';
 
 export default function LoginScreen({ navigation, route }: LoginScreenProps) {
-    const { 
-        signInWithGoogle, 
-        signInWithApple, 
-        sendEmailLink,
-        completeEmailSignIn,
+    const {
+        signInWithGoogle,
+        signInWithApple,
+        sendOTP,
+        verifyOTP,
         error: authError,
         clearError,
     } = useAuth();
 
     const [step, setStep] = useState<AuthStep>('options');
     const [email, setEmail] = useState('');
-    const [linkUrl, setLinkUrl] = useState('');
+    const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
     const [googleLoading, setGoogleLoading] = useState(false);
     const [appleLoading, setAppleLoading] = useState(false);
     const [emailLoading, setEmailLoading] = useState(false);
+    const [otpLoading, setOtpLoading] = useState(false);
     const [error, setError] = useState('');
+    const [resendCooldown, setResendCooldown] = useState(0);
+    const otpInputRefs = useRef<(TextInput | null)[]>([]);
 
     // Sync auth error
     useEffect(() => {
@@ -66,10 +68,18 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
     // Check if user was successfully signed in
     const { isAuthenticated } = useAuthContext();
     useEffect(() => {
-        if (isAuthenticated && (step === 'paste-link' || step === 'email-sent')) {
+        if (isAuthenticated && step === 'otp') {
             console.log('✅ User authenticated, navigation will happen automatically');
         }
     }, [isAuthenticated, step]);
+
+    // Resend cooldown timer
+    useEffect(() => {
+        if (resendCooldown > 0) {
+            const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [resendCooldown]);
 
     const handleGoogleSignIn = async () => {
         setGoogleLoading(true);
@@ -137,7 +147,7 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
         }
     };
 
-    const handleSendEmailLink = async () => {
+    const handleSendOTP = async () => {
         if (!email || !email.includes('@')) {
             setError('Please enter a valid email address');
             return;
@@ -148,20 +158,111 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
         clearError();
 
         try {
-            const success = await sendEmailLink(email.trim().toLowerCase());
+            const success = await sendOTP(email.trim().toLowerCase());
             if (success) {
-                setStep('email-sent');
+                setStep('otp');
+                setResendCooldown(60);
+                setOtpCode(['', '', '', '', '', '']);
+                // Focus first OTP input after transition
+                setTimeout(() => otpInputRefs.current[0]?.focus(), 300);
             }
         } catch (err: any) {
-            console.error('Send email link error:', err);
+            console.error('Send OTP error:', err);
         } finally {
             setEmailLoading(false);
         }
     };
 
+    const handleResendOTP = async () => {
+        if (resendCooldown > 0) return;
+
+        setError('');
+        clearError();
+        setEmailLoading(true);
+
+        try {
+            const success = await sendOTP(email.trim().toLowerCase());
+            if (success) {
+                setResendCooldown(60);
+                setOtpCode(['', '', '', '', '', '']);
+                setError('');
+            }
+        } catch (err: any) {
+            console.error('Resend OTP error:', err);
+        } finally {
+            setEmailLoading(false);
+        }
+    };
+
+    const handleOTPChange = (text: string, index: number) => {
+        // Only allow digits
+        const digit = text.replace(/[^0-9]/g, '');
+
+        if (digit.length <= 1) {
+            const newCode = [...otpCode];
+            newCode[index] = digit;
+            setOtpCode(newCode);
+
+            // Auto-advance to next input
+            if (digit && index < 5) {
+                otpInputRefs.current[index + 1]?.focus();
+            }
+
+            // Auto-submit when all 6 digits are entered
+            if (digit && index === 5) {
+                const fullCode = newCode.join('');
+                if (fullCode.length === 6) {
+                    handleVerifyOTP(fullCode);
+                }
+            }
+        } else if (digit.length === 6) {
+            // Handle paste of full code
+            const digits = digit.split('');
+            setOtpCode(digits);
+            otpInputRefs.current[5]?.focus();
+            handleVerifyOTP(digit);
+        }
+    };
+
+    const handleOTPKeyPress = (key: string, index: number) => {
+        if (key === 'Backspace' && !otpCode[index] && index > 0) {
+            otpInputRefs.current[index - 1]?.focus();
+            const newCode = [...otpCode];
+            newCode[index - 1] = '';
+            setOtpCode(newCode);
+        }
+    };
+
+    const handleVerifyOTP = async (code?: string) => {
+        const otpString = code || otpCode.join('');
+        if (otpString.length !== 6) {
+            setError('Please enter the complete 6-digit code');
+            return;
+        }
+
+        setOtpLoading(true);
+        setError('');
+        clearError();
+
+        try {
+            const success = await verifyOTP(email.trim().toLowerCase(), otpString);
+            if (success) {
+                console.log('✅ Sign-in successful!');
+            }
+        } catch (err: any) {
+            console.error('Verify OTP error:', err);
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
     const handleBack = () => {
-        if (step === 'email' || step === 'email-sent') {
-            setStep('options');
+        if (step === 'email' || step === 'otp') {
+            if (step === 'otp') {
+                setStep('email');
+            } else {
+                setStep('options');
+            }
             setError('');
             clearError();
         } else {
@@ -192,7 +293,7 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
     };
 
     const isAppleSignInAvailable = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 13;
-    const isLoading = googleLoading || appleLoading || emailLoading;
+    const isLoading = googleLoading || appleLoading || emailLoading || otpLoading;
     const isEmailValid = email.includes('@') && email.includes('.');
 
     return (
@@ -223,12 +324,12 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
                                 resizeMode="contain"
                             />
                             <Text style={styles.title}>
-                                {step === 'email-sent' ? 'Check your email!' : 'Welcome back'}
+                                {step === 'otp' ? 'Enter your code' : 'Welcome back'}
                             </Text>
                             <Text style={styles.subtitle}>
                                 {step === 'options' && 'Sign in to continue your journey'}
-                                {step === 'email' && 'Enter your email to receive a sign-in link'}
-                                {step === 'email-sent' && `We sent a magic link to ${email}`}
+                                {step === 'email' && 'Enter your email to receive a verification code'}
+                                {step === 'otp' && `We sent a 6-digit code to ${email}`}
                             </Text>
                         </View>
 
@@ -322,158 +423,97 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
 
                                 <TouchableOpacity
                                     style={[styles.primaryButton, !isEmailValid && styles.primaryButtonDisabled]}
-                                    onPress={handleSendEmailLink}
+                                    onPress={handleSendOTP}
                                     disabled={!isEmailValid || emailLoading}
                                     activeOpacity={0.8}
                                 >
                                     {emailLoading ? (
                                         <ActivityIndicator size="small" color="#FFFFFF" />
                                     ) : (
-                                        <Text style={styles.primaryButtonText}>Send Magic Link</Text>
+                                        <Text style={styles.primaryButtonText}>Send Code</Text>
                                     )}
                                 </TouchableOpacity>
 
                                 <Text style={styles.emailHint}>
-                                    We'll send you a link to sign in instantly — no password needed!
+                                    We'll send you a 6-digit code to verify your email — no password needed!
                                 </Text>
                             </>
                         )}
 
-                        {step === 'email-sent' && (
+                        {step === 'otp' && (
                             <>
-                                <View style={styles.emailSentCard}>
-                                    <Ionicons name="checkmark-circle" size={64} color={looviColors.accent.success} />
-                                    <Text style={styles.emailSentText}>
-                                        Click the link in your email to sign in.
-                                    </Text>
-                                    <Text style={styles.emailSentHint}>
-                                        The link will expire in 1 hour. Check your spam folder if you don't see it.
-                                    </Text>
+                                {/* OTP Input */}
+                                <View style={styles.otpContainer}>
+                                    <View style={styles.otpRow}>
+                                        {otpCode.map((digit, index) => (
+                                            <TextInput
+                                                key={index}
+                                                ref={(ref) => { otpInputRefs.current[index] = ref; }}
+                                                style={[
+                                                    styles.otpInput,
+                                                    digit ? styles.otpInputFilled : null,
+                                                ]}
+                                                value={digit}
+                                                onChangeText={(text) => handleOTPChange(text, index)}
+                                                onKeyPress={({ nativeEvent }) => handleOTPKeyPress(nativeEvent.key, index)}
+                                                keyboardType="number-pad"
+                                                maxLength={index === 0 ? 6 : 1}
+                                                selectTextOnFocus
+                                                textContentType="oneTimeCode"
+                                                autoFocus={index === 0}
+                                            />
+                                        ))}
+                                    </View>
+
+                                    {error ? (
+                                        <Text style={[styles.errorText, { marginTop: spacing.md }]}>{error}</Text>
+                                    ) : null}
                                 </View>
 
                                 <TouchableOpacity
-                                    style={[styles.socialButton, styles.emailButton, { marginBottom: spacing.md }]}
-                                    onPress={() => setStep('paste-link')}
+                                    style={[
+                                        styles.primaryButton,
+                                        otpCode.join('').length !== 6 && styles.primaryButtonDisabled,
+                                    ]}
+                                    onPress={() => handleVerifyOTP()}
+                                    disabled={otpCode.join('').length !== 6 || otpLoading}
+                                    activeOpacity={0.8}
                                 >
-                                    <Ionicons name="link-outline" size={22} color={looviColors.text.primary} />
-                                    <Text style={[styles.socialButtonText, styles.emailButtonText]}>
-                                        Paste Link Manually
-                                    </Text>
+                                    {otpLoading ? (
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                    ) : (
+                                        <Text style={styles.primaryButtonText}>Verify & Sign In</Text>
+                                    )}
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={styles.resendButton}
-                                    onPress={handleSendEmailLink}
-                                    disabled={emailLoading}
+                                    onPress={handleResendOTP}
+                                    disabled={resendCooldown > 0 || emailLoading}
                                 >
                                     {emailLoading ? (
                                         <ActivityIndicator size="small" color={looviColors.accent.primary} />
                                     ) : (
-                                        <Text style={styles.resendText}>Resend email</Text>
+                                        <Text style={[
+                                            styles.resendText,
+                                            resendCooldown > 0 && styles.resendTextDisabled,
+                                        ]}>
+                                            {resendCooldown > 0
+                                                ? `Resend code in ${resendCooldown}s`
+                                                : 'Resend code'}
+                                        </Text>
                                     )}
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
                                     style={styles.changeEmailButton}
-                                    onPress={() => setStep('email')}
+                                    onPress={() => {
+                                        setStep('email');
+                                        setOtpCode(['', '', '', '', '', '']);
+                                        setError('');
+                                    }}
                                 >
                                     <Text style={styles.changeEmailText}>Use a different email</Text>
-                                </TouchableOpacity>
-                            </>
-                        )}
-
-                        {step === 'paste-link' && (
-                            <>
-                                <GlassCard variant="light" padding="lg" style={styles.formCard}>
-                                    <Text style={styles.inputLabel}>Paste Magic Link</Text>
-                                    <Text style={[styles.emailSentHint, { marginBottom: spacing.md }]}>
-                                        If the link didn't open automatically, paste it here:
-                                    </Text>
-                                    <TextInput
-                                        style={[styles.input, { minHeight: 100, textAlignVertical: 'top' }]}
-                                        value={linkUrl}
-                                        onChangeText={setLinkUrl}
-                                        placeholder="https://sugar-reset.firebaseapp.com/auth/email-signin?..."
-                                        placeholderTextColor={looviColors.text.muted}
-                                        multiline
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                    />
-                                </GlassCard>
-
-                                <TouchableOpacity
-                                    style={[styles.primaryButton, { marginTop: spacing.lg }]}
-                                    onPress={async () => {
-                                        if (!linkUrl.trim()) {
-                                            setError('Please paste the link from your email');
-                                            return;
-                                        }
-                                        setError('');
-                                        setEmailLoading(true);
-                                        clearError();
-                                        
-                                        const linkToVerify = linkUrl.trim();
-                                        console.log('🔗 Verifying link manually');
-                                        console.log('📋 Link length:', linkToVerify.length);
-                                        
-                                        // Check if email is stored
-                                        const EMAIL_STORAGE_KEY = '@auth_email_for_sign_in';
-                                        const storedEmail = await AsyncStorage.getItem(EMAIL_STORAGE_KEY);
-                                        console.log('📧 Stored email:', storedEmail || 'NOT FOUND');
-                                        
-                                        if (!storedEmail && email) {
-                                            // Store the email if we have it from the form
-                                            await AsyncStorage.setItem(EMAIL_STORAGE_KEY, email);
-                                            console.log('📧 Stored email from form:', email);
-                                        } else if (!storedEmail) {
-                                            setError(`No email found. Please request a new link.`);
-                                            setEmailLoading(false);
-                                            return;
-                                        }
-                                        
-                                        try {
-                                            const success = await completeEmailSignIn(linkToVerify);
-                                            console.log('✅ Link verification result:', success);
-                                            
-                                            if (success) {
-                                                console.log('✅ Sign-in successful! User should be authenticated now.');
-                                            } else {
-                                                setTimeout(() => {
-                                                    if (authError) {
-                                                        setError(authError.message);
-                                                    } else {
-                                                        setError('Invalid or expired link. Please request a new one.');
-                                                    }
-                                                }, 100);
-                                            }
-                                        } catch (err: any) {
-                                            console.error('❌ Link verification error:', err);
-                                            console.error('❌ Error code:', err.code);
-                                            console.error('❌ Error message:', err.message);
-                                            setError(err.message || 'Failed to verify link. Please try again.');
-                                        } finally {
-                                            setEmailLoading(false);
-                                        }
-                                    }}
-                                    disabled={emailLoading || !linkUrl.trim()}
-                                    activeOpacity={0.8}
-                                >
-                                    {emailLoading ? (
-                                        <ActivityIndicator size="small" color="#FFFFFF" />
-                                    ) : (
-                                        <Text style={styles.primaryButtonText}>Verify Link</Text>
-                                    )}
-                                </TouchableOpacity>
-                                
-                                {error && step === 'paste-link' && (
-                                    <Text style={styles.errorText}>{error}</Text>
-                                )}
-
-                                <TouchableOpacity
-                                    style={styles.changeEmailButton}
-                                    onPress={() => setStep('email-sent')}
-                                >
-                                    <Text style={styles.changeEmailText}>Back</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -656,25 +696,31 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: spacing.xl,
     },
-    emailSentCard: {
+    // OTP Styles
+    otpContainer: {
         alignItems: 'center',
-        paddingVertical: spacing['2xl'],
         marginBottom: spacing.xl,
     },
-    emailSentText: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: looviColors.text.primary,
-        textAlign: 'center',
-        marginTop: spacing.lg,
+    otpRow: {
+        flexDirection: 'row',
+        gap: 10,
+        justifyContent: 'center',
     },
-    emailSentHint: {
-        fontSize: 14,
-        fontWeight: '400',
-        color: looviColors.text.tertiary,
+    otpInput: {
+        width: 48,
+        height: 56,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        borderWidth: 2,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
         textAlign: 'center',
-        marginTop: spacing.sm,
-        paddingHorizontal: spacing.lg,
+        fontSize: 24,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+    },
+    otpInputFilled: {
+        borderColor: looviColors.accent.primary,
+        backgroundColor: 'rgba(232, 168, 124, 0.1)',
     },
     resendButton: {
         alignItems: 'center',
@@ -684,6 +730,9 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: looviColors.accent.primary,
+    },
+    resendTextDisabled: {
+        color: looviColors.text.tertiary,
     },
     changeEmailButton: {
         alignItems: 'center',

@@ -143,7 +143,7 @@ export interface Post {
 
 export type AuthStackParamList = {
     Welcome: undefined;
-    Login: undefined;
+    Login: { fromOnboardingWelcome?: boolean } | undefined;
     SignUp: undefined;
 };
 

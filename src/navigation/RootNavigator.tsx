@@ -21,7 +21,7 @@ import { colors } from '../theme';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
 import { useRevenueCat } from '../hooks/useRevenueCat';
-import { useEmailLinkHandler } from '../hooks/useEmailLinkHandler';
+
 import { useInviteLinkHandler } from '../hooks/useInviteLinkHandler';
 
 // Onboarding Screens
@@ -226,9 +226,8 @@ export default function RootNavigator() {
     const { isPremium, isLoading: revenueCatLoading } = useRevenueCat();
     const posthog = usePostHog();
 
-    // Handle email magic link deep links
-    const { isProcessing: isProcessingEmailLink } = useEmailLinkHandler();
-    
+    // OTP auth - no deep link handler needed
+
     // Note: useInviteLinkHandler is called inside NavigationContainer via InviteLinkHandler component below
 
     // Screen tracking for PostHog
