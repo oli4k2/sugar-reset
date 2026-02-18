@@ -23,7 +23,12 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
 import { AuthStackParamList } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+let GoogleSignin: any = null;
+try {
+    GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+} catch (e) {
+    console.warn('Google Sign-In native module not available (Expo Go)');
+}
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 
@@ -82,6 +87,10 @@ export default function LoginScreen({ navigation, route }: LoginScreenProps) {
     }, [resendCooldown]);
 
     const handleGoogleSignIn = async () => {
+        if (!GoogleSignin) {
+            setError('Google Sign-In is not available in Expo Go. Use email instead.');
+            return;
+        }
         setGoogleLoading(true);
         setError('');
         clearError();

@@ -8,7 +8,12 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+let GoogleSignin: any = null;
+try {
+  GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+} catch (e) {
+  console.warn('Google Sign-In native module not available (Expo Go)');
+}
 import { PostHogProvider } from 'posthog-react-native';
 import { AuthProvider } from './src/context/AuthContext';
 import { UserDataProvider } from './src/context/UserDataContext';
@@ -53,13 +58,15 @@ export default function App() {
     Outfit_800ExtraBold,
   });
 
-  // Configure Google Sign-In
+  // Configure Google Sign-In (only if native module is available)
   useEffect(() => {
-    GoogleSignin.configure({
-      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
-      iosClientId: '68240123690-a3vhmp88g4ng97npdpgkvkbgrspj4hfr.apps.googleusercontent.com',
-      offlineAccess: true,
-    });
+    if (GoogleSignin) {
+      GoogleSignin.configure({
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+        iosClientId: '68240123690-a3vhmp88g4ng97npdpgkvkbgrspj4hfr.apps.googleusercontent.com',
+        offlineAccess: true,
+      });
+    }
   }, []);
 
   if (!fontsLoaded) {
