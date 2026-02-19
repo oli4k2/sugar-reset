@@ -374,7 +374,12 @@ export default function HomeScreen() {
                 });
             }
 
-            setShowWellnessModal(false);
+            // Immediately update button state so it reflects the save
+            const todayStr2 = new Date().toISOString().split('T')[0];
+            if (log.date === todayStr2) {
+                setHasWellnessToday(true);
+                setTodayWellnessData(log);
+            }
         } catch (error) {
             console.error('Failed to save wellness log:', error);
         }

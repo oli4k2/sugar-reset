@@ -39,7 +39,7 @@ export interface WellnessLog {
 interface WellnessModalProps {
     visible: boolean;
     onClose: () => void;
-    onSave: (log: WellnessLog) => void;
+    onSave: (log: WellnessLog) => void | Promise<void>;
     selectedDate: string;
     existingData?: WellnessLog | null;
 }
@@ -95,9 +95,9 @@ export function WellnessModal({
         }
     }, [visible, existingData]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         Keyboard.dismiss();
-        onSave({
+        await onSave({
             date: selectedDate,
             mood,
             energy,
