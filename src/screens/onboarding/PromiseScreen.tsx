@@ -50,6 +50,8 @@ export default function PromiseScreen({ navigation, route }: PromiseScreenProps)
     // #endregion
 
     useEffect(() => {
+        setOnboardingCheckpoint('Promise').catch(() => { });
+
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,

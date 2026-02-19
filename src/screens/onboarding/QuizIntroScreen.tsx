@@ -20,6 +20,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing, typography } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 
+import { useUserData } from '../../context/UserDataContext';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type QuizIntroScreenProps = {
@@ -27,11 +29,13 @@ type QuizIntroScreenProps = {
 };
 
 export default function QuizIntroScreen({ navigation }: QuizIntroScreenProps) {
+    const { setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
 
     useEffect(() => {
+        setOnboardingCheckpoint('QuizIntro').catch(() => { });
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 1,

@@ -6,7 +6,7 @@
  * Content swipes while pagination dots and Next button remain fixed at the bottom.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -21,6 +21,7 @@ import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
+import { useUserData } from '../../context/UserDataContext';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -83,9 +84,14 @@ const FEATURES: Feature[] = [
 ];
 
 export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScreenProps) {
+    const { setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
     const [currentIndex, setCurrentIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
+
+    useEffect(() => {
+        setOnboardingCheckpoint('FeatureShowcase').catch(() => { });
+    }, []);
 
     const handleContinue = () => {
         if (currentIndex < FEATURES.length - 1) {
