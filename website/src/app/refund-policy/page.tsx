@@ -181,7 +181,7 @@ export default function RefundPolicyPage() {
               6. Contact Us
             </h2>
             <p className="text-loovi-text-secondary mb-4 leading-relaxed">
-              If you have questions about refunds or need assistance with the refund process, please contact us at <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline font-semibold">hello@scriptcollective.com</a>.
+              If you have questions about refunds or need assistance with the refund process, please contact us at <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline font-semibold">hello@craveless.info</a>.
             </p>
             <p className="text-loovi-text-secondary leading-relaxed">
               Please note that we cannot process refunds directly. All refund requests must go through Apple or Google, as they process the payments. However, we're happy to help guide you through the process or address any concerns you may have.
@@ -194,7 +194,7 @@ export default function RefundPolicyPage() {
               Last updated: January 2026
             </p>
             <p className="text-sm text-loovi-text-tertiary">
-              Contact: <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline">hello@scriptcollective.com</a>
+              Contact: <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline">hello@craveless.info</a>
             </p>
           </div>
         </div>
@@ -202,6 +202,7 @@ export default function RefundPolicyPage() {
     </main>
   );
 }
+
 
 
 

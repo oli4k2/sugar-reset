@@ -726,7 +726,7 @@ export default function HomeScreen() {
                                         navigation.navigate('Analytics');
                                         break;
                                     case 'community':
-                                        navigation.navigate('Social');
+                                        navigation.navigate('Social', { initialTab: 'community' });
                                         break;
                                     case 'cheer_friend':
                                         // Navigate to friend's profile to send encouragement

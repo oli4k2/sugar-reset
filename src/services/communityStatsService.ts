@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseReady, app } from '../config/firebase';
+import { getMockTopStreak, getMockAvgStreak } from './mockDataService';
 
 export interface MoodDistribution {
     great: number;
@@ -109,11 +110,11 @@ export const communityStatsService = {
                 console.log('📊 Cached stats missing mood data, recalculating...');
                 const freshStats = await this.calculateCommunityStats();
                 if (freshStats) {
-                    return freshStats;
+                    return this.applyMockBoost(freshStats);
                 }
             }
 
-            return fetchedStats;
+            return this.applyMockBoost(fetchedStats);
         } catch (error: any) {
             // Enhanced error logging for debugging
             console.error('❌ Community stats error details:', {
@@ -136,7 +137,7 @@ export const communityStatsService = {
                     const cfStats = await this.fetchViaCloudFunction();
                     if (cfStats) {
                         console.log('✅ Got community stats via Cloud Function!');
-                        return cfStats;
+                        return this.applyMockBoost(cfStats);
                     }
                 } catch (cfError) {
                     console.log('⚠️ Cloud Function failed:', cfError);
@@ -148,7 +149,7 @@ export const communityStatsService = {
                     const restStats = await this.fetchViaRestApi();
                     if (restStats) {
                         console.log('✅ Got community stats via REST API!');
-                        return restStats;
+                        return this.applyMockBoost(restStats);
                     }
                 } catch (restError) {
                     console.log('❌ REST API also failed:', restError);
@@ -275,7 +276,7 @@ export const communityStatsService = {
      * Get default stats for when Firestore is unavailable
      */
     getDefaultStats(): CommunityStats {
-        return {
+        return this.applyMockBoost({
             totalUsers: 0,
             activeUsers: 0,
             averageStreak: 0,
@@ -286,6 +287,55 @@ export const communityStatsService = {
             moodDistribution: null,
             goalAchievementRate: null,
             updatedAt: new Date(),
+        });
+    },
+
+    /**
+     * When the community has fewer than 10 active users, boost stats
+     * with realistic mock data so the app doesn't look empty.
+     * Mock streaks are date-dependent and change daily (sourced from mockDataService).
+     *
+     * Once mock users are seeded to Firestore and the community stats are
+     * recalculated, activeUsers will naturally be ≥ 10 and this becomes a no-op.
+     */
+    applyMockBoost(stats: CommunityStats): CommunityStats {
+        if (stats.activeUsers >= 10) return stats;
+
+        const mockActiveUsers = Math.max(14, stats.activeUsers + 9);
+        const mockTotalUsers = Math.max(28, stats.totalUsers + 18);
+
+        // Use the same cycle-based formulas from mockDataService
+        const currentMockTopStreak = getMockTopStreak();
+        const currentMockAvgStreak = getMockAvgStreak();
+
+        const mockAvgStreak = Math.max(
+            stats.averageStreak,
+            Math.round((stats.averageStreak * stats.activeUsers + currentMockAvgStreak * 10) / mockActiveUsers * 10) / 10 || currentMockAvgStreak
+        );
+        const mockAvgHealth = Math.max(
+            stats.averageHealthScore,
+            Math.round((stats.averageHealthScore * stats.activeUsers + 57 * 10) / mockActiveUsers) || 55
+        );
+        const mockTopStreak = Math.max(stats.topStreak, currentMockTopStreak);
+        const mockTopHealth = Math.max(stats.topHealthScore, 74);
+        const mockTotalDays = Math.max(stats.totalDaysSugarFree, mockAvgStreak * mockActiveUsers);
+
+        return {
+            ...stats,
+            totalUsers: mockTotalUsers,
+            activeUsers: mockActiveUsers,
+            averageStreak: mockAvgStreak,
+            averageHealthScore: mockAvgHealth,
+            totalDaysSugarFree: Math.round(mockTotalDays),
+            topStreak: mockTopStreak,
+            topHealthScore: mockTopHealth,
+            moodDistribution: stats.moodDistribution || {
+                great: 4,
+                good: 6,
+                okay: 3,
+                struggling: 1,
+            },
+            goalAchievementRate: stats.goalAchievementRate ?? 64,
         };
     },
 
@@ -395,7 +445,7 @@ export const communityStatsService = {
                 console.warn('⚠️ Could not cache community stats (expected if client writes are blocked):', saveError?.code);
             }
 
-            return stats;
+            return this.applyMockBoost(stats);
         } catch (error) {
             console.error('Error calculating community stats:', error);
             return null;

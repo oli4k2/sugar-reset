@@ -19,7 +19,7 @@ import {
     Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useRoute, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { spacing, borderRadius, typography } from '../theme';
@@ -47,7 +47,8 @@ const WELLNESS_LOGS_KEY = 'wellness_logs';
 
 export default function TrackingScreen() {
     const route = useRoute<any>();
-    const { journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry } = useUserData();
+    const navigation = useNavigation<any>();
+    const { journalEntries, addJournalEntry, updateJournalEntry, deleteJournalEntry, refreshStreakFromFoodLogs } = useUserData();
 
     // State
     const [showScannerModal, setShowScannerModal] = useState(false);
@@ -65,8 +66,8 @@ export default function TrackingScreen() {
 
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Calculate today's sugar total
-    const todaySugarTotal = todayFoods.reduce((sum, food) => sum + (food.addedSugar || food.sugar || 0), 0);
+    // Calculate today's added sugar total (fall back to sugar for legacy items)
+    const todaySugarTotal = todayFoods.reduce((sum, food) => sum + (food.addedSugar ?? food.sugar ?? 0), 0);
 
     // Load food counts for calendar
     const loadFoodCounts = useCallback(async () => {
@@ -151,6 +152,11 @@ export default function TrackingScreen() {
         }
         loadFoodCounts();
         loadSelectedDayFoods();
+        loadTodayFoods();
+        // Refresh streak whenever food is updated or deleted
+        if (refreshStreakFromFoodLogs) {
+            refreshStreakFromFoodLogs();
+        }
     };
 
     const handleWellnessSave = async (log: WellnessLog) => {
@@ -429,6 +435,16 @@ export default function TrackingScreen() {
                                         {isToday ? "How are you feeling today?" : "No journal entries this day"}
                                     </Text>
                                 </View>
+                            )}
+                            {/* See all journals button */}
+                            {journalEntries.length > 0 && (
+                                <TouchableOpacity
+                                    style={styles.seeAllJournalsButton}
+                                    onPress={() => navigation.navigate('Journal')}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.seeAllJournalsText}>See all journals →</Text>
+                                </TouchableOpacity>
                             )}
                         </GlassCard>
                     </ScrollView>
@@ -729,5 +745,17 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: looviColors.coralOrange,
+    },
+    seeAllJournalsButton: {
+        marginTop: spacing.sm,
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    seeAllJournalsText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: looviColors.accent.primary,
     },
 });

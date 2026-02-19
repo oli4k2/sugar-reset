@@ -449,7 +449,10 @@ export function getNutritionInsights(
     avgFat: number;
     avgSugar: number;
     avgAddedSugar: number;
+    avgNaturalSugar: number;
     avgFiber: number;
+    avgSodium: number;
+    avgFatSaturated: number;
     macroBalance: { protein: number; carbs: number; fat: number };
     sugarStatus: 'excellent' | 'good' | 'high' | 'very-high';
     recommendations: string[];
@@ -469,7 +472,10 @@ export function getNutritionInsights(
             avgFat: 0,
             avgSugar: 0,
             avgAddedSugar: 0,
+            avgNaturalSugar: 0,
             avgFiber: 0,
+            avgSodium: 0,
+            avgFatSaturated: 0,
             macroBalance: { protein: 0, carbs: 0, fat: 0 },
             sugarStatus: 'excellent',
             recommendations: ['Start logging food to see nutrition insights'],
@@ -492,7 +498,10 @@ export function getNutritionInsights(
         fat: 0,
         sugar: 0,
         addedSugar: 0,
+        naturalSugar: 0,
         fiber: 0,
+        sodium: 0,
+        fatSaturated: 0,
     };
 
     dayMap.forEach((items) => {
@@ -501,8 +510,11 @@ export function getNutritionInsights(
         totals.carbs += items.reduce((sum, i) => sum + i.carbs, 0);
         totals.fat += items.reduce((sum, i) => sum + i.fat, 0);
         totals.sugar += items.reduce((sum, i) => sum + i.sugar, 0);
-        totals.addedSugar += items.reduce((sum, i) => sum + (i.addedSugar || i.sugar), 0);
+        totals.addedSugar += items.reduce((sum, i) => sum + (i.addedSugar ?? i.sugar ?? 0), 0);
+        totals.naturalSugar += items.reduce((sum, i) => sum + (i.naturalSugar ?? 0), 0);
         totals.fiber += items.reduce((sum, i) => sum + i.fiber, 0);
+        totals.sodium += items.reduce((sum, i) => sum + (i.sodium ?? 0), 0);
+        totals.fatSaturated += items.reduce((sum, i) => sum + (i.fatSaturated ?? 0), 0);
     });
 
     const avgCalories = Math.round(totals.calories / daysWithData);
@@ -511,7 +523,10 @@ export function getNutritionInsights(
     const avgFat = Math.round(totals.fat / daysWithData);
     const avgSugar = Math.round(totals.sugar / daysWithData);
     const avgAddedSugar = Math.round(totals.addedSugar / daysWithData);
+    const avgNaturalSugar = Math.round(totals.naturalSugar / daysWithData);
     const avgFiber = Math.round(totals.fiber / daysWithData);
+    const avgSodium = Math.round(totals.sodium / daysWithData);
+    const avgFatSaturated = Math.round((totals.fatSaturated / daysWithData) * 10) / 10;
 
     // Calculate macro percentages
     const totalMacroCalories = (avgProtein * 4) + (avgCarbs * 4) + (avgFat * 9);
@@ -557,7 +572,10 @@ export function getNutritionInsights(
         avgFat,
         avgSugar,
         avgAddedSugar,
+        avgNaturalSugar,
         avgFiber,
+        avgSodium,
+        avgFatSaturated,
         macroBalance,
         sugarStatus,
         recommendations,

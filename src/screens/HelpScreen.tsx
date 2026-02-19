@@ -12,7 +12,7 @@ export default function HelpScreen() {
     const navigation = useNavigation();
 
     const handleEmailSupport = () => {
-        Linking.openURL('mailto:hello@scriptcollective.com');
+        Linking.openURL('mailto:hello@craveless.info');
     };
 
     return (
@@ -58,7 +58,7 @@ export default function HelpScreen() {
                         </Text>
                         <TouchableOpacity style={styles.emailButton} onPress={handleEmailSupport}>
                             <Feather name="mail" size={20} color="#FFFFFF" style={styles.emailIcon} />
-                            <Text style={styles.emailButtonText}>hello@scriptcollective.com</Text>
+                            <Text style={styles.emailButtonText}>hello@craveless.info</Text>
                         </TouchableOpacity>
                     </GlassCard>
                 </ScrollView>

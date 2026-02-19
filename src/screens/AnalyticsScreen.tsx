@@ -444,6 +444,7 @@ export default function AnalyticsScreen() {
     const [showFoodScanner, setShowFoodScanner] = useState(false);
     const [showWellnessModal, setShowWellnessModal] = useState(false);
     const [showInsightModal, setShowInsightModal] = useState<InsightType | null>(null);
+    const [showNutritionPopup, setShowNutritionPopup] = useState(false);
     const [dailySugarLimit, setDailySugarLimit] = useState<number>(25); // Default to 25g
     const { onboardingData, addJournalEntry, refreshStreakFromFoodLogs } = useUserData();
 
@@ -868,74 +869,87 @@ export default function AnalyticsScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Nutrition Summary - Simplified */}
+                        {/* Nutrition Summary - Clickable for full breakdown */}
                         {nutritionInsights && (
-                            <GlassCard variant="light" padding="lg" style={styles.nutritionSummaryCard}>
-                                <Text style={styles.nutritionSummaryTitle}>Nutrition Summary</Text>
-
-                                {nutritionInsights.avgCalories > 0 ? (
-                                    <>
-                                        <View style={styles.nutritionStatsRow}>
-                                            <View style={styles.nutritionStat}>
-                                                <Text style={styles.nutritionStatValue}>{nutritionInsights.avgCalories}</Text>
-                                                <Text style={styles.nutritionStatLabel}>Calories/day</Text>
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={() => nutritionInsights.avgCalories > 0 && setShowNutritionPopup(true)}
+                            >
+                                <GlassCard variant="light" padding="lg" style={styles.nutritionSummaryCard}>
+                                    <View style={styles.nutritionSummaryHeader}>
+                                        <Text style={styles.nutritionSummaryTitle}>Nutrition Summary</Text>
+                                        {nutritionInsights.avgCalories > 0 && (
+                                            <View style={styles.tapHint}>
+                                                <Ionicons name="expand-outline" size={14} color={looviColors.text.tertiary} />
+                                                <Text style={styles.tapHintText}>Tap for details</Text>
                                             </View>
-                                            <View style={styles.nutritionStatDivider} />
-                                            <View style={styles.nutritionStat}>
-                                                <Text style={[
-                                                    styles.nutritionStatValue,
-                                                    { color: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444' }
-                                                ]}>
-                                                    {nutritionInsights.avgAddedSugar}g
-                                                </Text>
-                                                <Text style={styles.nutritionStatLabel}>Sugar/day</Text>
-                                            </View>
-                                            <View style={styles.nutritionStatDivider} />
-                                            <View style={styles.nutritionStat}>
-                                                <Text style={styles.nutritionStatValue}>{nutritionInsights.avgProtein}g</Text>
-                                                <Text style={styles.nutritionStatLabel}>Protein/day</Text>
-                                            </View>
-                                        </View>
-
-                                        {/* Visual sugar meter */}
-                                        <View style={styles.sugarMeter}>
-                                            <View style={styles.sugarMeterHeader}>
-                                                <Text style={styles.sugarMeterLabel}>Daily Sugar</Text>
-                                                <Text style={styles.sugarMeterValue}>
-                                                    {nutritionInsights.avgAddedSugar}g / {dailySugarLimit}g recommended
-                                                </Text>
-                                            </View>
-                                            <View style={styles.sugarMeterTrack}>
-                                                <View
-                                                    style={[
-                                                        styles.sugarMeterFill,
-                                                        {
-                                                            width: `${Math.min((nutritionInsights.avgAddedSugar / (dailySugarLimit * 2)) * 100, 100)}%`,
-                                                            backgroundColor: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444'
-                                                        }
-                                                    ]}
-                                                />
-                                                <View style={styles.sugarMeterMarker} />
-                                            </View>
-                                            <View style={styles.sugarMeterLabels}>
-                                                <Text style={styles.sugarMeterMarkerLabel}>0g</Text>
-                                                <Text style={[styles.sugarMeterMarkerLabel, { position: 'absolute', left: '50%' }]}>{dailySugarLimit}g</Text>
-                                                <Text style={styles.sugarMeterMarkerLabel}>50g+</Text>
-                                            </View>
-                                        </View>
-                                    </>
-                                ) : (
-                                    <View style={styles.noNutritionData}>
-                                        <Ionicons name="nutrition-outline" size={32} color={looviColors.text.tertiary} />
-                                        <Text style={styles.noNutritionDataText}>
-                                            No food logged in this timeframe
-                                        </Text>
-                                        <Text style={styles.noNutritionDataSubtext}>
-                                            Start logging food to see your nutrition summary
-                                        </Text>
+                                        )}
                                     </View>
-                                )}
-                            </GlassCard>
+
+                                    {nutritionInsights.avgCalories > 0 ? (
+                                        <>
+                                            <View style={styles.nutritionStatsRow}>
+                                                <View style={styles.nutritionStat}>
+                                                    <Text style={styles.nutritionStatValue}>{nutritionInsights.avgCalories}</Text>
+                                                    <Text style={styles.nutritionStatLabel}>Calories/day</Text>
+                                                </View>
+                                                <View style={styles.nutritionStatDivider} />
+                                                <View style={styles.nutritionStat}>
+                                                    <Text style={[
+                                                        styles.nutritionStatValue,
+                                                        { color: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444' }
+                                                    ]}>
+                                                        {nutritionInsights.avgAddedSugar}g
+                                                    </Text>
+                                                    <Text style={styles.nutritionStatLabel}>Added Sugar/day</Text>
+                                                </View>
+                                                <View style={styles.nutritionStatDivider} />
+                                                <View style={styles.nutritionStat}>
+                                                    <Text style={styles.nutritionStatValue}>{nutritionInsights.avgProtein}g</Text>
+                                                    <Text style={styles.nutritionStatLabel}>Protein/day</Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Visual sugar meter */}
+                                            <View style={styles.sugarMeter}>
+                                                <View style={styles.sugarMeterHeader}>
+                                                    <Text style={styles.sugarMeterLabel}>Added Sugar</Text>
+                                                    <Text style={styles.sugarMeterValue}>
+                                                        {nutritionInsights.avgAddedSugar}g / {dailySugarLimit}g recommended
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.sugarMeterTrack}>
+                                                    <View
+                                                        style={[
+                                                            styles.sugarMeterFill,
+                                                            {
+                                                                width: `${Math.min((nutritionInsights.avgAddedSugar / (dailySugarLimit * 2)) * 100, 100)}%`,
+                                                                backgroundColor: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444'
+                                                            }
+                                                        ]}
+                                                    />
+                                                    <View style={styles.sugarMeterMarker} />
+                                                </View>
+                                                <View style={styles.sugarMeterLabels}>
+                                                    <Text style={styles.sugarMeterMarkerLabel}>0g</Text>
+                                                    <Text style={[styles.sugarMeterMarkerLabel, { position: 'absolute', left: '50%' }]}>{dailySugarLimit}g</Text>
+                                                    <Text style={styles.sugarMeterMarkerLabel}>{dailySugarLimit * 2}g+</Text>
+                                                </View>
+                                            </View>
+                                        </>
+                                    ) : (
+                                        <View style={styles.noNutritionData}>
+                                            <Ionicons name="nutrition-outline" size={32} color={looviColors.text.tertiary} />
+                                            <Text style={styles.noNutritionDataText}>
+                                                No food logged in this timeframe
+                                            </Text>
+                                            <Text style={styles.noNutritionDataSubtext}>
+                                                Start logging food to see your nutrition summary
+                                            </Text>
+                                        </View>
+                                    )}
+                                </GlassCard>
+                            </TouchableOpacity>
                         )}
 
                         {/* Wellness Summary */}
@@ -992,6 +1006,180 @@ export default function AnalyticsScreen() {
                         insightType={showInsightModal}
                         onClose={() => setShowInsightModal(null)}
                     />
+
+                    {/* Nutrition Detail Popup */}
+                    <Modal
+                        visible={showNutritionPopup}
+                        transparent
+                        animationType="fade"
+                        onRequestClose={() => setShowNutritionPopup(false)}
+                    >
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.nutritionPopupContent}>
+                                <ScrollView showsVerticalScrollIndicator={false}>
+                                    <View style={styles.nutritionPopupHeader}>
+                                        <Text style={styles.nutritionPopupTitle}>Nutrition Breakdown</Text>
+                                        <TouchableOpacity
+                                            style={styles.infoModalClose}
+                                            onPress={() => setShowNutritionPopup(false)}
+                                        >
+                                            <Feather name="x" size={20} color={looviColors.text.secondary} />
+                                        </TouchableOpacity>
+                                    </View>
+                                    <Text style={styles.nutritionPopupSubtitle}>
+                                        Daily averages based on {timeframe === '7d' ? 'last 7 days' : timeframe === '1m' ? 'last 30 days' : 'all time'}
+                                    </Text>
+
+                                    {nutritionInsights && (
+                                        <>
+                                            {/* Calories */}
+                                            <View style={styles.nutritionPopupSection}>
+                                                <Text style={styles.nutritionPopupSectionTitle}>Energy</Text>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#F5B461' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>Calories</Text>
+                                                    </View>
+                                                    <Text style={styles.nutritionPopupValue}>{nutritionInsights.avgCalories} kcal</Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Macronutrients */}
+                                            <View style={styles.nutritionPopupSection}>
+                                                <Text style={styles.nutritionPopupSectionTitle}>Macronutrients</Text>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#3B82F6' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>Protein</Text>
+                                                    </View>
+                                                    <Text style={styles.nutritionPopupValue}>{nutritionInsights.avgProtein}g</Text>
+                                                </View>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#F59E0B' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>Carbohydrates</Text>
+                                                    </View>
+                                                    <Text style={styles.nutritionPopupValue}>{nutritionInsights.avgCarbs}g</Text>
+                                                </View>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#EF4444' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>Fat</Text>
+                                                    </View>
+                                                    <Text style={styles.nutritionPopupValue}>{nutritionInsights.avgFat}g</Text>
+                                                </View>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#DC2626' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>  Saturated Fat</Text>
+                                                    </View>
+                                                    <Text style={styles.nutritionPopupValue}>{nutritionInsights.avgFatSaturated}g</Text>
+                                                </View>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#22C55E' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>Fiber</Text>
+                                                    </View>
+                                                    <Text style={styles.nutritionPopupValue}>{nutritionInsights.avgFiber}g</Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Sugar Breakdown */}
+                                            <View style={styles.nutritionPopupSection}>
+                                                <Text style={styles.nutritionPopupSectionTitle}>Sugar Breakdown</Text>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#8B5CF6' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>Total Sugar</Text>
+                                                    </View>
+                                                    <Text style={styles.nutritionPopupValue}>{nutritionInsights.avgSugar}g</Text>
+                                                </View>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#EF4444' }]} />
+                                                        <Text style={[styles.nutritionPopupLabel, { fontWeight: '600' }]}>Added Sugar</Text>
+                                                    </View>
+                                                    <Text style={[styles.nutritionPopupValue, {
+                                                        color: nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : nutritionInsights.avgAddedSugar <= (dailySugarLimit * 2) ? '#F59E0B' : '#EF4444',
+                                                        fontWeight: '700',
+                                                    }]}>
+                                                        {nutritionInsights.avgAddedSugar}g
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#22C55E' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>Natural Sugar</Text>
+                                                    </View>
+                                                    <Text style={[styles.nutritionPopupValue, { color: '#22C55E' }]}>
+                                                        {nutritionInsights.avgNaturalSugar}g
+                                                    </Text>
+                                                </View>
+
+                                                {/* Sugar target indicator */}
+                                                <View style={styles.sugarTargetBox}>
+                                                    <Ionicons
+                                                        name={nutritionInsights.avgAddedSugar <= dailySugarLimit ? 'checkmark-circle' : 'warning'}
+                                                        size={18}
+                                                        color={nutritionInsights.avgAddedSugar <= dailySugarLimit ? '#22C55E' : '#F59E0B'}
+                                                    />
+                                                    <Text style={styles.sugarTargetText}>
+                                                        {nutritionInsights.avgAddedSugar <= dailySugarLimit
+                                                            ? `You're within your daily limit of ${dailySugarLimit}g added sugar`
+                                                            : `${Math.round(nutritionInsights.avgAddedSugar - dailySugarLimit)}g over your daily limit of ${dailySugarLimit}g`
+                                                        }
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Minerals */}
+                                            <View style={styles.nutritionPopupSection}>
+                                                <Text style={styles.nutritionPopupSectionTitle}>Minerals</Text>
+                                                <View style={styles.nutritionPopupRow}>
+                                                    <View style={styles.nutritionPopupRowLeft}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#6B7280' }]} />
+                                                        <Text style={styles.nutritionPopupLabel}>Sodium</Text>
+                                                    </View>
+                                                    <Text style={styles.nutritionPopupValue}>{nutritionInsights.avgSodium}mg</Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Macro Balance */}
+                                            <View style={styles.nutritionPopupSection}>
+                                                <Text style={styles.nutritionPopupSectionTitle}>Macro Balance</Text>
+                                                <View style={styles.macroBarContainer}>
+                                                    <View style={[styles.macroBarSegment, { flex: nutritionInsights.macroBalance.protein || 1, backgroundColor: '#3B82F6' }]} />
+                                                    <View style={[styles.macroBarSegment, { flex: nutritionInsights.macroBalance.carbs || 1, backgroundColor: '#F59E0B' }]} />
+                                                    <View style={[styles.macroBarSegment, { flex: nutritionInsights.macroBalance.fat || 1, backgroundColor: '#EF4444' }]} />
+                                                </View>
+                                                <View style={styles.macroBarLegend}>
+                                                    <View style={styles.macroBarLegendItem}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#3B82F6' }]} />
+                                                        <Text style={styles.macroBarLegendText}>Protein {nutritionInsights.macroBalance.protein}%</Text>
+                                                    </View>
+                                                    <View style={styles.macroBarLegendItem}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#F59E0B' }]} />
+                                                        <Text style={styles.macroBarLegendText}>Carbs {nutritionInsights.macroBalance.carbs}%</Text>
+                                                    </View>
+                                                    <View style={styles.macroBarLegendItem}>
+                                                        <View style={[styles.nutritionPopupDot, { backgroundColor: '#EF4444' }]} />
+                                                        <Text style={styles.macroBarLegendText}>Fat {nutritionInsights.macroBalance.fat}%</Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </>
+                                    )}
+
+                                    <TouchableOpacity
+                                        style={styles.infoModalButton}
+                                        onPress={() => setShowNutritionPopup(false)}
+                                    >
+                                        <Text style={styles.infoModalButtonText}>Close</Text>
+                                    </TouchableOpacity>
+                                </ScrollView>
+                            </View>
+                        </View>
+                    </Modal>
                 </SafeAreaView>
             </LooviBackground>
         </SwipeableTabView>
@@ -1184,6 +1372,21 @@ const styles = StyleSheet.create({
         color: looviColors.coralOrange,
     },
     // Nutrition Summary
+    nutritionSummaryHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.md,
+    },
+    tapHint: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    tapHintText: {
+        fontSize: 11,
+        color: looviColors.text.tertiary,
+    },
     nutritionSummaryCard: {
         marginBottom: spacing.lg,
     },
@@ -1209,7 +1412,6 @@ const styles = StyleSheet.create({
         fontFamily: typography.fonts.heading.bold,
         fontSize: 18,
         color: looviColors.text.primary,
-        marginBottom: spacing.md,
     },
     nutritionStatsRow: {
         flexDirection: 'row',
@@ -1472,5 +1674,107 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#FFFFFF',
+    },
+    // Nutrition Detail Popup
+    nutritionPopupContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius['2xl'],
+        padding: spacing.xl,
+        width: '100%',
+        maxWidth: 400,
+        maxHeight: '85%',
+    },
+    nutritionPopupHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    nutritionPopupTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+    },
+    nutritionPopupSubtitle: {
+        fontSize: 13,
+        color: looviColors.text.tertiary,
+        marginTop: 4,
+        marginBottom: spacing.lg,
+    },
+    nutritionPopupSection: {
+        marginBottom: spacing.lg,
+    },
+    nutritionPopupSectionTitle: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: looviColors.text.tertiary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: spacing.sm,
+    },
+    nutritionPopupRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(0,0,0,0.06)',
+    },
+    nutritionPopupRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    nutritionPopupDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    nutritionPopupLabel: {
+        fontSize: 15,
+        color: looviColors.text.primary,
+    },
+    nutritionPopupValue: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: looviColors.text.primary,
+    },
+    sugarTargetBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: spacing.md,
+        backgroundColor: 'rgba(0,0,0,0.03)',
+        padding: spacing.md,
+        borderRadius: borderRadius.lg,
+    },
+    sugarTargetText: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
+        lineHeight: 18,
+    },
+    macroBarContainer: {
+        flexDirection: 'row',
+        height: 10,
+        borderRadius: 5,
+        overflow: 'hidden',
+        marginBottom: spacing.sm,
+    },
+    macroBarSegment: {
+        height: '100%',
+    },
+    macroBarLegend: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+    },
+    macroBarLegendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    macroBarLegendText: {
+        fontSize: 12,
+        color: looviColors.text.tertiary,
     },
 });

@@ -83,6 +83,7 @@ export default function FoodScannerModal({
     const [editSugar, setEditSugar] = useState('');
     const [editAddedSugar, setEditAddedSugar] = useState('');
     const [editNaturalSugar, setEditNaturalSugar] = useState('');
+    const [editFiber, setEditFiber] = useState('');
 
     // Manual entry state
     const [manualCalories, setManualCalories] = useState('');
@@ -176,6 +177,7 @@ export default function FoodScannerModal({
         setEditSugar('');
         setEditAddedSugar('');
         setEditNaturalSugar('');
+        setEditFiber('');
     };
 
     // Populate edit fields when result arrives
@@ -187,6 +189,7 @@ export default function FoodScannerModal({
         setEditSugar(String(res.sugar));
         setEditAddedSugar(String(res.addedSugar ?? 0));
         setEditNaturalSugar(String(res.naturalSugar ?? 0));
+        setEditFiber(String(res.fiber ?? 0));
     };
 
     const pickImageForManual = async () => {
@@ -298,8 +301,12 @@ export default function FoodScannerModal({
     const processTextOnly = async () => {
         if (!textOnlyInput.trim()) return;
 
-        // If we have manual values, skip analysis and go straight to result or save
-        if (manualCalories || manualSugar) {
+        // When the user is on the manual entry step (text-input), ALWAYS use
+        // their entered values — never send to AI.  AI analysis is only used
+        // when the quick-input on the select screen is submitted.
+        const isManualEntry = step === 'text-input';
+
+        if (isManualEntry || manualCalories || manualSugar) {
             const addedSugarVal = parseFloat(manualSugar) || 0;
             const manualResult: AnalysisResult = {
                 foodName: textOnlyInput.trim(),
@@ -338,10 +345,12 @@ export default function FoodScannerModal({
             setResult(manualResult);
             setEditedName(manualResult.foodName);
             populateEditFields(manualResult);
+            if (manualImageUri) setImageUri(manualImageUri);
             setStep('result');
             return;
         }
 
+        // AI text analysis (from the quick-input on the select screen)
         if (!checkDailyLimit()) return;
         setStep('analyzing');
         try {
@@ -384,6 +393,7 @@ export default function FoodScannerModal({
         const sug = parseFloat(editSugar) || result.sugar;
         const addSug = parseFloat(editAddedSugar) || (result.addedSugar ?? 0);
         const natSug = parseFloat(editNaturalSugar) || (result.naturalSugar ?? 0);
+        const fib = parseFloat(editFiber) || (result.fiber ?? 0);
 
         const scannedItem: ScannedItem = {
             id: generateScanId(),
@@ -397,7 +407,7 @@ export default function FoodScannerModal({
             carbsSugars: Math.round(sug * portionMultiplier * 10) / 10,
             fat: Math.round(fatVal * portionMultiplier * 10) / 10,
             fatSaturated: Math.round(result.fatSaturated * portionMultiplier * 10) / 10,
-            fiber: Math.round(result.fiber * portionMultiplier * 10) / 10,
+            fiber: Math.round(fib * portionMultiplier * 10) / 10,
             sugar: Math.round(sug * portionMultiplier * 10) / 10,
             addedSugar: Math.round(addSug * portionMultiplier * 10) / 10,
             naturalSugar: Math.round(natSug * portionMultiplier * 10) / 10,
@@ -435,12 +445,26 @@ export default function FoodScannerModal({
 
                         {/* Camera Scan - Premium Only */}
                         {isPremium ? (
-                            <TouchableOpacity style={styles.heroButton} onPress={takePhoto} activeOpacity={0.9}>
+                            <TouchableOpacity
+                                style={styles.heroButton}
+                                onPress={() => {
+                                    Alert.alert(
+                                        'Scan Meal',
+                                        'Capture or upload your food',
+                                        [
+                                            { text: 'Camera', onPress: takePhoto },
+                                            { text: 'Gallery', onPress: pickFromGallery },
+                                            { text: 'Cancel', style: 'cancel' }
+                                        ]
+                                    );
+                                }}
+                                activeOpacity={0.9}
+                            >
                                 <View style={styles.heroContent}>
                                     <View style={styles.shutterRing}><View style={styles.shutterInner} /></View>
                                     <View style={styles.heroTextContainer}>
                                         <Text style={styles.heroTitle}>Scan Meal</Text>
-                                        <Text style={styles.heroSubtitle}>Capture food to analyze</Text>
+                                        <Text style={styles.heroSubtitle}>Capture or upload food</Text>
                                     </View>
                                     <Feather name="chevron-right" size={24} color="#FFF" />
                                 </View>
@@ -473,6 +497,54 @@ export default function FoodScannerModal({
                                         <Text style={styles.heroSubtitle}>Premium Feature - Upgrade to unlock</Text>
                                     </View>
                                     <Ionicons name="lock-closed" size={24} color="#FFF" />
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
+                        {/* Quick AI Text Input - Premium Only */}
+                        {isPremium ? (
+                            <View style={styles.quickInputContainer}>
+                                <TextInput
+                                    style={styles.quickInput}
+                                    placeholder="Describe meal (e.g. Oatmeal with berries)..."
+                                    placeholderTextColor={looviColors.text.tertiary}
+                                    value={textOnlyInput}
+                                    onChangeText={setTextOnlyInput}
+                                    onSubmitEditing={processTextOnly}
+                                    returnKeyType="go"
+                                />
+                                <TouchableOpacity
+                                    style={[styles.quickSendButton, { opacity: textOnlyInput.trim() ? 1 : 0.6 }]}
+                                    onPress={processTextOnly}
+                                    disabled={!textOnlyInput.trim()}
+                                >
+                                    <Feather name="arrow-up" size={20} color="#FFF" />
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                style={[styles.quickInputContainer, { opacity: 0.8, backgroundColor: '#F5F5F5', borderColor: '#EEE' }]}
+                                onPress={() => {
+                                    Alert.alert(
+                                        'Premium Feature',
+                                        'AI food analysis from text description is a premium feature.',
+                                        [
+                                            { text: 'Cancel', style: 'cancel' },
+                                            {
+                                                text: 'Upgrade',
+                                                onPress: () => {
+                                                    handleClose();
+                                                    onShowPaywall?.();
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[styles.quickInput, { color: looviColors.text.muted, textAlignVertical: 'center', paddingVertical: 12 }]}>Describe meal (Premium)</Text>
+                                <View style={[styles.quickSendButton, { backgroundColor: '#E0E0E0' }]}>
+                                    <Ionicons name="lock-closed" size={16} color={looviColors.text.muted} />
                                 </View>
                             </TouchableOpacity>
                         )}
@@ -870,6 +942,11 @@ export default function FoodScannerModal({
                                             <TextInput style={styles.inlineMacroValue} value={editFat} onChangeText={setEditFat} keyboardType="numeric" />
                                             <Text style={styles.inlineMacroLabel}>Fat</Text>
                                         </View>
+                                        <View style={styles.inlineMacroDivider} />
+                                        <View style={styles.inlineMacroItem}>
+                                            <TextInput style={styles.inlineMacroValue} value={editFiber} onChangeText={setEditFiber} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroLabel}>Fiber</Text>
+                                        </View>
                                     </View>
                                 </View>
 
@@ -1180,4 +1257,37 @@ const styles = StyleSheet.create({
         marginLeft: 4,
     },
     nutritionHint: { fontSize: 11, color: looviColors.text.muted, fontStyle: 'italic', marginTop: 1 },
+
+    // Quick Input
+    quickInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        borderRadius: 16,
+        padding: 4,
+        paddingLeft: 16,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#EEE',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    quickInput: {
+        flex: 1,
+        height: 48,
+        fontSize: 15,
+        color: looviColors.text.primary,
+    },
+    quickSendButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: looviColors.coralOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 4,
+    },
 });

@@ -28,6 +28,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { isMockUser, getMockUserStats } from '../services/mockDataService';
 
 type FriendStatus = 'loading' | 'self' | 'friend' | 'pending_sent' | 'pending_received' | 'none';
 
@@ -63,6 +64,12 @@ export function UserProfilePopup({
         // Self check
         if (user.id === userId) {
             setFriendStatus('self');
+            return;
+        }
+
+        // Mock users can't be added as friends
+        if (isMockUser(userId)) {
+            setFriendStatus('none');
             return;
         }
 
@@ -113,20 +120,37 @@ export function UserProfilePopup({
             setIsLoading(true);
             setFriendStatus('loading');
 
-            // Fetch stats
-            friendService.getFriendStats(userId)
-                .then(fetchedStats => {
-                    setStats(fetchedStats);
-                })
-                .catch(error => {
-                    console.error('Error fetching user stats:', error);
-                })
-                .finally(() => {
-                    setIsLoading(false);
-                });
+            if (isMockUser(userId)) {
+                // Use local mock stats — no Firestore fetch needed
+                const mockStats = getMockUserStats(userId);
+                if (mockStats) {
+                    setStats({
+                        userId,
+                        currentStreak: mockStats.currentStreak,
+                        healthScore: mockStats.healthScore,
+                        goalAchieved: mockStats.goalAchieved,
+                        pledgedToday: mockStats.pledgedToday,
+                        updatedAt: new Date(),
+                    });
+                }
+                setIsLoading(false);
+                setFriendStatus('none');
+            } else {
+                // Fetch real stats from Firestore
+                friendService.getFriendStats(userId)
+                    .then(fetchedStats => {
+                        setStats(fetchedStats);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching user stats:', error);
+                    })
+                    .finally(() => {
+                        setIsLoading(false);
+                    });
 
-            // Check friend status
-            checkFriendStatus();
+                // Check friend status
+                checkFriendStatus();
+            }
         }
     }, [visible, userId, user?.id]);
 
@@ -204,7 +228,7 @@ export function UserProfilePopup({
     };
 
     const renderFriendButton = () => {
-        if (friendStatus === 'loading' || friendStatus === 'self') {
+        if (friendStatus === 'loading' || friendStatus === 'self' || isMockUser(userId)) {
             return null;
         }
 

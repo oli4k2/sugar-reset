@@ -28,7 +28,7 @@ This document outlines all the crucial components needed on your website and in 
   - Must be updated date
 
 ### 3. **Contact Information** ✅
-- **Email**: hello@scriptcollective.com
+- **Email**: hello@craveless.info
 - **Status**: Updated in all pages
 - **Requirements**:
   - Must be a valid, monitored email address
@@ -130,7 +130,7 @@ This document outlines all the crucial components needed on your website and in 
 
 ### Required Information:
 1. **Privacy Policy URL** ✅ - Must be provided during app submission
-2. **Support Email** ✅ - hello@scriptcollective.com
+2. **Support Email** ✅ - hello@craveless.info
 3. **Support URL** ✅ - Link to support page at `/support`
 4. **Data Safety Section** - Detailed breakdown in Play Console:
    - Data types collected
@@ -181,7 +181,7 @@ This document outlines all the crucial components needed on your website and in 
 ### Website:
 - [x] Privacy Policy page created with URL
 - [x] Terms of Service page created with URL
-- [x] Contact email updated to hello@scriptcollective.com
+- [x] Contact email updated to hello@craveless.info
 - [x] Support page created at `/support`
 - [x] Account Deletion page created at `/account-deletion`
 - [ ] Website is live and accessible
@@ -233,7 +233,7 @@ This document outlines all the crucial components needed on your website and in 
 
 ## 📧 Contact Information
 
-- **Support Email**: hello@scriptcollective.com ✅
+- **Support Email**: hello@craveless.info ✅
 - **Website**: [Your domain]
 - **Support URL**: `/support`
 - **Account Deletion URL**: `/account-deletion`
@@ -253,7 +253,8 @@ This document outlines all the crucial components needed on your website and in 
 ---
 
 **Last Updated**: January 2026
-**Contact**: hello@scriptcollective.com
+**Contact**: hello@craveless.info
+
 
 
 

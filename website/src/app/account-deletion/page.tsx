@@ -79,13 +79,13 @@ export default function AccountDeletionPage() {
                             If you are unable to access the app, you can request account deletion by sending an email to:
                         </p>
                         <a
-                            href="mailto:hello@scriptcollective.com?subject=Account%20Deletion%20Request"
+                            href="mailto:hello@craveless.info?subject=Account%20Deletion%20Request"
                             className="inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-loovi-coral-orange/10 border border-loovi-coral-orange/20 text-loovi-text-primary font-semibold hover:bg-loovi-coral-orange/20 transition-colors"
                         >
                             <svg className="w-5 h-5 text-loovi-coral-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
-                            hello@scriptcollective.com
+                            hello@craveless.info
                         </a>
                         <p className="text-sm text-loovi-text-tertiary mt-4">
                             Please include the email address associated with your Craveless account. We will process your request within 30 days.
@@ -167,7 +167,7 @@ export default function AccountDeletionPage() {
                             Last updated: February 2026
                         </p>
                         <p className="text-sm text-loovi-text-tertiary">
-                            Contact: <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline">hello@scriptcollective.com</a>
+                            Contact: <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline">hello@craveless.info</a>
                         </p>
                     </div>
                 </div>

@@ -34,6 +34,7 @@ import postService, { Comment } from '../services/postService';
 import { Post } from '../types';
 import { UserAvatar } from '../components/UserAvatar';
 import { adminService } from '../services/adminService';
+// Mock post detection helper (posts exist only client-side)
 
 type PostDTO = Omit<Post, 'createdAt' | 'updatedAt'> & {
     createdAt: string;
@@ -80,8 +81,16 @@ export default function PostDetailScreen({ route, navigation }: Props) {
         }
     };
 
+    const isMockPost = post.id.startsWith('mock_post_');
+
     const loadData = async () => {
         try {
+            if (isMockPost) {
+                // Mock posts only exist client-side — use params data, no Firestore
+                setLoadingComments(false);
+                return;
+            }
+
             // Fetch latest post data (for upvote count etc)
             const freshPost = await postService.getPost(post.id);
             if (freshPost) {
@@ -105,16 +114,19 @@ export default function PostDetailScreen({ route, navigation }: Props) {
 
     const handleUpvote = async () => {
         if (!user) return;
-        try {
-            // Optimistic update - toggle based on current state
-            setPost(prev => ({ ...prev, upvotes: hasVoted ? prev.upvotes - 1 : prev.upvotes + 1 }));
-            setHasVoted(!hasVoted);
 
-            await postService.upvotePost(post.id, user.id);
-        } catch (error) {
-            console.error('Error upvoting:', error);
-            // Revert on error
-            loadData();
+        // Optimistic update
+        setPost(prev => ({ ...prev, upvotes: hasVoted ? prev.upvotes - 1 : prev.upvotes + 1 }));
+        setHasVoted(!hasVoted);
+
+        // Only persist for real posts
+        if (!isMockPost) {
+            try {
+                await postService.upvotePost(post.id, user.id);
+            } catch (error) {
+                console.error('Error upvoting:', error);
+                loadData();
+            }
         }
     };
 
@@ -127,20 +139,38 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             // Use onboarding nickname first, then user displayName, then email, fallback            
             const authorName = onboardingData?.nickname || user.displayName || user.username || 'Anonymous';
 
-            await postService.addComment(
-                post.id,
-                user.id,
-                authorName,
-                newComment,
-                {
+            if (isMockPost) {
+                // Add comment locally for mock posts (visual-only, not persisted)
+                const localComment: Comment = {
+                    id: `local_comment_${Date.now()}`,
+                    postId: post.id,
+                    authorId: user.id,
+                    authorName,
                     photoURL: user.photoURL,
                     avatarType: user.avatarType,
-                    avatarValue: user.avatarValue
-                }
-            );
-            setNewComment('');
-            // Refresh comments
-            await loadData();
+                    avatarValue: user.avatarValue,
+                    content: newComment.trim(),
+                    createdAt: new Date(),
+                };
+                setComments(prev => [...prev, localComment]);
+                setPost(prev => ({ ...prev, commentCount: prev.commentCount + 1 }));
+                setNewComment('');
+            } else {
+                await postService.addComment(
+                    post.id,
+                    user.id,
+                    authorName,
+                    newComment,
+                    {
+                        photoURL: user.photoURL,
+                        avatarType: user.avatarType,
+                        avatarValue: user.avatarValue
+                    }
+                );
+                setNewComment('');
+                // Refresh comments
+                await loadData();
+            }
         } catch (error: any) {
             console.error('Error submitting comment:', error);
             // Show the error message (includes profanity filter message)

@@ -50,13 +50,13 @@ type PaywallStep = 'intro' | 'reminder' | 'plans';
 
 export default function PaywallScreen({ navigation, route }: PaywallScreenProps) {
     const { currentOffering, isLoading, purchasePackage, isPremium, customerInfo, findPackageByIdentifier } = useRevenueCat();
-    const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint } = useUserData();
+    const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint, onboardingData } = useUserData();
     const { isAuthenticated } = useAuthContext();
     const posthog = usePostHog();
 
     // Check if we should show full flow (from route params or if in onboarding)
     const showFullFlow = route?.params?.showFullFlow || !hasCompletedOnboarding;
-    
+
     // If user has completed onboarding AND we're not showing full flow, they're accessing from within the app
     const isFromApp = hasCompletedOnboarding && !showFullFlow;
     const [currentStep, setCurrentStep] = useState<PaywallStep>(isFromApp ? 'plans' : 'intro');
@@ -64,15 +64,22 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [showCancellationOffer, setShowCancellationOffer] = useState(false);
-    
-    // Check if user can get a trial (hasn't used one before)
+
+    // Check if user can get a trial (hasn't used one before AND account is new)
     // RevenueCat tracks trial usage - check if user has ever had a trial period
     const yearlyPkg = currentOffering?.annual;
     const hasUsedTrial = customerInfo?.entitlements?.all?.['premium']?.periodType === 'TRIAL' ||
-                         (customerInfo?.entitlements?.all?.['premium']?.willRenew === false && 
-                          customerInfo?.entitlements?.all?.['premium']?.expirationDate && 
-                          new Date(customerInfo.entitlements.all['premium'].expirationDate) < new Date());
-    const canGetTrial = !hasUsedTrial && (yearlyPkg?.product?.introPrice !== null);
+        (customerInfo?.entitlements?.all?.['premium']?.willRenew === false &&
+            customerInfo?.entitlements?.all?.['premium']?.expirationDate &&
+            new Date(customerInfo.entitlements.all['premium'].expirationDate) < new Date());
+
+    // Check account age (if > 3 days, no trial)
+    const accountAgeDays = onboardingData?.startDate
+        ? Math.floor((new Date().getTime() - new Date(onboardingData.startDate).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+    const isAccountNew = accountAgeDays <= 3;
+
+    const canGetTrial = !hasUsedTrial && (yearlyPkg?.product?.introPrice !== null) && isAccountNew;
 
     // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -548,154 +555,180 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
         // Check if selected package has a trial period
         const yearlyPkg = currentOffering?.annual;
         const hasTrial = canGetTrial && (yearlyPkg?.product?.introPrice !== null);
-        const title = isFromApp 
+        const title = isFromApp
             ? (hasTrial ? 'Upgrade to Premium' : 'Subscribe to Premium')
             : 'Start your 3-day FREE\ntrial to continue.';
-        
+
         return (
-        <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.contentArea}>
-                <Text style={styles.mainTitle}>{title}</Text>
+            <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                <View style={styles.contentArea}>
+                    <Text style={styles.mainTitle}>{title}</Text>
 
-                {/* Timeline - Only show during onboarding */}
-                {!isFromApp && (
-                <View style={styles.timeline}>
-                    {/* Today */}
-                    <View style={styles.timelineItem}>
-                        <View style={styles.timelineIconContainer}>
-                            <View style={[styles.timelineIcon, styles.timelineIconActive]}>
-                                <Ionicons name="lock-open" size={16} color="#FFFFFF" />
+                    {/* Timeline - Only show during onboarding */}
+                    {!isFromApp ? (
+                        <View style={styles.timeline}>
+                            {/* Today */}
+                            <View style={styles.timelineItem}>
+                                <View style={styles.timelineIconContainer}>
+                                    <View style={[styles.timelineIcon, styles.timelineIconActive]}>
+                                        <Ionicons name="lock-open" size={16} color="#FFFFFF" />
+                                    </View>
+                                    <View style={styles.timelineLine} />
+                                </View>
+                                <View style={styles.timelineContent}>
+                                    <Text style={styles.timelineTitle}>Today</Text>
+                                    <Text style={styles.timelineDescription}>
+                                        Unlock all the app's features like food scanning, craving support and more.
+                                    </Text>
+                                </View>
                             </View>
-                            <View style={styles.timelineLine} />
-                        </View>
-                        <View style={styles.timelineContent}>
-                            <Text style={styles.timelineTitle}>Today</Text>
-                            <Text style={styles.timelineDescription}>
-                                Unlock all the app's features like food scanning, craving support and more.
-                            </Text>
-                        </View>
-                    </View>
 
-                    {/* Day 2 */}
-                    <View style={styles.timelineItem}>
-                        <View style={styles.timelineIconContainer}>
-                            <View style={[styles.timelineIcon, styles.timelineIconPending]}>
-                                <Ionicons name="notifications" size={16} color="#FFFFFF" />
+                            {/* Day 2 */}
+                            <View style={styles.timelineItem}>
+                                <View style={styles.timelineIconContainer}>
+                                    <View style={[styles.timelineIcon, styles.timelineIconPending]}>
+                                        <Ionicons name="notifications" size={16} color="#FFFFFF" />
+                                    </View>
+                                    <View style={styles.timelineLine} />
+                                </View>
+                                <View style={styles.timelineContent}>
+                                    <Text style={styles.timelineTitle}>In 2 Days - Reminder</Text>
+                                    <Text style={styles.timelineDescription}>
+                                        We'll send you a reminder that your trial is ending soon.
+                                    </Text>
+                                </View>
                             </View>
-                            <View style={styles.timelineLine} />
-                        </View>
-                        <View style={styles.timelineContent}>
-                            <Text style={styles.timelineTitle}>In 2 Days - Reminder</Text>
-                            <Text style={styles.timelineDescription}>
-                                We'll send you a reminder that your trial is ending soon.
-                            </Text>
-                        </View>
-                    </View>
 
-                    {/* Day 3 */}
-                    <View style={styles.timelineItem}>
-                        <View style={styles.timelineIconContainer}>
-                            <View style={[styles.timelineIcon, styles.timelineIconFuture]}>
-                                <Ionicons name="card" size={16} color="#FFFFFF" />
+                            {/* Day 3 */}
+                            <View style={styles.timelineItem}>
+                                <View style={styles.timelineIconContainer}>
+                                    <View style={[styles.timelineIcon, styles.timelineIconFuture]}>
+                                        <Ionicons name="card" size={16} color="#FFFFFF" />
+                                    </View>
+                                    <View style={styles.timelineLineBottom} />
+                                </View>
+                                <View style={styles.timelineContent}>
+                                    <Text style={styles.timelineTitle}>In 3 Days - Billing Starts</Text>
+                                    <Text style={styles.timelineDescription}>
+                                        You'll be charged on {getBillingDate()} unless you cancel anytime before.
+                                    </Text>
+                                </View>
                             </View>
-                            <View style={styles.timelineLineBottom} />
                         </View>
-                        <View style={styles.timelineContent}>
-                            <Text style={styles.timelineTitle}>In 3 Days - Billing Starts</Text>
-                            <Text style={styles.timelineDescription}>
-                                You'll be charged on {getBillingDate()} unless you cancel anytime before.
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-                )}
-
-                {/* Plan Selection */}
-                <View style={styles.planSelection}>
-                    {/* Monthly */}
-                    <TouchableOpacity
-                        style={[
-                            styles.planOption,
-                            selectedPlan === 'monthly' && styles.planOptionSelected,
-                        ]}
-                        onPress={() => {
-                            Haptics.selectionAsync();
-                            setSelectedPlan('monthly');
-                        }}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.planLabel}>Monthly</Text>
-                        <Text style={styles.planPrice}>{getMonthlyPrice()}<Text style={styles.planPeriod}>/mo</Text></Text>
-                        <View style={[
-                            styles.radioCircle,
-                            selectedPlan === 'monthly' && styles.radioCircleSelected,
-                        ]}>
-                            {selectedPlan === 'monthly' && <View style={styles.radioInner} />}
-                        </View>
-                    </TouchableOpacity>
-
-                    {/* Yearly */}
-                    <TouchableOpacity
-                        style={[
-                            styles.planOption,
-                            selectedPlan === 'yearly' && styles.planOptionSelected,
-                        ]}
-                        onPress={() => {
-                            Haptics.selectionAsync();
-                            setSelectedPlan('yearly');
-                        }}
-                        activeOpacity={0.8}
-                    >
-                        {hasTrial && (
-                            <View style={styles.freeTrialBadge}>
-                                <Text style={styles.freeTrialBadgeText}>3 DAYS FREE</Text>
-                            </View>
-                        )}
-                        <Text style={styles.planLabel}>Yearly</Text>
-                        <Text style={styles.planPrice}>{getYearlyMonthlyEquivalent()}<Text style={styles.planPeriod}>/mo</Text></Text>
-                        <View style={[
-                            styles.radioCircle,
-                            selectedPlan === 'yearly' && styles.radioCircleSelected,
-                        ]}>
-                            {selectedPlan === 'yearly' && (
-                                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                            )}
-                        </View>
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            <View style={styles.bottomArea}>
-                {hasTrial && (
-                    <View style={styles.noPaymentRow}>
-                        <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
-                        <Text style={styles.noPaymentText}>No Payment Due Now</Text>
-                    </View>
-                )}
-
-                <TouchableOpacity
-                    style={[styles.primaryButton, isPurchasing && styles.buttonDisabled]}
-                    onPress={handleStartTrial}
-                    activeOpacity={0.8}
-                    disabled={isPurchasing || isLoading}
-                >
-                    {isPurchasing ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                        <Text style={styles.primaryButtonText}>
-                            {hasTrial ? 'Start My 3-Day Free Trial' : 'Subscribe Now'}
-                        </Text>
+                        <View style={styles.featuresContainer}>
+                            <View style={styles.featureItem}>
+                                <View style={styles.featureIconBg}>
+                                    <Ionicons name="scan" size={20} color={looviColors.accent.primary} />
+                                </View>
+                                <Text style={styles.featureText}>Unlimited Food Scanning</Text>
+                            </View>
+                            <View style={styles.featureItem}>
+                                <View style={styles.featureIconBg}>
+                                    <Ionicons name="stats-chart" size={20} color={looviColors.accent.primary} />
+                                </View>
+                                <Text style={styles.featureText}>Advanced Analytics</Text>
+                            </View>
+                            <View style={styles.featureItem}>
+                                <View style={styles.featureIconBg}>
+                                    <Ionicons name="heart" size={20} color={looviColors.accent.primary} />
+                                </View>
+                                <Text style={styles.featureText}>Craving Support</Text>
+                            </View>
+                            <View style={styles.featureItem}>
+                                <View style={styles.featureIconBg}>
+                                    <Ionicons name="people" size={20} color={looviColors.accent.primary} />
+                                </View>
+                                <Text style={styles.featureText}>Inner Circle Community</Text>
+                            </View>
+                        </View>
                     )}
-                </TouchableOpacity>
+                    {/* Plan Selection */}
+                    <View style={styles.planSelection}>
+                        {/* Monthly */}
+                        <TouchableOpacity
+                            style={[
+                                styles.planOption,
+                                selectedPlan === 'monthly' && styles.planOptionSelected,
+                            ]}
+                            onPress={() => {
+                                Haptics.selectionAsync();
+                                setSelectedPlan('monthly');
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.planLabel}>Monthly</Text>
+                            <Text style={styles.planPrice}>{getMonthlyPrice()}<Text style={styles.planPeriod}>/mo</Text></Text>
+                            <View style={[
+                                styles.radioCircle,
+                                selectedPlan === 'monthly' && styles.radioCircleSelected,
+                            ]}>
+                                {selectedPlan === 'monthly' && <View style={styles.radioInner} />}
+                            </View>
+                        </TouchableOpacity>
 
-                <Text style={styles.priceSubtext}>
-                    {hasTrial 
-                        ? `3 days free, then ${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} (${selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)`
-                        : `${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} (${selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)`
-                    }
-                </Text>
-            </View>
-        </Animated.View>
+                        {/* Yearly */}
+                        <TouchableOpacity
+                            style={[
+                                styles.planOption,
+                                selectedPlan === 'yearly' && styles.planOptionSelected,
+                            ]}
+                            onPress={() => {
+                                Haptics.selectionAsync();
+                                setSelectedPlan('yearly');
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            {hasTrial && (
+                                <View style={styles.freeTrialBadge}>
+                                    <Text style={styles.freeTrialBadgeText}>3 DAYS FREE</Text>
+                                </View>
+                            )}
+                            <Text style={styles.planLabel}>Yearly</Text>
+                            <Text style={styles.planPrice}>{getYearlyMonthlyEquivalent()}<Text style={styles.planPeriod}>/mo</Text></Text>
+                            <View style={[
+                                styles.radioCircle,
+                                selectedPlan === 'yearly' && styles.radioCircleSelected,
+                            ]}>
+                                {selectedPlan === 'yearly' && (
+                                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                                )}
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.bottomArea}>
+                    {hasTrial && (
+                        <View style={styles.noPaymentRow}>
+                            <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
+                            <Text style={styles.noPaymentText}>No Payment Due Now</Text>
+                        </View>
+                    )}
+
+                    <TouchableOpacity
+                        style={[styles.primaryButton, isPurchasing && styles.buttonDisabled]}
+                        onPress={handleStartTrial}
+                        activeOpacity={0.8}
+                        disabled={isPurchasing || isLoading}
+                    >
+                        {isPurchasing ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                            <Text style={styles.primaryButtonText}>
+                                {hasTrial ? 'Start My 3-Day Free Trial' : 'Subscribe Now'}
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+
+                    <Text style={styles.priceSubtext}>
+                        {hasTrial
+                            ? `3 days free, then ${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} (${selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)`
+                            : `${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} (${selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)`
+                        }
+                    </Text>
+                </View>
+            </Animated.View>
         );
     };
 
@@ -798,44 +831,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     scannerCorners: {
-        width: 120,
-        height: 120,
-        position: 'relative',
+        ...StyleSheet.absoluteFillObject,
+        margin: 20,
     },
     corner: {
         position: 'absolute',
-        width: 24,
-        height: 24,
+        width: 20,
+        height: 20,
         borderColor: '#FFFFFF',
+        borderWidth: 3,
     },
-    cornerTL: {
-        top: 0,
-        left: 0,
-        borderTopWidth: 3,
-        borderLeftWidth: 3,
-        borderTopLeftRadius: 8,
-    },
-    cornerTR: {
-        top: 0,
-        right: 0,
-        borderTopWidth: 3,
-        borderRightWidth: 3,
-        borderTopRightRadius: 8,
-    },
-    cornerBL: {
-        bottom: 0,
-        left: 0,
-        borderBottomWidth: 3,
-        borderLeftWidth: 3,
-        borderBottomLeftRadius: 8,
-    },
-    cornerBR: {
-        bottom: 0,
-        right: 0,
-        borderBottomWidth: 3,
-        borderRightWidth: 3,
-        borderBottomRightRadius: 8,
-    },
+    cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
+    cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
+    cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
+    cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
     // Bell
     bellContainer: {
         flex: 1,
@@ -1030,5 +1039,32 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: looviColors.text.tertiary,
         textAlign: 'center',
+    },
+    // Feature List Styles
+    featuresContainer: {
+        marginTop: spacing.md,
+        marginBottom: spacing.xl,
+        gap: spacing.md,
+    },
+    featureItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.6)',
+        padding: spacing.md,
+        borderRadius: 16,
+    },
+    featureIconBg: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: spacing.md,
+    },
+    featureText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: looviColors.text.primary,
     },
 });
