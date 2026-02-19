@@ -1,12 +1,14 @@
 /**
  * Scanner Service
- * 
+ *
  * Handles storage and retrieval of scanned food items.
  * Uses AsyncStorage for persistence.
+ * Food analysis is powered by Google Gemini AI (see geminiService.ts).
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateFoodHealthScore } from './healthScoringService';
+import { analyzeFood as geminiAnalyzeFood } from './geminiService';
 
 const SCANNED_ITEMS_KEY = '@sugar_reset_scanned_items';
 const PINNED_ITEMS_KEY = '@sugar_reset_pinned_items';
@@ -205,69 +207,81 @@ export const getFoodCountsByDate = async (): Promise<Record<string, number>> => 
 };
 
 /**
- * Analyze food image using AI
- * TODO: Replace with actual Gemini Vision API call
+ * Analyze food using Google Gemini AI.
+ *
+ * - If imageUri is provided → Gemini Vision (multimodal image + optional text).
+ * - If only description is provided → Gemini text analysis.
+ * - Falls back to demo mock data when no API key is set.
  */
-export const analyzeFood = async (imageUri: string, description?: string): Promise<AnalysisResult> => {
-    // PLACEHOLDER: Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+export const analyzeFood = async (
+    imageUri: string,
+    description?: string
+): Promise<AnalysisResult> => {
+    const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+    const hasKey = apiKey.length > 0 && apiKey !== 'YOUR_GEMINI_API_KEY_HERE';
 
-    // TODO: Implement Google Gemini Vision API integration
-    // 1. Get API key from environment: process.env.EXPO_PUBLIC_GEMINI_API_KEY
-    // 2. Convert image to base64
-    // 3. Send to Gemini Vision API with prompt for macro analysis
-    // 4. Parse response for full nutritional info
+    if (hasKey) {
+        // ── Real Gemini call ────────────────────────────────────────────────
+        try {
+            return await geminiAnalyzeFood(imageUri, description);
+        } catch (error: any) {
+            console.error('[scannerService] Gemini analysis failed:', error?.message ?? error);
+            // Re-throw so the UI can display the real error rather than silently
+            // falling back to incorrect demo data.
+            throw error;
+        }
+    }
 
-    // Mock foods with full macro data including added vs natural sugar
+    // ── Demo / no-key fallback ──────────────────────────────────────────────
+    console.warn('[scannerService] No Gemini API key — returning demo data.');
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
     const mockFoods: Omit<AnalysisResult, 'healthScore'>[] = [
         {
             foodName: 'Apple',
             calories: 95, protein: 0.5, carbs: 25, carbsSugars: 19,
             fat: 0.3, fatSaturated: 0.1, fiber: 4.4, sugar: 19,
-            addedSugar: 0, naturalSugar: 19, // All natural fruit sugars
-            sodium: 2, confidence: 0.85
+            addedSugar: 0, naturalSugar: 19,
+            sodium: 2, confidence: 0.85,
         },
         {
             foodName: 'Coca-Cola (330ml)',
             calories: 139, protein: 0, carbs: 39, carbsSugars: 39,
             fat: 0, fatSaturated: 0, fiber: 0, sugar: 39,
-            addedSugar: 39, naturalSugar: 0, // All added sugar
-            sodium: 45, confidence: 0.92
+            addedSugar: 39, naturalSugar: 0,
+            sodium: 45, confidence: 0.92,
         },
         {
             foodName: 'Grilled Chicken Breast',
             calories: 165, protein: 31, carbs: 0, carbsSugars: 0,
             fat: 3.6, fatSaturated: 1, fiber: 0, sugar: 0,
-            addedSugar: 0, naturalSugar: 0, // No sugar
-            sodium: 74, confidence: 0.88
+            addedSugar: 0, naturalSugar: 0,
+            sodium: 74, confidence: 0.88,
         },
         {
             foodName: 'Chocolate Bar',
             calories: 235, protein: 3, carbs: 26, carbsSugars: 24,
             fat: 13, fatSaturated: 8, fiber: 1.5, sugar: 24,
-            addedSugar: 22, naturalSugar: 2, // Mostly added sugar, some from milk
-            sodium: 35, confidence: 0.78
+            addedSugar: 22, naturalSugar: 2,
+            sodium: 35, confidence: 0.78,
         },
         {
             foodName: 'Greek Yogurt (plain)',
             calories: 100, protein: 17, carbs: 6, carbsSugars: 4,
             fat: 0.7, fatSaturated: 0.3, fiber: 0, sugar: 4,
-            addedSugar: 0, naturalSugar: 4, // Natural lactose from dairy
-            sodium: 65, confidence: 0.82
+            addedSugar: 0, naturalSugar: 4,
+            sodium: 65, confidence: 0.82,
         },
         {
             foodName: 'Caesar Salad',
             calories: 320, protein: 12, carbs: 14, carbsSugars: 3,
             fat: 24, fatSaturated: 5, fiber: 3, sugar: 3,
-            addedSugar: 2, naturalSugar: 1, // Small amount from dressing
-            sodium: 580, confidence: 0.75
+            addedSugar: 2, naturalSugar: 1,
+            sodium: 580, confidence: 0.75,
         },
     ];
 
-    // Return random mock food for demo
     const randomFood = mockFoods[Math.floor(Math.random() * mockFoods.length)];
-
-    // Calculate scientifically-backed health score
     const mockItem: ScannedItem = {
         id: 'temp',
         imageUri: '',
@@ -275,7 +289,7 @@ export const analyzeFood = async (imageUri: string, description?: string): Promi
         timestamp: '',
         portionPercent: 100,
         ...randomFood,
-        healthScore: 0, // Will be calculated
+        healthScore: 0,
         confidence: randomFood.confidence,
     };
 
@@ -283,8 +297,8 @@ export const analyzeFood = async (imageUri: string, description?: string): Promi
 
     return {
         ...randomFood,
-        healthScore: Math.round(healthScore / 10), // Convert from 0-100 to 0-10 scale
-        suggestion: '💡 This is demo data. Add Gemini API key to enable real detection.',
+        healthScore: healthScore, // Score is 0-100
+        suggestion: '💡 Demo data — add your Gemini API key in .env to enable real AI analysis.',
     };
 };
 

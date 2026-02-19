@@ -125,11 +125,9 @@ export async function getDayStatus(
     const dailyTarget = await getDailyTargetForDate(dateString, planType, planStartDate);
 
     // Sum up ADDED sugar only from all food items (not natural sugars from fruit/dairy)
-    // If addedSugar is not available, fall back to sugar but this is not ideal
+    // Fall back to total sugar for items logged before addedSugar field existed
     const totalAddedSugar = items.reduce((sum, item) => {
-        // Prefer addedSugar if available, otherwise use total sugar as fallback
-        const sugarToCount = item.addedSugar !== undefined ? item.addedSugar : (item.sugar || 0);
-        return sum + sugarToCount;
+        return sum + (item.addedSugar ?? item.sugar ?? 0);
     }, 0);
 
     const hasLogs = items.length > 0;
@@ -178,8 +176,17 @@ export async function calculateStreak(
     // Get today's status first
     const todayStatus = await getDayStatus(todayString, planType, planStartDate);
 
-    // Check each day starting from today going backwards
-    for (let i = 0; i < lookbackDays; i++) {
+    // TODAY is handled specially: it can BREAK the streak (if over target),
+    // but it does NOT count as a completed day yet (must pass 24h).
+    // Only check today for streak-breaking conditions.
+    if (todayStatus.hasLogs && !todayStatus.isUnderTarget) {
+        // Today has logs AND exceeded sugar target - streak is broken
+        streakBroken = true;
+    }
+    // If today has no logs or is under target, streak continues from yesterday
+
+    // Check each COMPLETED day (starting from yesterday) going backwards
+    for (let i = 1; i < lookbackDays; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(checkDate.getDate() - i);
         const dateString = getLocalDateString(checkDate);
@@ -189,10 +196,7 @@ export async function calculateStreak(
             break;
         }
 
-        // Use cached status for today, fetch for other days
-        const status = i === 0
-            ? todayStatus
-            : await getDayStatus(dateString, planType, planStartDate);
+        const status = await getDayStatus(dateString, planType, planStartDate);
 
         if (status.isStreakDay) {
             // Valid streak day - reset missing days counter
@@ -223,6 +227,9 @@ export async function calculateStreak(
                     streakBroken = true;
                     runningStreak = 0;
                 }
+            } else {
+                // Streak already broken — missing day interrupts any historical streak run
+                runningStreak = 0;
             }
         } else {
             // Has logs but exceeded sugar target - immediate streak break

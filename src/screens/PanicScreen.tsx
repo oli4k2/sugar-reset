@@ -9,6 +9,7 @@ import {
     Dimensions,
     Easing,
     Platform,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -166,7 +167,12 @@ export default function PanicScreen() {
             <BlurView intensity={20} style={StyleSheet.absoluteFillObject} tint="dark" />
 
             <SafeAreaView style={styles.safeArea} edges={['top']}>
-                <View style={styles.contentContainer}>
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.contentContainer}
+                    showsVerticalScrollIndicator={false}
+                    bounces={true}
+                >
 
                     {/* Serious Header */}
                     <View style={styles.header}>
@@ -259,7 +265,7 @@ export default function PanicScreen() {
                             </TouchableOpacity>
                         </View>
                     </View>
-                </View>
+                </ScrollView>
             </SafeAreaView>
         </View>
     );
@@ -274,10 +280,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     contentContainer: {
-        flex: 1,
         paddingHorizontal: spacing.lg,
         paddingBottom: Platform.OS === 'ios' ? 90 : 70,
         paddingTop: spacing.xs,
+        minHeight: '100%',
     },
     ambientOrb: {
         position: 'absolute',
@@ -317,10 +323,10 @@ const styles = StyleSheet.create({
         letterSpacing: 2,
     },
     heroSection: {
-        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: 180,
+        marginVertical: spacing.lg,
     },
     breathingContainer: {
         width: height < 700 ? 120 : 160,

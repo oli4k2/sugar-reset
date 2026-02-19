@@ -190,7 +190,7 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
     }
 
     // Inner Circle tips - HIGH priority if no friends
-    if (!props.hasInnerCircleFriends) {
+    if (!props.hasInnerCircleFriends && !props.hasCheckedCircleToday) {
         tips.push({
             id: 'find_friends',
             icon: 'users',

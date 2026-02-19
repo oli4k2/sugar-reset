@@ -327,10 +327,12 @@ export const postService = {
 
         const docRef = await addDoc(commentsRef, newComment);
 
-        // Update comment count on post
-        await updateDoc(doc(db, 'posts', postId), {
-            commentCount: increment(1)
-        });
+        // Update comment count on post (skip for mock posts – parent doc doesn't exist)
+        if (!postId.startsWith('mock_post_')) {
+            await updateDoc(doc(db, 'posts', postId), {
+                commentCount: increment(1)
+            });
+        }
 
         return docRef.id;
     },

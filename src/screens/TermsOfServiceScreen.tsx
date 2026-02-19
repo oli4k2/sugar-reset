@@ -62,7 +62,7 @@ export default function TermsOfServiceScreen() {
 
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>Last updated: January 2026</Text>
-                        <Text style={[styles.footerText, { marginTop: 8 }]}>Contact: hello@scriptcollective.com</Text>
+                        <Text style={[styles.footerText, { marginTop: 8 }]}>Contact: hello@craveless.info</Text>
                     </View>
                 </ScrollView>
             </SafeAreaView>

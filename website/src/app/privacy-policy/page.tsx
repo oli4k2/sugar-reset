@@ -205,7 +205,7 @@ export default function PrivacyPolicyPage() {
               7. Data Deletion
             </h2>
             <p className="text-loovi-text-secondary leading-relaxed">
-              You have the right to request the deletion of your account and all associated data at any time. You can do this by contacting our support at <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline font-semibold">hello@scriptcollective.com</a> or using the delete account option in the app settings. We will process your request within 30 days.
+              You have the right to request the deletion of your account and all associated data at any time. You can do this by contacting our support at <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline font-semibold">hello@craveless.info</a> or using the delete account option in the app settings. We will process your request within 30 days.
             </p>
           </div>
 
@@ -215,7 +215,7 @@ export default function PrivacyPolicyPage() {
               Last updated: January 2026
             </p>
             <p className="text-sm text-loovi-text-tertiary">
-              Contact: <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline">hello@scriptcollective.com</a>
+              Contact: <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline">hello@craveless.info</a>
             </p>
           </div>
         </div>

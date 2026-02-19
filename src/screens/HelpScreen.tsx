@@ -15,6 +15,10 @@ export default function HelpScreen() {
         Linking.openURL('https://craveless.info/support');
     };
 
+    const handleEmailSupport = () => {
+        Linking.openURL('mailto:hello@craveless.info');
+    };
+
     return (
         <LooviBackground variant="blueRight">
             <SafeAreaView style={styles.container}>
@@ -59,6 +63,10 @@ export default function HelpScreen() {
                         <TouchableOpacity style={styles.emailButton} onPress={handleOpenSupport}>
                             <Feather name="external-link" size={20} color="#FFFFFF" style={styles.emailIcon} />
                             <Text style={styles.emailButtonText}>Visit Support Page</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.emailButton} onPress={handleEmailSupport}>
+                            <Feather name="mail" size={20} color="#FFFFFF" style={styles.emailIcon} />
+                            <Text style={styles.emailButtonText}>Email: hello@craveless.info</Text>
                         </TouchableOpacity>
                     </GlassCard>
                 </ScrollView>

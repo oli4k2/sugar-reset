@@ -41,6 +41,8 @@ import { useUserData } from '../context/UserDataContext';
 import { useUserProfile } from '../context/UserProfileContext';
 import { UserAvatar } from '../components/UserAvatar';
 import { Friend, FriendRequest, UserStats, User, Post } from '../types';
+import { getMockLeaderboardEntries, getMockPosts, adjustMockPostUpvote } from '../services/mockDataService';
+import { useRevenueCat } from '../hooks/useRevenueCat';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -66,8 +68,9 @@ interface LeaderboardEntry {
 export default function SocialScreen() {
     const navigation = useNavigation<any>();
     const { user, isAuthenticated } = useAuthContext();
-    const { streakData, latestHealthScore } = useUserData();
+    const { streakData, latestHealthScore, refreshStreakFromFoodLogs } = useUserData();
     const { showUserProfile } = useUserProfile();
+    const { isPremium } = useRevenueCat();
 
     const [activeTab, setActiveTab] = useState<Tab>('community');
     const [sortFilter, setSortFilter] = useState<'new' | 'hot' | 'top'>('hot');
@@ -156,6 +159,12 @@ export default function SocialScreen() {
 
         setIsLoading(true);
         try {
+            // 1. Sync latest streak/health stats to Firestore so leaderboard is fresh
+            if (refreshStreakFromFoodLogs) {
+                await refreshStreakFromFoodLogs();
+            }
+
+            // 2. Load everything in parallel
             await Promise.all([
                 loadPosts(),
                 loadFriends(),
@@ -173,9 +182,29 @@ export default function SocialScreen() {
     const loadPosts = async () => {
         try {
             const fetchedPosts = await postService.getPosts(sortFilter, 20);
-            setPosts(fetchedPosts);
 
-            // Load user votes for all posts
+            // Merge mock posts (deduplicate by id in case they somehow exist)
+            const existingIds = new Set(fetchedPosts.map(p => p.id));
+            const mockPosts = getMockPosts().filter(p => !existingIds.has(p.id));
+            let allPosts = [...fetchedPosts, ...mockPosts];
+
+            // Re-apply sorting to the combined list
+            if (sortFilter === 'new') {
+                allPosts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            } else if (sortFilter === 'top') {
+                allPosts.sort((a, b) => b.upvotes - a.upvotes);
+            } else {
+                // hot — recent + upvotes
+                allPosts.sort((a, b) => {
+                    const ageA = (Date.now() - a.createdAt.getTime()) / (1000 * 60 * 60);
+                    const ageB = (Date.now() - b.createdAt.getTime()) / (1000 * 60 * 60);
+                    return (b.upvotes / (ageB + 2)) - (a.upvotes / (ageA + 2));
+                });
+            }
+
+            setPosts(allPosts);
+
+            // Load user votes for real (non-mock) posts only
             if (user) {
                 const votesMap = new Map<string, 'up' | 'down'>();
                 await Promise.all(
@@ -297,22 +326,51 @@ export default function SocialScreen() {
 
             const entries: LeaderboardEntry[] = freshStats.map((stat, index) => {
                 const userInfo = usersMap.get(stat.userId);
-                const badge = index === 0 ? '🏆' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
-
                 return {
-                    rank: index + 1,
+                    rank: 0, // will be set after merging
                     userId: stat.userId,
                     name: userInfo?.displayName || 'User',
                     score: stat.healthScore,
                     streak: stat.currentStreak,
-                    badge,
+                    badge: '',
                     photoURL: userInfo?.photoURL,
                     avatarType: userInfo?.avatarType,
                     avatarValue: userInfo?.avatarValue,
                 };
             });
 
-            setLeaderboard(entries);
+            // Merge mock leaderboard entries (deduplicate by userId)
+            const existingUserIds = new Set(entries.map(e => e.userId));
+            const mockEntries = getMockLeaderboardEntries(type)
+                .filter(m => !existingUserIds.has(m.userId))
+                .map(m => ({
+                    rank: 0,
+                    userId: m.userId,
+                    name: m.name,
+                    score: m.score,
+                    streak: m.streak,
+                    badge: '',
+                    photoURL: undefined,
+                    avatarType: m.avatarType as LeaderboardEntry['avatarType'],
+                    avatarValue: m.avatarValue,
+                }));
+
+            const allEntries = [...entries, ...mockEntries];
+
+            // Re-sort combined list
+            if (type === 'streak') {
+                allEntries.sort((a, b) => b.streak - a.streak);
+            } else {
+                allEntries.sort((a, b) => b.score - a.score);
+            }
+
+            // Assign ranks and badges
+            allEntries.forEach((entry, index) => {
+                entry.rank = index + 1;
+                entry.badge = index === 0 ? '🏆' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+            });
+
+            setLeaderboard(allEntries);
         } catch (error) {
             console.error('Error loading leaderboard:', error);
         }
@@ -461,34 +519,40 @@ export default function SocialScreen() {
         const handleUpvote = async (postId: string) => {
             if (!user) return;
 
+            // Mock posts are read-only — visual-only toggle
+            const isMock = postId.startsWith('mock_post_');
+
             const hasVoted = userVotes.has(postId);
 
-            try {
-                // Optimistic update
-                setPosts(prev => prev.map(p => {
-                    if (p.id === postId) {
-                        // Toggle: if already voted, remove vote; otherwise add
-                        return { ...p, upvotes: hasVoted ? p.upvotes - 1 : p.upvotes + 1 };
-                    }
-                    return p;
-                }));
+            // Optimistic update
+            setPosts(prev => prev.map(p => {
+                if (p.id === postId) {
+                    return { ...p, upvotes: hasVoted ? p.upvotes - 1 : p.upvotes + 1 };
+                }
+                return p;
+            }));
 
-                // Optimistic vote state update
-                setUserVotes(prev => {
-                    const newMap = new Map(prev);
-                    if (hasVoted) {
-                        newMap.delete(postId);
-                    } else {
-                        newMap.set(postId, 'up');
-                    }
-                    return newMap;
-                });
+            setUserVotes(prev => {
+                const newMap = new Map(prev);
+                if (hasVoted) {
+                    newMap.delete(postId);
+                } else {
+                    newMap.set(postId, 'up');
+                }
+                return newMap;
+            });
 
-                await postService.upvotePost(postId, user.id);
-            } catch (error) {
-                console.error('Error upvoting:', error);
-                // Revert on error
-                loadPosts();
+            if (isMock) {
+                // Track the delta so it survives loadPosts() re-fetches
+                adjustMockPostUpvote(postId, hasVoted ? -1 : 1);
+            } else {
+                // Persist to Firestore for real posts
+                try {
+                    await postService.upvotePost(postId, user.id);
+                } catch (error) {
+                    console.error('Error upvoting:', error);
+                    loadPosts();
+                }
             }
         };
 
@@ -1007,7 +1071,20 @@ export default function SocialScreen() {
                     <TouchableOpacity
                         style={styles.floatingFab}
                         activeOpacity={0.9}
-                        onPress={() => setShowCreatePostModal(true)}
+                        onPress={() => {
+                            if (!isPremium) {
+                                Alert.alert(
+                                    'Premium Feature ✨',
+                                    'Creating posts is available for premium members. Upgrade to share your journey with the community!',
+                                    [
+                                        { text: 'Maybe Later', style: 'cancel' },
+                                        { text: 'Learn More', onPress: () => navigation.navigate('Paywall') },
+                                    ]
+                                );
+                                return;
+                            }
+                            setShowCreatePostModal(true);
+                        }}
                     >
                         <Ionicons name="add" size={30} color="#FFFFFF" />
                     </TouchableOpacity>

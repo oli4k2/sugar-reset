@@ -3,6 +3,7 @@
  * 
  * Modal showing full macro breakdown for a food item.
  * Allows editing and deleting.
+ * Shows sugar breakdown (added vs natural) and AI recommendation.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -19,6 +20,7 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { ScannedItem, getHealthScoreColor, updateScannedItem, deleteScannedItem } from '../services/scannerService';
@@ -38,9 +40,10 @@ interface MacroRowProps {
     subValue?: string;
     isEditing?: boolean;
     onChangeText?: (text: string) => void;
+    valueColor?: string;
 }
 
-function MacroRow({ label, value, unit, subValue, isEditing, onChangeText }: MacroRowProps) {
+function MacroRow({ label, value, unit, subValue, isEditing, onChangeText, valueColor }: MacroRowProps) {
     if (isEditing) {
         return (
             <View style={styles.macroRow}>
@@ -64,7 +67,7 @@ function MacroRow({ label, value, unit, subValue, isEditing, onChangeText }: Mac
         <View style={styles.macroRow}>
             <Text style={styles.macroLabel}>{label}</Text>
             <View style={styles.macroValueContainer}>
-                <Text style={styles.macroValue}>{value}</Text>
+                <Text style={[styles.macroValue, valueColor ? { color: valueColor } : undefined]}>{value}</Text>
                 <Text style={styles.macroUnit}>{unit}</Text>
                 {subValue && <Text style={styles.macroSub}>{subValue}</Text>}
             </View>
@@ -85,9 +88,15 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
     if (!item || !editedItem) return null;
 
     const healthColor = getHealthScoreColor(item.healthScore);
+    const addedSugar = item.addedSugar !== undefined ? item.addedSugar : item.sugar;
+    const naturalSugar = item.naturalSugar || 0;
 
     const handleSave = async () => {
         if (editedItem) {
+            // Recalculate health score after editing
+            const { calculateFoodHealthScore } = await import('../services/healthScoringService');
+            editedItem.healthScore = calculateFoodHealthScore(editedItem);
+            
             await updateScannedItem(editedItem);
             setIsEditing(false);
             onUpdate(editedItem);
@@ -166,7 +175,65 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
                                 <Text style={[styles.healthScoreValue, { color: healthColor }]}>
                                     {item.healthScore}
                                 </Text>
-                                <Text style={styles.healthScoreLabel}>/ 10 Health Score</Text>
+                                <Text style={styles.healthScoreLabel}>/ 100 Health Score</Text>
+                            </View>
+
+                            {/* AI Recommendation */}
+                            {item.suggestion && item.suggestion !== 'Manually entered' && item.suggestion !== 'Manually entered — only added sugar counts toward your streak.' && (
+                                <View style={styles.suggestionCard}>
+                                    <Feather name="cpu" size={14} color={looviColors.text.tertiary} />
+                                    <Text style={styles.suggestionText}>{item.suggestion}</Text>
+                                </View>
+                            )}
+
+                            {/* Sugar Breakdown */}
+                            <View style={styles.sugarBreakdownSection}>
+                                <Text style={styles.sectionTitle}>Sugar Breakdown</Text>
+                                <View style={styles.sugarBreakdownCard}>
+                                    <View style={styles.sugarBreakdownRow}>
+                                        <View style={styles.sugarBreakdownItem}>
+                                            {isEditing ? (
+                                                <View style={styles.sugarEditRow}>
+                                                    <TextInput
+                                                        style={[styles.sugarBreakdownValue, { color: '#EF4444' }]}
+                                                        value={String(editedItem.addedSugar ?? 0)}
+                                                        onChangeText={(val) => updateField('addedSugar', parseFloat(val) || 0)}
+                                                        keyboardType="numeric"
+                                                    />
+                                                    <Text style={[styles.sugarBreakdownUnit, { color: '#EF4444' }]}>g</Text>
+                                                </View>
+                                            ) : (
+                                                <View style={styles.sugarValueRow}>
+                                                    <Text style={[styles.sugarBreakdownValue, { color: '#EF4444' }]}>{addedSugar}</Text>
+                                                    <Text style={[styles.sugarBreakdownUnit, { color: '#EF4444' }]}>g</Text>
+                                                </View>
+                                            )}
+                                            <Text style={styles.sugarBreakdownLabel}>Added Sugar</Text>
+                                            <Text style={styles.sugarBreakdownHint}>Counts toward streak</Text>
+                                        </View>
+                                        <View style={styles.sugarBreakdownDivider} />
+                                        <View style={styles.sugarBreakdownItem}>
+                                            {isEditing ? (
+                                                <View style={styles.sugarEditRow}>
+                                                    <TextInput
+                                                        style={[styles.sugarBreakdownValue, { color: '#22C55E' }]}
+                                                        value={String(editedItem.naturalSugar ?? 0)}
+                                                        onChangeText={(val) => updateField('naturalSugar', parseFloat(val) || 0)}
+                                                        keyboardType="numeric"
+                                                    />
+                                                    <Text style={[styles.sugarBreakdownUnit, { color: '#22C55E' }]}>g</Text>
+                                                </View>
+                                            ) : (
+                                                <View style={styles.sugarValueRow}>
+                                                    <Text style={[styles.sugarBreakdownValue, { color: '#22C55E' }]}>{naturalSugar}</Text>
+                                                    <Text style={[styles.sugarBreakdownUnit, { color: '#22C55E' }]}>g</Text>
+                                                </View>
+                                            )}
+                                            <Text style={styles.sugarBreakdownLabel}>Natural Sugar</Text>
+                                            <Text style={styles.sugarBreakdownHint}>From fruit, dairy</Text>
+                                        </View>
+                                    </View>
+                                </View>
                             </View>
 
                             {/* Portion */}
@@ -337,7 +404,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: spacing.lg,
         borderRadius: borderRadius.lg,
-        marginBottom: spacing.lg,
+        marginBottom: spacing.md,
     },
     healthScoreValue: {
         fontSize: 48,
@@ -348,6 +415,78 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: looviColors.text.secondary,
         marginLeft: spacing.xs,
+    },
+    // AI Suggestion
+    suggestionCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: spacing.sm,
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        padding: spacing.md,
+        borderRadius: borderRadius.lg,
+        marginBottom: spacing.lg,
+    },
+    suggestionText: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
+        lineHeight: 18,
+    },
+    // Sugar Breakdown
+    sugarBreakdownSection: {
+        marginBottom: spacing.lg,
+    },
+    sugarBreakdownCard: {
+        backgroundColor: 'rgba(0, 0, 0, 0.02)',
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+    },
+    sugarBreakdownRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+    },
+    sugarBreakdownItem: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: spacing.sm,
+    },
+    sugarBreakdownDivider: {
+        width: 1,
+        height: 60,
+        backgroundColor: 'rgba(0, 0, 0, 0.08)',
+    },
+    sugarValueRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+    },
+    sugarEditRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+    },
+    sugarBreakdownValue: {
+        fontSize: 24,
+        fontWeight: '700',
+        textAlign: 'center',
+        minWidth: 30,
+    },
+    sugarBreakdownUnit: {
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 2,
+    },
+    sugarBreakdownLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: looviColors.text.primary,
+        marginTop: spacing.xs,
+    },
+    sugarBreakdownHint: {
+        fontSize: 10,
+        fontWeight: '400',
+        color: looviColors.text.muted,
+        marginTop: 2,
     },
     portionSection: {
         marginBottom: spacing.lg,

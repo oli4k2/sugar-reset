@@ -29,6 +29,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { isMockUser, getMockUserStats } from '../services/mockDataService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type FriendStatus = 'loading' | 'self' | 'friend' | 'pending_sent' | 'pending_received' | 'none';
 
@@ -52,7 +54,7 @@ export function UserProfilePopup({
     avatarValue,
 }: UserProfilePopupProps) {
     const { user } = useAuthContext();
-    const { latestHealthScore, streakData } = useUserData();
+    const { latestHealthScore, streakData, onboardingData } = useUserData();
     const [stats, setStats] = useState<UserStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [friendStatus, setFriendStatus] = useState<FriendStatus>('loading');
@@ -66,6 +68,12 @@ export function UserProfilePopup({
         // Self check
         if (user.id === userId) {
             setFriendStatus('self');
+            return;
+        }
+
+        // Mock users can't be added as friends
+        if (isMockUser(userId)) {
+            setFriendStatus('none');
             return;
         }
 
@@ -116,44 +124,72 @@ export function UserProfilePopup({
             setIsLoading(true);
             setFriendStatus('loading');
 
-            // Fetch stats
-            friendService.getFriendStats(userId)
-                .then(fetchedStats => {
-                    if (fetchedStats) {
-                        // goalAchieved and pledgedToday are daily flags —
-                        // only trust them if updatedAt is from today
-                        const today = new Date().toISOString().split('T')[0];
-                        const statsDate = fetchedStats.updatedAt
-                            ? new Date(fetchedStats.updatedAt).toISOString().split('T')[0]
-                            : null;
-                        const isFromToday = statsDate === today;
+            if (isMockUser(userId)) {
+                // Use local mock stats — no Firestore fetch needed
+                const mockStats = getMockUserStats(userId);
+                if (mockStats) {
+                    setStats({
+                        userId,
+                        currentStreak: mockStats.currentStreak,
+                        healthScore: mockStats.healthScore,
+                        goalAchieved: mockStats.goalAchieved,
+                        pledgedToday: mockStats.pledgedToday,
+                        updatedAt: new Date(),
+                    });
+                }
+                setIsLoading(false);
+                setFriendStatus('none');
+            } else {
+                // Fetch stats from Firestore
+                friendService.getFriendStats(userId)
+                    .then(async (fetchedStats) => {
+                        if (fetchedStats) {
+                            // goalAchieved and pledgedToday are daily flags —
+                            // only trust them if updatedAt is from today
+                            const today = new Date().toISOString().split('T')[0];
+                            const statsDate = fetchedStats.updatedAt
+                                ? new Date(fetchedStats.updatedAt).toISOString().split('T')[0]
+                                : null;
+                            const isFromToday = statsDate === today;
 
-                        const adjustedStats = {
-                            ...fetchedStats,
-                            goalAchieved: isFromToday ? fetchedStats.goalAchieved : false,
-                            pledgedToday: isFromToday ? fetchedStats.pledgedToday : false,
-                        };
+                            const adjustedStats = {
+                                ...fetchedStats,
+                                goalAchieved: isFromToday ? fetchedStats.goalAchieved : false,
+                                pledgedToday: isFromToday ? fetchedStats.pledgedToday : false,
+                            };
 
-                        // For self: use fresh local values instead of potentially stale Firestore data
-                        if (isSelf) {
-                            adjustedStats.healthScore = latestHealthScore || adjustedStats.healthScore;
-                            adjustedStats.currentStreak = streakData?.currentStreak ?? adjustedStats.currentStreak;
+                            // For the current user, overlay local pledge status and fresh values
+                            if (isSelf && user && userId === user.id) {
+                                try {
+                                    const pledgeDate = await AsyncStorage.getItem('pledge_date');
+                                    const todayStr = new Date().toISOString().split('T')[0];
+                                    if (pledgeDate === todayStr) {
+                                        adjustedStats.pledgedToday = true;
+                                    }
+                                } catch (e) {
+                                    // ignore
+                                }
+                                
+                                // Use fresh local values instead of potentially stale Firestore data
+                                adjustedStats.healthScore = latestHealthScore || adjustedStats.healthScore;
+                                adjustedStats.currentStreak = streakData?.currentStreak ?? adjustedStats.currentStreak;
+                            }
+
+                            setStats(adjustedStats);
+                        } else {
+                            setStats(fetchedStats);
                         }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching user stats:', error);
+                    })
+                    .finally(() => {
+                        setIsLoading(false);
+                    });
 
-                        setStats(adjustedStats);
-                    } else {
-                        setStats(fetchedStats);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching user stats:', error);
-                })
-                .finally(() => {
-                    setIsLoading(false);
-                });
-
-            // Check friend status
-            checkFriendStatus();
+                // Check friend status
+                checkFriendStatus();
+            }
         }
     }, [visible, userId, user?.id]);
 
@@ -176,7 +212,7 @@ export function UserProfilePopup({
 
             await friendService.sendFriendRequest(
                 user.id,
-                user.displayName || 'User',
+                onboardingData?.nickname || user.displayName || user.email || 'User',
                 user.username, // Pass username for GDPR compliance
                 userId,
                 displayName
@@ -231,7 +267,7 @@ export function UserProfilePopup({
     };
 
     const renderFriendButton = () => {
-        if (friendStatus === 'loading' || friendStatus === 'self') {
+        if (friendStatus === 'loading' || friendStatus === 'self' || isMockUser(userId)) {
             return null;
         }
 

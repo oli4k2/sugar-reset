@@ -51,13 +51,13 @@ export default function SupportPage() {
                             Have a question, feedback, or need help? Our support team is happy to assist. You can reach us at:
                         </p>
                         <a
-                            href="mailto:hello@scriptcollective.com"
+                            href="mailto:hello@craveless.info"
                             className="inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-loovi-coral-orange/10 border border-loovi-coral-orange/20 text-loovi-text-primary font-semibold hover:bg-loovi-coral-orange/20 transition-colors"
                         >
                             <svg className="w-5 h-5 text-loovi-coral-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
-                            hello@scriptcollective.com
+                            hello@craveless.info
                         </a>
                         <p className="text-sm text-loovi-text-tertiary mt-4">
                             We aim to respond to all inquiries within 48 hours.
@@ -124,8 +124,8 @@ export default function SupportPage() {
                                 </h3>
                                 <p className="text-loovi-text-secondary leading-relaxed">
                                     First, try closing and reopening the app, or restarting your device. Make sure you have the latest version installed from the App Store or Google Play Store. If the issue persists, please contact us at{" "}
-                                    <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline font-semibold">
-                                        hello@scriptcollective.com
+                                    <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline font-semibold">
+                                        hello@craveless.info
                                     </a>{" "}
                                     with a description of the problem and your device model.
                                 </p>
@@ -184,7 +184,7 @@ export default function SupportPage() {
                             Last updated: February 2026
                         </p>
                         <p className="text-sm text-loovi-text-tertiary">
-                            Contact: <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline">hello@scriptcollective.com</a>
+                            Contact: <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline">hello@craveless.info</a>
                         </p>
                     </div>
                 </div>

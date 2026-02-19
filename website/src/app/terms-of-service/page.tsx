@@ -130,7 +130,7 @@ export default function TermsOfServicePage() {
               6. Account Termination
             </h2>
             <p className="text-loovi-text-secondary mb-4 leading-relaxed">
-              We reserve the right to suspend or terminate your account if you violate these Terms of Service. You may also terminate your account at any time through the app settings or by contacting us at <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline font-semibold">hello@scriptcollective.com</a>.
+              We reserve the right to suspend or terminate your account if you violate these Terms of Service. You may also terminate your account at any time through the app settings or by contacting us at <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline font-semibold">hello@craveless.info</a>.
             </p>
             <p className="text-loovi-text-secondary leading-relaxed">
               Upon termination, your access to the app will be revoked, but you may request deletion of your data in accordance with our Privacy Policy.
@@ -163,7 +163,7 @@ export default function TermsOfServicePage() {
               Last updated: January 2026
             </p>
             <p className="text-sm text-loovi-text-tertiary">
-              Contact: <a href="mailto:hello@scriptcollective.com" className="text-loovi-text-primary hover:underline">hello@scriptcollective.com</a>
+              Contact: <a href="mailto:hello@craveless.info" className="text-loovi-text-primary hover:underline">hello@craveless.info</a>
             </p>
           </div>
         </div>

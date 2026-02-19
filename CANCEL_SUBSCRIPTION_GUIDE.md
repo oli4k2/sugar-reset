@@ -50,7 +50,7 @@
 ### Use Sandbox Accounts Instead!
 
 You have sandbox test accounts set up:
-- `hello@scriptcollective.com`
+- `hello@craveless.info`
 - `g.swets.gs@gmail.com`
 - `olivier@absolum.nl`
 
@@ -82,7 +82,7 @@ You have sandbox test accounts set up:
 
 ### Sandbox Accounts (What You Need):
 - **Purpose:** Testing purchases for FREE
-- **Emails:** hello@scriptcollective.com, g.swets.gs@gmail.com, olivier@absolum.nl
+- **Emails:** hello@craveless.info, g.swets.gs@gmail.com, olivier@absolum.nl
 - **These are for:** Payment testing without real charges
 
 **Key Point:** TestFlight testers can use ANY Apple ID (real or sandbox) to make purchases. Use sandbox accounts for purchases to avoid charges!

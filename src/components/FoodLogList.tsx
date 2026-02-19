@@ -2,10 +2,11 @@
  * FoodLogList
  * 
  * Displays a list of food items for a selected day.
- * Shows: Image, Name, Calories, Sugar, Health Score
+ * Shows: Image, Name, Calories, Added Sugar, Health Score
+ * Includes visual sugar meter comparing to daily recommended limit.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -17,15 +18,18 @@ import {
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { ScannedItem, getHealthScoreColor } from '../services/scannerService';
+import { getDailyAddedSugarLimit } from '../services/streakService';
 
 interface FoodLogListProps {
     items: ScannedItem[];
     onItemPress: (item: ScannedItem) => void;
     emptyMessage?: string;
+    dailySugarLimit?: number;
 }
 
 function FoodItemRow({ item, onPress }: { item: ScannedItem; onPress: () => void }) {
     const healthColor = getHealthScoreColor(item.healthScore);
+    const addedSugar = item.addedSugar !== undefined ? item.addedSugar : (item.sugar || 0);
 
     return (
         <TouchableOpacity style={styles.itemRow} onPress={onPress} activeOpacity={0.7}>
@@ -48,8 +52,8 @@ function FoodItemRow({ item, onPress }: { item: ScannedItem; onPress: () => void
                     </Text>
                     <Text style={styles.itemStatDivider}>•</Text>
                     <Text style={styles.itemStat}>
-                        <Text style={styles.itemStatValue}>{Math.round((item.sugar || 0) * 10) / 10}</Text>
-                        <Text style={styles.itemStatUnit}>g sugar</Text>
+                        <Text style={styles.itemStatValue}>{Math.round(addedSugar * 10) / 10}</Text>
+                        <Text style={styles.itemStatUnit}>g added sugar</Text>
                     </Text>
                 </View>
             </View>
@@ -67,7 +71,17 @@ function FoodItemRow({ item, onPress }: { item: ScannedItem; onPress: () => void
     );
 }
 
-export function FoodLogList({ items, onItemPress, emptyMessage }: FoodLogListProps) {
+export function FoodLogList({ items, onItemPress, emptyMessage, dailySugarLimit: propLimit }: FoodLogListProps) {
+    const [dailySugarLimit, setDailySugarLimit] = useState(propLimit || 25);
+
+    useEffect(() => {
+        if (propLimit !== undefined) {
+            setDailySugarLimit(propLimit);
+        } else {
+            getDailyAddedSugarLimit().then(limit => setDailySugarLimit(limit));
+        }
+    }, [propLimit]);
+
     if (items.length === 0) {
         return (
             <View style={styles.emptyContainer}>
@@ -80,15 +94,24 @@ export function FoodLogList({ items, onItemPress, emptyMessage }: FoodLogListPro
     // Calculate totals and round to prevent floating-point precision issues
     const rawTotals = items.reduce((acc, item) => ({
         calories: acc.calories + (item.calories || 0),
-        sugar: acc.sugar + (item.sugar || 0),
+        addedSugar: acc.addedSugar + (item.addedSugar !== undefined ? item.addedSugar : (item.sugar || 0)),
         protein: acc.protein + (item.protein || 0),
-    }), { calories: 0, sugar: 0, protein: 0 });
+    }), { calories: 0, addedSugar: 0, protein: 0 });
 
     const totals = {
         calories: Math.round(rawTotals.calories),
-        sugar: Math.round(rawTotals.sugar * 10) / 10, // One decimal for sugar
+        addedSugar: Math.round(rawTotals.addedSugar * 10) / 10, // One decimal for sugar
         protein: Math.round(rawTotals.protein),
     };
+
+    // Sugar meter colors
+    const sugarColor = totals.addedSugar <= dailySugarLimit
+        ? '#22C55E'
+        : totals.addedSugar <= (dailySugarLimit * 2)
+            ? '#F59E0B'
+            : '#EF4444';
+
+    const sugarFillPercent = Math.min((totals.addedSugar / (dailySugarLimit * 2)) * 100, 100);
 
     return (
         <View style={styles.container}>
@@ -100,13 +123,40 @@ export function FoodLogList({ items, onItemPress, emptyMessage }: FoodLogListPro
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
-                    <Text style={styles.summaryValue}>{totals.sugar}g</Text>
-                    <Text style={styles.summaryLabel}>sugar</Text>
+                    <Text style={[styles.summaryValue, { color: sugarColor }]}>{totals.addedSugar}g</Text>
+                    <Text style={styles.summaryLabel}>Added Sugar</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
                     <Text style={styles.summaryValue}>{totals.protein}g</Text>
                     <Text style={styles.summaryLabel}>protein</Text>
+                </View>
+            </View>
+
+            {/* Sugar Meter */}
+            <View style={styles.sugarMeter}>
+                <View style={styles.sugarMeterHeader}>
+                    <Text style={styles.sugarMeterLabel}>Added Sugar</Text>
+                    <Text style={styles.sugarMeterValue}>
+                        {totals.addedSugar}g / {dailySugarLimit}g recommended
+                    </Text>
+                </View>
+                <View style={styles.sugarMeterTrack}>
+                    <View
+                        style={[
+                            styles.sugarMeterFill,
+                            {
+                                width: `${sugarFillPercent}%`,
+                                backgroundColor: sugarColor,
+                            },
+                        ]}
+                    />
+                    <View style={styles.sugarMeterMarker} />
+                </View>
+                <View style={styles.sugarMeterLabels}>
+                    <Text style={styles.sugarMeterMarkerLabel}>0g</Text>
+                    <Text style={[styles.sugarMeterMarkerLabel, { position: 'absolute', left: '50%' }]}>{dailySugarLimit}g</Text>
+                    <Text style={styles.sugarMeterMarkerLabel}>{dailySugarLimit * 2}g+</Text>
                 </View>
             </View>
 
@@ -131,7 +181,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-around',
         alignItems: 'center',
         paddingVertical: spacing.md,
-        marginBottom: spacing.md,
+        marginBottom: spacing.sm,
         backgroundColor: 'rgba(59, 130, 246, 0.08)',
         borderRadius: borderRadius.lg,
     },
@@ -154,6 +204,54 @@ const styles = StyleSheet.create({
         height: 30,
         backgroundColor: 'rgba(0, 0, 0, 0.1)',
     },
+    // Sugar Meter
+    sugarMeter: {
+        marginBottom: spacing.md,
+    },
+    sugarMeterHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: spacing.sm,
+    },
+    sugarMeterLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: looviColors.text.primary,
+    },
+    sugarMeterValue: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: looviColors.text.tertiary,
+    },
+    sugarMeterTrack: {
+        height: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        borderRadius: 4,
+        position: 'relative',
+    },
+    sugarMeterFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    sugarMeterMarker: {
+        position: 'absolute',
+        left: '50%',
+        top: -2,
+        width: 2,
+        height: 12,
+        backgroundColor: looviColors.text.tertiary,
+    },
+    sugarMeterLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 4,
+        position: 'relative',
+    },
+    sugarMeterMarkerLabel: {
+        fontSize: 10,
+        color: looviColors.text.muted,
+    },
+    // Item Row
     itemRow: {
         flexDirection: 'row',
         alignItems: 'center',

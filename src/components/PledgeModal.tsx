@@ -26,6 +26,10 @@ import LooviBackground, { looviColors } from './LooviBackground';
  * - High-end "Ceremonial" feel.
  * - Under-screen sensor metaphor.
  * - Full-screen immersive experience.
+ * 
+ * Performance: Spinning blob rotations use Animated.View wrappers with
+ * useNativeDriver: true so the UI thread handles them at 60 fps without
+ * blocking the JS thread (which runs haptics & state changes).
  */
 
 interface PledgeModalProps {
@@ -62,9 +66,6 @@ const generateBlob = (radius: number, lobes: number, intensity: number) => {
     return d;
 };
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedG = Animated.createAnimatedComponent(G);
-
 export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPledgeComplete }) => {
     const [isHolding, setIsHolding] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
@@ -72,12 +73,12 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
     // Animation Drivers
     const progressDriver = useRef(new Animated.Value(0)).current;
 
-    // Continuous Spinners
+    // Continuous Spinners – driven on the native thread (useNativeDriver: true)
     const spin1 = useRef(new Animated.Value(0)).current;
     const spin2 = useRef(new Animated.Value(0)).current;
     const spin3 = useRef(new Animated.Value(0)).current;
 
-    // Reactivity
+    // Reactivity (these drive scale/translate on the lotus container which is non-native because of SVG)
     const elasticScale = useRef(new Animated.Value(0.5)).current;
     const tensionDriver = useRef(new Animated.Value(0)).current;
     const sensorLightDriver = useRef(new Animated.Value(0)).current;
@@ -89,11 +90,9 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
         PanResponder.create({
             onStartShouldSetPanResponder: () => false,
             onMoveShouldSetPanResponder: (_, gestureState) => {
-                // Only respond to downward swipes from top
                 return gestureState.dy > 10 && Math.abs(gestureState.dx) < Math.abs(gestureState.dy);
             },
             onPanResponderRelease: (_, gestureState) => {
-                // If swiped down more than 100px, dismiss
                 if (gestureState.dy > 100 && !isCompleted) {
                     onClose();
                 }
@@ -101,9 +100,10 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
         })
     ).current;
 
-    // Success Animations
+    // Success Animations – use native driver for smooth crossfade
     const flashAnim = useRef(new Animated.Value(0)).current;
-    const rewardAnim = useRef(new Animated.Value(300)).current; // Start off-screen
+    const rewardOpacity = useRef(new Animated.Value(0)).current;
+    const rewardTranslateY = useRef(new Animated.Value(40)).current;
     const hapticTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const startTimeRef = useRef<number>(0);
 
@@ -131,19 +131,21 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
 
         // Reset Success
         flashAnim.setValue(0);
-        rewardAnim.setValue(300);
+        rewardOpacity.setValue(0);
+        rewardTranslateY.setValue(40);
     };
 
     const startVibrantMotion = () => {
-        Animated.loop(Animated.timing(spin1, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: false })).start();
-        Animated.loop(Animated.timing(spin2, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: false })).start();
-        Animated.loop(Animated.timing(spin3, { toValue: 1, duration: 10000, easing: Easing.linear, useNativeDriver: false })).start();
+        // Spinning animations on native thread for smooth 60 fps rotation
+        Animated.loop(Animated.timing(spin1, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: true })).start();
+        Animated.loop(Animated.timing(spin2, { toValue: 1, duration: 12000, easing: Easing.linear, useNativeDriver: true })).start();
+        Animated.loop(Animated.timing(spin3, { toValue: 1, duration: 10000, easing: Easing.linear, useNativeDriver: true })).start();
 
+        // Glow flicker is subtle & infrequent – keep on JS thread (drives opacity on SVG)
         Animated.loop(
             Animated.sequence([
-                Animated.timing(glowFlicker, { toValue: 1, duration: 50, useNativeDriver: false }),
-                Animated.timing(glowFlicker, { toValue: 0.2, duration: 80, useNativeDriver: false }),
-                Animated.timing(glowFlicker, { toValue: 0.6, duration: 120, useNativeDriver: false }),
+                Animated.timing(glowFlicker, { toValue: 1, duration: 800, useNativeDriver: false }),
+                Animated.timing(glowFlicker, { toValue: 0.4, duration: 1200, useNativeDriver: false }),
             ])
         ).start();
     };
@@ -152,13 +154,12 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
         if (!startTimeRef.current) return;
         const elapsed = Date.now() - startTimeRef.current;
         const p = Math.min(elapsed / DURATION, 1);
-        // Reduced frequency: min 100ms (was 50), base 300ms (was 400)
-        const delay = Math.max(100, 300 * (1 - p) + 100);
+        // Gentler haptic timing: less frequent to avoid JS-thread stalls
+        const delay = Math.max(150, 350 * (1 - p) + 150);
 
         if (p >= 1) return;
         if (p > 0.8) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        else if (p > 0.3) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        // Skip early haptics to reduce calls
+        else if (p > 0.4) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         hapticTimeoutRef.current = setTimeout(runHapticLoop, delay);
     };
@@ -181,11 +182,11 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
                     useNativeDriver: false,
                 }).start();
 
-                // 2. Jitter - Slowed down for smoother animation
+                // 2. Jitter – slower intervals for smoother feel
                 Animated.loop(
                     Animated.sequence([
-                        Animated.timing(tensionDriver, { toValue: 1, duration: 80, useNativeDriver: false }),
-                        Animated.timing(tensionDriver, { toValue: -1, duration: 80, useNativeDriver: false }),
+                        Animated.timing(tensionDriver, { toValue: 1, duration: 120, useNativeDriver: false }),
+                        Animated.timing(tensionDriver, { toValue: -1, duration: 120, useNativeDriver: false }),
                     ])
                 ).start();
 
@@ -240,40 +241,81 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
         if (hapticTimeoutRef.current) clearTimeout(hapticTimeoutRef.current);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        // 1. Flash of "Enlightenment"
-        Animated.timing(flashAnim, {
-            toValue: 1,
-            duration: 150,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: false
-        }).start(({ finished }) => {
-            if (finished) {
-                // Flash reached peak opacity (White Screen)
-                // Now switch state to Completed (hides old Lotus, shows new Seal)
-                setIsCompleted(true);
+        // Switch to completed state FIRST (renders success content behind flash)
+        setIsCompleted(true);
 
-                // Fade flash out
+        // Brief flash then smooth crossfade reveal (no white glitch)
+        Animated.sequence([
+            // Quick flash to white
+            Animated.timing(flashAnim, {
+                toValue: 1,
+                duration: 120,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+            }),
+            // Small hold so the success UI is fully mounted
+            Animated.delay(50),
+            // Fade flash out while sliding in reward content
+            Animated.parallel([
                 Animated.timing(flashAnim, {
                     toValue: 0,
-                    duration: 800,
-                    useNativeDriver: false
-                }).start();
-
-                // Slide in Reward
-                Animated.spring(rewardAnim, {
+                    duration: 600,
+                    easing: Easing.out(Easing.quad),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(rewardOpacity, {
+                    toValue: 1,
+                    duration: 600,
+                    easing: Easing.out(Easing.quad),
+                    useNativeDriver: true,
+                }),
+                Animated.spring(rewardTranslateY, {
                     toValue: 0,
-                    friction: 12,
+                    friction: 14,
                     tension: 50,
-                    useNativeDriver: false,
-                }).start();
-            }
-        });
+                    useNativeDriver: true,
+                }),
+            ]),
+        ]).start();
     };
 
 
     // --- INTERPOLATIONS ---
     const jitterX = tensionDriver.interpolate({ inputRange: [-1, 1], outputRange: [-2, 2] });
     const jitterY = tensionDriver.interpolate({ inputRange: [-1, 1], outputRange: [-1, 1] });
+
+    // Spin interpolations (native-driver compatible)
+    const spinRotate1 = spin1.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+    const spinRotate2 = spin2.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
+    const spinRotate3 = spin3.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
+
+    // Shared blob SVG renderer – each blob is wrapped in its own Animated.View for native rotation
+    const renderBlobLayer = (
+        blobPath: string,
+        gradId: string,
+        color: string,
+        rotation: Animated.AnimatedInterpolation<string>,
+        opacity: number = 1,
+    ) => (
+        <Animated.View
+            style={{
+                position: 'absolute',
+                width: 400,
+                height: 400,
+                transform: [{ rotate: rotation }],
+            }}
+        >
+            <Svg width="400" height="400" viewBox="-200 -200 400 400">
+                <Defs>
+                    <RadialGradient id={gradId} cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
+                        <Stop offset="0" stopColor={color} stopOpacity="0.8" />
+                        <Stop offset="1" stopColor={color} stopOpacity="0" />
+                    </RadialGradient>
+                </Defs>
+                <Path d={blobPath} fill={`url(#${gradId})`} opacity={opacity} />
+            </Svg>
+        </Animated.View>
+    );
 
 
     return (
@@ -336,7 +378,7 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
 
                                     <View style={styles.hub}>
 
-                                        {/* LOTUS AURA (Underneath) */}
+                                        {/* LOTUS AURA (Underneath) – each blob rotated via native-driver Animated.View */}
                                         <Animated.View style={[
                                             styles.lotusContainer,
                                             {
@@ -344,34 +386,9 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
                                                 transform: [{ scale: elasticScale }, { translateX: jitterX }, { translateY: jitterY }]
                                             }
                                         ]}>
-                                            <Svg width="400" height="400" viewBox="-200 -200 400 400">
-                                                <Defs>
-                                                    <RadialGradient id="gradCoral" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.coral} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.coral} stopOpacity="0" />
-                                                    </RadialGradient>
-                                                    <RadialGradient id="gradSage" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.sage} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.sage} stopOpacity="0" />
-                                                    </RadialGradient>
-                                                    <RadialGradient id="gradCream" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.cream} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.cream} stopOpacity="0" />
-                                                    </RadialGradient>
-                                                </Defs>
-                                                {/* @ts-ignore */}
-                                                <AnimatedG style={{ transform: [{ rotate: spin1.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-                                                    <Path d={blobCoral} fill="url(#gradCoral)" />
-                                                </AnimatedG>
-                                                {/* @ts-ignore */}
-                                                <AnimatedG style={{ transform: [{ rotate: spin2.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] }) }] }}>
-                                                    <Path d={blobSage} fill="url(#gradSage)" opacity={0.9} />
-                                                </AnimatedG>
-                                                {/* @ts-ignore */}
-                                                <AnimatedG style={{ transform: [{ rotate: spin3.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
-                                                    <Path d={blobCream} fill="url(#gradCream)" opacity={0.8} />
-                                                </AnimatedG>
-                                            </Svg>
+                                            {renderBlobLayer(blobCoral, 'gradCoral', PLEDGE_COLORS.coral, spinRotate1)}
+                                            {renderBlobLayer(blobSage, 'gradSage', PLEDGE_COLORS.sage, spinRotate2, 0.9)}
+                                            {renderBlobLayer(blobCream, 'gradCream', PLEDGE_COLORS.cream, spinRotate3, 0.8)}
                                         </Animated.View>
 
                                         {/* ATMOSPHERIC GLOW */}
@@ -442,49 +459,24 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
                                 <Animated.View style={[
                                     styles.successCenter,
                                     {
-                                        opacity: flashAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }), // Reveal as flash fades
-                                        transform: [{ translateY: rewardAnim }]
+                                        opacity: rewardOpacity,
+                                        transform: [{ translateY: rewardTranslateY }],
                                     }
                                 ]}>
                                     <View style={styles.successSealContainer}>
 
                                         {/* Living Lotus Aura (Behind Seal) */}
-                                        <Animated.View style={[
+                                        <View style={[
                                             styles.lotusContainer,
                                             {
-                                                transform: [{ scale: 0.6 }], // Scaled down for the result view
+                                                transform: [{ scale: 0.6 }],
                                                 opacity: 0.8,
                                             }
                                         ]}>
-                                            <Svg width="400" height="400" viewBox="-200 -200 400 400">
-                                                <Defs>
-                                                    <RadialGradient id="gradCoralSuccess" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.coral} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.coral} stopOpacity="0" />
-                                                    </RadialGradient>
-                                                    <RadialGradient id="gradSageSuccess" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.sage} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.sage} stopOpacity="0" />
-                                                    </RadialGradient>
-                                                    <RadialGradient id="gradCreamSuccess" cx="0%" cy="0%" rx="100%" ry="100%" fx="0%" fy="0%" gradientUnits="userSpaceOnUse">
-                                                        <Stop offset="0" stopColor={PLEDGE_COLORS.cream} stopOpacity="0.8" />
-                                                        <Stop offset="1" stopColor={PLEDGE_COLORS.cream} stopOpacity="0" />
-                                                    </RadialGradient>
-                                                </Defs>
-                                                {/* @ts-ignore */}
-                                                <AnimatedG style={{ transform: [{ rotate: spin1.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-                                                    <Path d={blobCoral} fill="url(#gradCoralSuccess)" />
-                                                </AnimatedG>
-                                                {/* @ts-ignore */}
-                                                <AnimatedG style={{ transform: [{ rotate: spin2.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] }) }] }}>
-                                                    <Path d={blobSage} fill="url(#gradSageSuccess)" opacity={0.9} />
-                                                </AnimatedG>
-                                                {/* @ts-ignore */}
-                                                <AnimatedG style={{ transform: [{ rotate: spin3.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) }] }}>
-                                                    <Path d={blobCream} fill="url(#gradCreamSuccess)" opacity={0.8} />
-                                                </AnimatedG>
-                                            </Svg>
-                                        </Animated.View>
+                                            {renderBlobLayer(blobCoral, 'gradCoralS', PLEDGE_COLORS.coral, spinRotate1)}
+                                            {renderBlobLayer(blobSage, 'gradSageS', PLEDGE_COLORS.sage, spinRotate2, 0.9)}
+                                            {renderBlobLayer(blobCream, 'gradCreamS', PLEDGE_COLORS.cream, spinRotate3, 0.8)}
+                                        </View>
 
                                         <View style={styles.glassButtonSuccess}>
                                             <View style={[

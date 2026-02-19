@@ -12,33 +12,75 @@ import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { GlassCard } from './GlassCard';
 
-// Phase definitions based on plan progress
+// Phase definitions based on plan progress - More granular phases, especially early on
 const PHASES = [
     {
         minPercent: 0,
+        maxPercent: 5,
+        name: 'Phase 1: Starting Out',
+        feeling: 'taking your first steps',
+        endFeeling: 'you\'ve begun your journey',
+    },
+    {
+        minPercent: 5,
+        maxPercent: 10,
+        name: 'Phase 2: First Steps',
+        feeling: 'building your foundation',
+        endFeeling: 'establishing new routines',
+    },
+    {
+        minPercent: 10,
+        maxPercent: 15,
+        name: 'Phase 3: Building Foundation',
+        feeling: 'creating healthy habits',
+        endFeeling: 'patterns are forming',
+    },
+    {
+        minPercent: 15,
+        maxPercent: 20,
+        name: 'Phase 4: Early Progress',
+        feeling: 'seeing initial results',
+        endFeeling: 'momentum is building',
+    },
+    {
+        minPercent: 20,
         maxPercent: 25,
-        name: 'Phase 1: Detox',
+        name: 'Phase 5: Gaining Momentum',
+        feeling: 'feeling more in control',
+        endFeeling: 'habits are strengthening',
+    },
+    {
+        minPercent: 25,
+        maxPercent: 35,
+        name: 'Phase 6: Detox',
         feeling: 'experiencing cravings and adjustment',
         endFeeling: 'cravings will start to decrease',
     },
     {
-        minPercent: 25,
+        minPercent: 35,
         maxPercent: 50,
-        name: 'Phase 2: Adaptation',
+        name: 'Phase 7: Adaptation',
         feeling: 'adapting to lower sugar intake',
         endFeeling: 'energy levels will stabilize',
     },
     {
         minPercent: 50,
-        maxPercent: 75,
-        name: 'Phase 3: Momentum',
+        maxPercent: 65,
+        name: 'Phase 8: Momentum',
         feeling: 'building healthy habits',
         endFeeling: 'taste preferences will change',
     },
     {
-        minPercent: 75,
+        minPercent: 65,
+        maxPercent: 80,
+        name: 'Phase 9: Strengthening',
+        feeling: 'habits becoming second nature',
+        endFeeling: 'confidence is growing',
+    },
+    {
+        minPercent: 80,
         maxPercent: 100,
-        name: 'Phase 4: Mastery',
+        name: 'Phase 10: Mastery',
         feeling: 'mastering your sugar-free lifestyle',
         endFeeling: 'feel in complete control',
     },

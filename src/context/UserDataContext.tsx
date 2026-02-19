@@ -84,6 +84,9 @@ interface UserDataContextType {
     deleteJournalEntry: (id: string) => Promise<void>;
     getLatestJournalEntry: () => JournalEntry | null;
     getJournalEntries: (limit?: number) => JournalEntry[];
+
+    // Logout helper
+    resetForLogout: () => void;
 }
 
 const defaultStreakData: StreakData = {
@@ -166,6 +169,17 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             const needsAuth = await onboardingService.isPostPaywallAuthRequired();
             setPostPaywallAuthRequiredState(needsAuth);
 
+            // Load persisted journal entries from AsyncStorage
+            try {
+                const storedJournal = await AsyncStorage.getItem('journal_entries');
+                if (storedJournal) {
+                    const parsed: JournalEntry[] = JSON.parse(storedJournal);
+                    setJournalEntries(parsed.sort((a, b) => b.createdAt - a.createdAt));
+                }
+            } catch (error) {
+                console.error('Failed to load journal entries:', error);
+            }
+
             // If authenticated, try to load from Firebase with timeout
             if (isAuthenticated && userId) {
                 // Use Promise.race for timeout - don't block if Firestore is slow
@@ -219,28 +233,8 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
     // Calculate streak from food logs after initial load
     useEffect(() => {
         if (hasLoadedOnce && onboardingData?.startDate) {
-            // Calculate initial food-based streak
-            const planType = (onboardingData?.plan || 'cold_turkey') as PlanType;
-            const startDate = new Date(onboardingData.startDate);
-
-            calculateStreak(planType, startDate).then(result => {
-                setStreakResult(result);
-
-                // Convert to legacy StreakData format
-                const legacyStreakData: StreakData = {
-                    currentStreak: result.currentStreak,
-                    longestStreak: result.longestStreak,
-                    lastCheckIn: result.lastValidDate ? new Date(result.lastValidDate) : null,
-                    startDate: startDate,
-                    totalDaysSugarFree: result.totalDaysUnderTarget,
-                };
-                setStreakData(legacyStreakData);
-            }).catch(err => {
-                // Log only in development (non-critical background operation)
-                if (__DEV__) {
-                    console.error('Error calculating initial streak:', err);
-                }
-            });
+            // Use refreshStreakFromFoodLogs for consistent effective start date logic
+            refreshStreakFromFoodLogs();
         }
     }, [hasLoadedOnce, onboardingData?.startDate, onboardingData?.plan]);
 
@@ -312,21 +306,43 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
 
             // Calculate effective start date for the timer
             let effectiveStartDate = new Date();
+
+            // Determine if the user is currently "on track" today
+            // (either under target with food logged, or no food yet = grace period / not broken)
+            const todayOnTrack = result.todayStatus
+                ? (!result.todayStatus.hasLogs || result.todayStatus.isUnderTarget)
+                : true;
+
             if (result.currentStreak > 0) {
+                // Streak has completed days - count from streak beginning
+                await AsyncStorage.removeItem('streak_broken_at');
+
                 const onboardingStart = new Date(onboardingData.startDate || new Date());
                 const daysSinceStart = Math.floor((Date.now() - onboardingStart.getTime()) / (1000 * 60 * 60 * 24));
 
                 // If streak matches the full time since onboarding (approx), use original start date
-                // This preserves the exact time of day they started
                 if (Math.abs(result.currentStreak - daysSinceStart) <= 1) {
                     effectiveStartDate = onboardingStart;
                 } else {
-                    // Otherwise, streak started more recently. Calculate backwards.
                     effectiveStartDate.setDate(effectiveStartDate.getDate() - result.currentStreak);
                 }
+            } else if (todayOnTrack) {
+                // currentStreak is 0 but user is on track today (no completed day yet)
+                // Use the plan start date so the timer counts from when they started
+                await AsyncStorage.removeItem('streak_broken_at');
+                effectiveStartDate = new Date(onboardingData.startDate || new Date());
             } else {
-                // Streak is 0 (broken or not started). Timer should effectively show 0.
-                effectiveStartDate = new Date();
+                // Streak is truly broken (user exceeded sugar target today or past days broke it).
+                // Only set the broken timestamp ONCE when the streak first breaks.
+                // On subsequent refreshes, re-use the stored timestamp so the timer
+                // continues counting up from the moment the streak broke.
+                const storedBrokenAt = await AsyncStorage.getItem('streak_broken_at');
+                if (storedBrokenAt) {
+                    effectiveStartDate = new Date(storedBrokenAt);
+                } else {
+                    effectiveStartDate = new Date();
+                    await AsyncStorage.setItem('streak_broken_at', effectiveStartDate.toISOString());
+                }
             }
 
             // Convert to legacy StreakData format for backward compatibility
@@ -440,6 +456,9 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             [today]: { status: 'had_sugar' },
         }));
 
+        // Store the streak broken timestamp so the timer counts from this moment
+        await AsyncStorage.setItem('streak_broken_at', now.toISOString());
+
         if (isAuthenticated && userId) {
             await userService.updateStreak(userId, {
                 currentStreak: 0,
@@ -518,10 +537,16 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             createdAt: Date.now(),
         };
 
-        setJournalEntries(prev => [newEntry, ...prev].sort((a, b) => b.createdAt - a.createdAt));
+        const updated = [newEntry, ...journalEntries].sort((a, b) => b.createdAt - a.createdAt);
+        setJournalEntries(updated);
 
-        // TODO: Persist to AsyncStorage and sync to Firebase
-    }, []);
+        // Persist to AsyncStorage
+        try {
+            await AsyncStorage.setItem('journal_entries', JSON.stringify(updated));
+        } catch (error) {
+            console.error('Failed to persist journal entry:', error);
+        }
+    }, [journalEntries]);
 
     const getLatestJournalEntry = useCallback(() => {
         if (journalEntries.length === 0) return null;
@@ -534,15 +559,46 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
     }, [journalEntries]);
 
     const updateJournalEntry = useCallback(async (id: string, updates: Partial<Omit<JournalEntry, 'id' | 'createdAt'>>) => {
-        setJournalEntries(prev => prev.map(entry =>
+        const updated = journalEntries.map(entry =>
             entry.id === id ? { ...entry, ...updates } : entry
-        ));
-        // TODO: Persist to AsyncStorage and sync to Firebase
-    }, []);
+        );
+        setJournalEntries(updated);
+
+        // Persist to AsyncStorage
+        try {
+            await AsyncStorage.setItem('journal_entries', JSON.stringify(updated));
+        } catch (error) {
+            console.error('Failed to persist journal update:', error);
+        }
+    }, [journalEntries]);
 
     const deleteJournalEntry = useCallback(async (id: string) => {
-        setJournalEntries(prev => prev.filter(entry => entry.id !== id));
-        // TODO: Persist to AsyncStorage and sync to Firebase
+        const updated = journalEntries.filter(entry => entry.id !== id);
+        setJournalEntries(updated);
+
+        // Persist to AsyncStorage
+        try {
+            await AsyncStorage.setItem('journal_entries', JSON.stringify(updated));
+        } catch (error) {
+            console.error('Failed to persist journal deletion:', error);
+        }
+    }, [journalEntries]);
+
+    // Reset all in-memory state on logout so navigation doesn't use stale values
+    const resetForLogout = useCallback(() => {
+        setOnboardingData({});
+        setHasCompletedOnboarding(false);
+        setOnboardingCheckpointState(null);
+        setPostPaywallAuthRequiredState(false);
+        setStreakData(null);
+        setStreakResult(null);
+        setTodayCheckIn(null);
+        setCheckInHistory({});
+        setAchievements([]);
+        setJournalEntries([]);
+        setLatestHealthScore(0);
+        setInnerCircle([]);
+        setHasLoadedOnce(false);
     }, []);
 
     const value: UserDataContextType = {
@@ -579,27 +635,37 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         updateHealthScore: setLatestHealthScore,
         innerCircle,
         updateInnerCircle: setInnerCircle,
+        resetForLogout,
     };
 
     // Sync stats to Firestore when they change (Phase 1)
+    // NOTE: pledgedToday is synced separately from HomeScreen when the user actually pledges.
+    // We do NOT overwrite it here, because that would reset it to false.
     useEffect(() => {
         if (isAuthenticated && userId && streakData) {
-            // Debounce sync slightly or just sync on change (firestore handles merge)
-            // We only sync if we have meaningful data
-            userService.syncUserStats(userId, {
-                currentStreak: streakData.currentStreak,
-                healthScore: latestHealthScore,
-                goalAchieved: streakData.currentStreak > 0, // Simplified for now
-                pledgedToday: !!todayCheckIn, // True if user has checked in today
-                updatedAt: new Date(),
-            }).then(() => {
-                // Trigger community stats update in the background
-                communityStatsService.triggerStatsUpdate();
-            }).catch(err => {
-                console.error('Failed to sync user stats:', err);
-            });
+            const syncStats = async () => {
+                try {
+                    // Check if user has pledged today via AsyncStorage
+                    const pledgeDate = await AsyncStorage.getItem('pledge_date');
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const hasPledged = pledgeDate === todayStr;
+
+                    await userService.syncUserStats(userId, {
+                        currentStreak: streakData.currentStreak,
+                        healthScore: latestHealthScore,
+                        goalAchieved: streakData.currentStreak > 0,
+                        pledgedToday: hasPledged,
+                        updatedAt: new Date(),
+                    });
+                    // Trigger community stats update in the background
+                    communityStatsService.triggerStatsUpdate();
+                } catch (err) {
+                    console.error('Failed to sync user stats:', err);
+                }
+            };
+            syncStats();
         }
-    }, [isAuthenticated, userId, streakData, latestHealthScore, todayCheckIn?.mood]);
+    }, [isAuthenticated, userId, streakData, latestHealthScore]);
 
     return (
         <UserDataContext.Provider value={value}>

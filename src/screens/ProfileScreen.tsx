@@ -45,6 +45,8 @@ import * as Haptics from 'expo-haptics';
 import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
 import CancellationOfferScreen from '../components/CancellationOfferScreen';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
+import { PhasePreviewModal } from '../components/PhasePreviewModal';
+import { PlanPhasesPreviewModal } from '../components/PlanPhasesPreviewModal';
 
 interface MenuItem {
     id: string;
@@ -59,7 +61,7 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
         title: 'Account',
         items: [
             { id: 'profile', emoji: '👤', label: 'Edit Profile' },
-            { id: 'restore', emoji: '🔄', label: 'Restore Purchases' },
+
             { id: 'deleteAccount', emoji: '⚠️', label: 'Delete Account' },
         ],
     },
@@ -90,6 +92,8 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
             { id: 'migrateUsernames', emoji: '👤', label: 'Migrate Usernames (GDPR)' },
             { id: 'testReviewPrompt', emoji: '⭐', label: 'Test Review Popup' },
+            { id: 'phasePreview', emoji: '🌱', label: 'Phase Animation Preview' },
+            { id: 'planPhasesPreview', emoji: '📋', label: 'Plan Phases Preview' },
         ],
     }] : []),
     {
@@ -102,31 +106,46 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
 ];
 
 export default function ProfileScreen() {
-    const { onboardingData, streakData, updateOnboardingData, latestHealthScore, todayCheckIn } = useUserData();
+    const { onboardingData, streakData, updateOnboardingData, latestHealthScore, todayCheckIn, resetForLogout } = useUserData();
     const { user, isAuthenticated, firebaseUser, refreshUser } = useAuthContext();
     const { signOut } = useAuth();
-    const { restorePurchases, isPremium, customerInfo, currentOffering, purchasePackage } = useRevenueCat();
+    const { isPremium, customerInfo, currentOffering, purchasePackage } = useRevenueCat();
     const navigation = useNavigation<any>();
     const [showCancellationOffer, setShowCancellationOffer] = useState(false);
+    const [showPhasePreview, setShowPhasePreview] = useState(false);
+    const [showPlanPhasesPreview, setShowPlanPhasesPreview] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
-    const [isRestoring, setIsRestoring] = useState(false);
+
     const [selectedAvatarType, setSelectedAvatarType] = useState<'photo' | 'emoji' | 'initial'>('initial');
     const [selectedAvatarValue, setSelectedAvatarValue] = useState<string>('');
     const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+    const [showEmojiModal, setShowEmojiModal] = useState(false);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
     const [showReviewPrompt, setShowReviewPrompt] = useState(false);
     const [reviewPromptVariant, setReviewPromptVariant] = useState<'first_scan' | 'day_two'>('first_scan');
 
-    // Fetch pledge status from Firebase (same source as UserProfilePopup)
+    // Fetch pledge status — check AsyncStorage first (instant), then Firestore
     useEffect(() => {
         const loadPledgeStatus = async () => {
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // Check AsyncStorage first (instant, survives app close)
+            try {
+                const pledgeDate = await AsyncStorage.getItem('pledge_date');
+                if (pledgeDate === todayStr) {
+                    setHasPledgedToday(true);
+                    return;
+                }
+            } catch (e) {
+                // fall through to Firestore
+            }
+
             if (!firebaseUser?.uid) {
-                // Fallback to context if not authenticated
-                setHasPledgedToday(!!todayCheckIn);
+                setHasPledgedToday(false);
                 return;
             }
 
@@ -143,13 +162,12 @@ export default function ProfileScreen() {
                 }
             } catch (error) {
                 console.warn('Failed to fetch pledge status:', error);
-                // Fallback to context
-                setHasPledgedToday(!!todayCheckIn);
+                setHasPledgedToday(false);
             }
         };
 
         loadPledgeStatus();
-    }, [firebaseUser?.uid, todayCheckIn]);
+    }, [firebaseUser?.uid]);
 
     // Determine auth provider type
     const authProvider = useMemo((): 'google' | 'apple' | 'email' | 'unknown' => {
@@ -185,30 +203,7 @@ export default function ProfileScreen() {
     // Health score display
     const healthScoreDisplay = latestHealthScore > 0 ? latestHealthScore : '--';
 
-    const handleRestorePurchases = async () => {
-        try {
-            setIsRestoring(true);
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await restorePurchases();
 
-            // Check if restore was successful
-            if (isPremium) {
-                Alert.alert('Success', 'Your purchases have been restored!');
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } else {
-                Alert.alert('No Purchases Found', 'We couldn\'t find any purchases to restore.');
-            }
-        } catch (error: any) {
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert(
-                'Restore Failed',
-                error.message || 'Unable to restore purchases. Please try again.',
-                [{ text: 'OK' }]
-            );
-        } finally {
-            setIsRestoring(false);
-        }
-    };
 
     const handleClearAllData = () => {
         Alert.alert(
@@ -342,10 +337,11 @@ export default function ProfileScreen() {
                                                 'Attempting client-side migration...',
                                                 [{ text: 'OK' }]
                                             );
-                                            
+
                                             // Try to update current user if they don't have username
                                             if (user?.id && !user.username) {
                                                 try {
+                                                    const { db } = await import('../config/firebase');
                                                     const { generateUniqueUsername } = await import('../utils/usernameGenerator');
                                                     const username = await generateUniqueUsername(db);
                                                     await userService.updateDisplayName(user.id, user.displayName || '');
@@ -487,6 +483,10 @@ export default function ProfileScreen() {
                             // This includes wellness logs, food logs, pledges, and all other local storage
                             await AsyncStorage.clear();
                             console.log('✅ Cleared all AsyncStorage data on logout');
+
+                            // Reset in-memory context state so navigation uses fresh values
+                            // (prevents landing on Paywall instead of Welcome)
+                            resetForLogout();
 
                             await signOut();
                             navigation.reset({
@@ -787,11 +787,11 @@ export default function ProfileScreen() {
                                             onPress={() => {
                                                 switch (item.id) {
                                                     case 'profile': handleEditProfile(); break;
-                                                    case 'restore': handleRestorePurchases(); break;
+
                                                     case 'deleteAccount': handleDeleteAccount(); break;
                                                     case 'notifications': setShowNotificationSettings(true); break;
                                                     case 'help': Linking.openURL('https://craveless.info/support'); break;
-                                                    case 'feedback': Linking.openURL('https://craveless.info/support'); break;
+                                                    case 'feedback': Linking.openURL('mailto:hello@craveless.info'); break;
                                                     case 'rate': StoreReview.requestReview(); break;
                                                     case 'viewNotifications': handleViewNotifications(); break;
                                                     case 'scheduleTestNotifications': handleScheduleTestNotifications(); break;
@@ -876,11 +876,13 @@ export default function ProfileScreen() {
                                                         );
                                                         break;
                                                     }
+                                                    case 'phasePreview': setShowPhasePreview(true); break;
+                                                    case 'planPhasesPreview': setShowPlanPhasesPreview(true); break;
                                                     case 'privacy': navigation.navigate('PrivacyPolicy'); break;
                                                     case 'terms': navigation.navigate('TermsOfService'); break;
                                                 }
                                             }}
-                                            disabled={(item.id === 'restore' && isRestoring) || (item.id === 'deleteAccount' && isDeletingAccount)}
+                                            disabled={item.id === 'deleteAccount' && isDeletingAccount}
                                         >
                                             <AppIcon emoji={item.emoji} size={20} />
                                             <View style={styles.menuLabelContainer}>
@@ -889,9 +891,7 @@ export default function ProfileScreen() {
                                                     item.id === 'deleteAccount' && styles.deleteMenuLabel
                                                 ]}>{item.label}</Text>
                                             </View>
-                                            {item.id === 'restore' && isRestoring ? (
-                                                <ActivityIndicator size="small" color={looviColors.accent.primary} />
-                                            ) : item.id === 'deleteAccount' && isDeletingAccount ? (
+                                            {item.id === 'deleteAccount' && isDeletingAccount ? (
                                                 <ActivityIndicator size="small" color="#FF3B30" />
                                             ) : (
                                                 <Text style={[
@@ -951,7 +951,11 @@ export default function ProfileScreen() {
                                 <View style={styles.avatarPickerSection}>
                                     <TouchableOpacity
                                         style={styles.currentAvatarPreview}
-                                        onPress={() => setShowAvatarPicker(!showAvatarPicker)}
+                                        onPress={() => {
+                                            // Toggle emoji dropdown
+                                            setShowEmojiModal(!showEmojiModal);
+                                        }}
+                                        activeOpacity={0.7}
                                     >
                                         <UserAvatar
                                             size={56}
@@ -978,26 +982,51 @@ export default function ProfileScreen() {
                                     )}
                                 </View>
 
-                                {/* Emoji Picker Grid */}
-                                {showAvatarPicker && (
-                                    <View style={styles.emojiPickerGrid}>
-                                        <Text style={styles.emojiPickerTitle}>Choose an emoji</Text>
-                                        <View style={styles.emojiGrid}>
-                                            {AVATAR_EMOJIS.map((emoji) => (
-                                                <TouchableOpacity
-                                                    key={emoji}
-                                                    style={[
-                                                        styles.emojiOption,
-                                                        selectedAvatarType === 'emoji' && selectedAvatarValue === emoji && styles.avatarOptionSelected
-                                                    ]}
-                                                    onPress={() => handleSelectAvatar('emoji', emoji)}
-                                                >
-                                                    <Text style={styles.emojiText}>{emoji}</Text>
-                                                </TouchableOpacity>
-                                            ))}
+                                {/* Emoji Picker Dropdown Container */}
+                                <View style={styles.emojiPickerContainer}>
+                                    <TouchableOpacity
+                                        style={styles.emojiPickerButton}
+                                        onPress={() => {
+                                            setShowEmojiModal(!showEmojiModal);
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.emojiPickerButtonText}>Choose an emoji</Text>
+                                        <Ionicons 
+                                            name={showEmojiModal ? "chevron-up" : "chevron-down"} 
+                                            size={18} 
+                                            color={looviColors.text.secondary} 
+                                        />
+                                    </TouchableOpacity>
+
+                                    {/* Emoji Grid Dropdown - Positioned absolutely */}
+                                    {showEmojiModal && (
+                                        <View style={styles.emojiPickerDropdown}>
+                                            <ScrollView
+                                                style={styles.emojiDropdownScroll}
+                                                contentContainerStyle={styles.emojiGrid}
+                                                showsVerticalScrollIndicator={false}
+                                                nestedScrollEnabled={true}
+                                            >
+                                                {AVATAR_EMOJIS.map((emoji) => (
+                                                    <TouchableOpacity
+                                                        key={emoji}
+                                                        style={[
+                                                            styles.emojiOption,
+                                                            selectedAvatarType === 'emoji' && selectedAvatarValue === emoji && styles.avatarOptionSelected
+                                                        ]}
+                                                        onPress={() => {
+                                                            handleSelectAvatar('emoji', emoji);
+                                                            setShowEmojiModal(false);
+                                                        }}
+                                                    >
+                                                        <Text style={styles.emojiText}>{emoji}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
                                         </View>
-                                    </View>
-                                )}
+                                    )}
+                                </View>
 
                                 {/* Email (Read-only) */}
                                 <Text style={styles.inputLabel}>Email</Text>
@@ -1050,6 +1079,7 @@ export default function ProfileScreen() {
                             </TouchableOpacity>
                         </TouchableOpacity>
                     </Modal>
+
 
                     {/* Notification Settings Modal */}
                     <NotificationSettingsModal
@@ -1105,6 +1135,22 @@ export default function ProfileScreen() {
                         onClose={() => setShowReviewPrompt(false)}
                         variant={reviewPromptVariant}
                     />
+
+                    {/* DEV: Phase Animation Preview */}
+                    {__DEV__ && (
+                        <PhasePreviewModal
+                            visible={showPhasePreview}
+                            onClose={() => setShowPhasePreview(false)}
+                        />
+                    )}
+
+                    {/* DEV: Plan Phases Preview */}
+                    {__DEV__ && (
+                        <PlanPhasesPreviewModal
+                            visible={showPlanPhasesPreview}
+                            onClose={() => setShowPlanPhasesPreview(false)}
+                        />
+                    )}
                 </SafeAreaView>
             </LooviBackground >
         </>
@@ -1546,20 +1592,52 @@ const styles = StyleSheet.create({
         color: looviColors.text.secondary,
         fontWeight: '500',
     },
-    emojiPickerGrid: {
-        marginBottom: spacing.md,
+    emojiPickerContainer: {
+        position: 'relative',
+        marginTop: spacing.sm,
+        zIndex: 10,
     },
-    emojiPickerTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: looviColors.text.secondary,
-        marginBottom: spacing.sm,
-        textAlign: 'center',
+    emojiPickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.lg,
+    },
+    emojiPickerButtonText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: looviColors.text.primary,
+    },
+    emojiPickerDropdown: {
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        right: 0,
+        maxHeight: 300,
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius.lg,
+        marginTop: spacing.xs,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+        zIndex: 1000,
+    },
+    emojiDropdownScroll: {
+        maxHeight: 300,
     },
     emojiGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center',
+        padding: spacing.md,
         gap: spacing.xs,
     },
     emojiOption: {

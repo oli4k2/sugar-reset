@@ -26,7 +26,7 @@ import {
     UIManager,
     FlatList,
     Dimensions,
-    Image, // Added Image
+    // Image removed - replaced sprout.png with PhaseAnimation
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -62,6 +62,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import { MascotTip } from '../components/MascotTip';
 import { friendService } from '../services/friendService';
+import { PhaseAnimation } from '../components/PhaseAnimation';
 import StreakInfoModal from '../components/StreakInfoModal';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
 import {
@@ -70,6 +71,7 @@ import {
     shouldShowDayTwoPrompt,
     markDayTwoPromptShown,
 } from '../services/reviewPromptService';
+// Note: Phase preview moved to ProfileScreen dev tools
 
 function formatDuration(ms: number) {
     const seconds = Math.floor((ms / 1000) % 60);
@@ -244,6 +246,26 @@ export default function HomeScreen() {
         }
     }, [isFocused, getTargetIndex]);
 
+    // Load pledge status from AsyncStorage on mount (survives app close)
+    useEffect(() => {
+        const loadPledgeStatus = async () => {
+            try {
+                const pledgeDate = await AsyncStorage.getItem('pledge_date');
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (pledgeDate === todayStr) {
+                    setHasPledgedToday(true);
+                } else {
+                    setHasPledgedToday(false);
+                    // Clear stale pledge date
+                    if (pledgeDate) await AsyncStorage.removeItem('pledge_date');
+                }
+            } catch (error) {
+                console.error('Error loading pledge status:', error);
+            }
+        };
+        loadPledgeStatus();
+    }, []);
+
     // Load Inner Circle friend count
     useEffect(() => {
         const loadFriendCount = async () => {
@@ -405,7 +427,12 @@ export default function HomeScreen() {
                 });
             }
 
-            setShowWellnessModal(false);
+            // Immediately update button state so it reflects the save
+            const todayStr2 = new Date().toISOString().split('T')[0];
+            if (log.date === todayStr2) {
+                setHasWellnessToday(true);
+                setTodayWellnessData(log);
+            }
         } catch (error) {
             console.error('Failed to save wellness log:', error);
         }
@@ -562,11 +589,9 @@ export default function HomeScreen() {
                                 onPress={() => setShowStreakInfoModal(true)}
                                 activeOpacity={0.7}
                             >
-                                <Image
-                                    source={require('../public/sprout.png')}
-                                    style={{ width: 150, height: 150, marginBottom: spacing.sm, marginTop: spacing['2xl'] }}
-                                    resizeMode="contain"
-                                />
+                                <View style={{ marginBottom: spacing.sm, marginTop: spacing['2xl'] }}>
+                                    <PhaseAnimation daysSugarFree={daysSugarFree} size={150} />
+                                </View>
                             </TouchableOpacity>
 
                             {/* Live Timer - floating below animation with days */}
@@ -757,7 +782,7 @@ export default function HomeScreen() {
                                         navigation.navigate('Analytics');
                                         break;
                                     case 'community':
-                                        navigation.navigate('Social');
+                                        navigation.navigate('Social', { initialTab: 'community' });
                                         break;
                                     case 'cheer_friend':
                                         // Navigate to friend's profile to send encouragement
@@ -996,6 +1021,10 @@ export default function HomeScreen() {
                             setHasPledgedToday(true);
                             // Trigger layout animation for the button change
                             LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+                            // Persist pledge date to AsyncStorage so it survives app close/logout
+                            const todayStr = new Date().toISOString().split('T')[0];
+                            await AsyncStorage.setItem('pledge_date', todayStr);
 
                             // Sync pledgedToday to Firebase for UserProfilePopup and ProfileScreen
                             if (isAuthenticated && user?.id) {
