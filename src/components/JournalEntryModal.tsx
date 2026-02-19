@@ -185,7 +185,13 @@ export function JournalEntryModal({
                                 >
                                     {/* Header */}
                                     <View style={styles.header}>
-                                        <Text style={styles.title}>📝 Evening Reflection</Text>
+                                        <Text style={styles.title}>
+                                            📝 {(() => {
+                                                const now = new Date();
+                                                const currentHour = now.getHours();
+                                                return currentHour >= 18 ? 'Evening Reflection' : 'Wellness Reflection';
+                                            })()}
+                                        </Text>
                                         <Text style={styles.dateText}>{dateString}</Text>
                                     </View>
 

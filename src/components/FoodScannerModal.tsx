@@ -117,7 +117,8 @@ export default function FoodScannerModal({
 
     // Start / stop scan line animation when step changes
     useEffect(() => {
-        if (step === 'analyzing') {
+        if (step === 'analyzing' && imageUri) {
+            // Only start scan animation if there's an image
             setScanComplete(false);
             scanFlashAnim.setValue(0);
             scanLineAnim.setValue(0);
@@ -133,7 +134,7 @@ export default function FoodScannerModal({
             scanLineLoop.current?.stop();
             scanLineLoop.current = null;
         }
-    }, [step]);
+    }, [step, imageUri]);
 
     const loadTodayScanCount = async () => {
         try {
@@ -919,17 +920,37 @@ export default function FoodScannerModal({
 
             case 'analyzing':
                 const scanImageHeight = 260;
+                
+                // If no image (text-only input), show simple circular loading animation
+                if (!imageUri) {
+                    return (
+                        <View style={styles.analyzingContainer}>
+                            <View style={styles.simpleLoadingContainer}>
+                                <ActivityIndicator size="large" color={looviColors.coralOrange} />
+                            </View>
+                            <View style={styles.analyzingTextContainer}>
+                                {scanComplete ? (
+                                    <>
+                                        <Text style={[styles.analyzingTitle, { color: '#10B981' }]}>Analysis Complete ✓</Text>
+                                        <Text style={styles.analyzingSubtitle}>Preparing your results…</Text>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Text style={styles.analyzingTitle}>Analyzing with AI...</Text>
+                                        <Text style={styles.analyzingSubtitle}>Gemini is identifying sugars & macros</Text>
+                                    </>
+                                )}
+                            </View>
+                        </View>
+                    );
+                }
+                
+                // If image exists, show scan animation
                 return (
                     <View style={styles.analyzingContainer}>
                         {/* Image or placeholder */}
                         <View style={styles.scanImageWrapper}>
-                            {imageUri ? (
-                                <Image source={{ uri: imageUri }} style={styles.scanImage} />
-                            ) : (
-                                <View style={[styles.scanImagePlaceholder]}>
-                                    <Feather name="search" size={48} color={looviColors.text.muted} />
-                                </View>
-                            )}
+                            <Image source={{ uri: imageUri }} style={styles.scanImage} />
 
                             {/* Scan line overlay */}
                             <Animated.View
@@ -1188,6 +1209,13 @@ const styles = StyleSheet.create({
 
     // Analyzing / scan effect
     analyzingContainer: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.xl },
+    simpleLoadingContainer: { 
+        width: 120, 
+        height: 120, 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        marginBottom: spacing.lg,
+    },
     scanImageWrapper: {
         width: '88%',
         height: 260,

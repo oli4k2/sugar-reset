@@ -177,11 +177,16 @@ const generateTips = (props: Omit<MascotTipProps, 'onTipPress' | 'forceTip'>): M
     }
 
     if (!props.hasWellnessToday) {
+        // Check if it's past 18:00 (6 PM) to determine title
+        const now = new Date();
+        const currentHour = now.getHours();
+        const isEvening = currentHour >= 18;
+        
         tips.push({
             id: 'journal',
             icon: 'book',
             iconColor: looviColors.accent.success,
-            title: 'Evening reflection',
+            title: isEvening ? 'Evening reflection' : 'Wellness reflection',
             subtitle: 'How was your day? Take a moment to journal',
             action: 'journal',
             category: 'task',
