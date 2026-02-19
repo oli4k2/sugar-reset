@@ -44,6 +44,7 @@ import { AppIcon } from '../components/OnboardingIcon';
 import * as Haptics from 'expo-haptics';
 import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
 import CancellationOfferScreen from '../components/CancellationOfferScreen';
+import { PhasePreviewModal } from '../components/PhasePreviewModal';
 
 interface MenuItem {
     id: string;
@@ -88,6 +89,7 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
             { id: 'clearData', emoji: '🗑️', label: 'Clear All Data' },
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
             { id: 'migrateUsernames', emoji: '👤', label: 'Migrate Usernames (GDPR)' },
+            { id: 'phasePreview', emoji: '🌱', label: 'Phase Animation Preview' },
         ],
     }] : []),
     {
@@ -100,12 +102,13 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
 ];
 
 export default function ProfileScreen() {
-    const { onboardingData, streakData, updateOnboardingData, latestHealthScore, todayCheckIn } = useUserData();
+    const { onboardingData, streakData, updateOnboardingData, latestHealthScore, todayCheckIn, resetForLogout } = useUserData();
     const { user, isAuthenticated, firebaseUser, refreshUser } = useAuthContext();
     const { signOut } = useAuth();
     const { isPremium, customerInfo, currentOffering, purchasePackage } = useRevenueCat();
     const navigation = useNavigation<any>();
     const [showCancellationOffer, setShowCancellationOffer] = useState(false);
+    const [showPhasePreview, setShowPhasePreview] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -117,12 +120,24 @@ export default function ProfileScreen() {
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
 
-    // Fetch pledge status from Firebase (same source as UserProfilePopup)
+    // Fetch pledge status — check AsyncStorage first (instant), then Firestore
     useEffect(() => {
         const loadPledgeStatus = async () => {
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // Check AsyncStorage first (instant, survives app close)
+            try {
+                const pledgeDate = await AsyncStorage.getItem('pledge_date');
+                if (pledgeDate === todayStr) {
+                    setHasPledgedToday(true);
+                    return;
+                }
+            } catch (e) {
+                // fall through to Firestore
+            }
+
             if (!firebaseUser?.uid) {
-                // Fallback to context if not authenticated
-                setHasPledgedToday(!!todayCheckIn);
+                setHasPledgedToday(false);
                 return;
             }
 
@@ -139,13 +154,12 @@ export default function ProfileScreen() {
                 }
             } catch (error) {
                 console.warn('Failed to fetch pledge status:', error);
-                // Fallback to context
-                setHasPledgedToday(!!todayCheckIn);
+                setHasPledgedToday(false);
             }
         };
 
         loadPledgeStatus();
-    }, [firebaseUser?.uid, todayCheckIn]);
+    }, [firebaseUser?.uid]);
 
     // Determine auth provider type
     const authProvider = useMemo((): 'google' | 'apple' | 'email' | 'unknown' => {
@@ -461,6 +475,10 @@ export default function ProfileScreen() {
                             // This includes wellness logs, food logs, pledges, and all other local storage
                             await AsyncStorage.clear();
                             console.log('✅ Cleared all AsyncStorage data on logout');
+
+                            // Reset in-memory context state so navigation uses fresh values
+                            // (prevents landing on Paywall instead of Welcome)
+                            resetForLogout();
 
                             await signOut();
                             navigation.reset({
@@ -823,6 +841,7 @@ export default function ProfileScreen() {
                                                     case 'clearData': handleClearAllData(); break;
                                                     case 'cleanupCommunity': handleCleanupCommunityData(); break;
                                                     case 'migrateUsernames': handleMigrateUsernames(); break;
+                                                    case 'phasePreview': setShowPhasePreview(true); break;
                                                     case 'privacy': navigation.navigate('PrivacyPolicy'); break;
                                                     case 'terms': navigation.navigate('TermsOfService'); break;
                                                 }
@@ -1041,6 +1060,14 @@ export default function ProfileScreen() {
                                 Alert.alert('Free Tier', 'Continuing with free tier');
                                 setShowCancellationOffer(false);
                             }}
+                        />
+                    )}
+
+                    {/* DEV: Phase Animation Preview */}
+                    {__DEV__ && (
+                        <PhasePreviewModal
+                            visible={showPhasePreview}
+                            onClose={() => setShowPhasePreview(false)}
                         />
                     )}
                 </SafeAreaView>

@@ -26,7 +26,10 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
   const [dailyLimit, setDailyLimit] = useState<number>(25); // Default to 25g
 
   const planType = (onboardingData?.plan || 'cold_turkey') as PlanType;
-  const startDate = onboardingData?.startDate ? new Date(onboardingData.startDate) : new Date();
+  // Use streakData.startDate so the plan resets when the streak resets
+  const startDate = streakData?.startDate
+    ? (streakData.startDate instanceof Date ? streakData.startDate : new Date(String(streakData.startDate)))
+    : onboardingData?.startDate ? new Date(onboardingData.startDate) : new Date();
   const currentWeek = getCurrentWeek(startDate);
   const planDetails = getPlanDetails(planType);
   

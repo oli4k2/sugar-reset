@@ -5,7 +5,7 @@
  * Prioritizes the "Scan" action while keeping other options accessible.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -21,7 +21,11 @@ import {
     Platform,
     Keyboard,
     TouchableWithoutFeedback,
+    Animated,
+    Easing,
+    Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Slider from '@react-native-community/slider';
@@ -93,6 +97,12 @@ export default function FoodScannerModal({
     const [manualFat, setManualFat] = useState('');
     const [manualImageUri, setManualImageUri] = useState<string | null>(null);
 
+    // Scan animation state
+    const [scanComplete, setScanComplete] = useState(false);
+    const scanLineAnim = useRef(new Animated.Value(0)).current;
+    const scanFlashAnim = useRef(new Animated.Value(0)).current;
+    const scanLineLoop = useRef<Animated.CompositeAnimation | null>(null);
+
     const { refreshStreakFromFoodLogs } = useUserData();
 
     useEffect(() => {
@@ -104,6 +114,26 @@ export default function FoodScannerModal({
             setStep('select');
         }
     }, [visible, isPremium]);
+
+    // Start / stop scan line animation when step changes
+    useEffect(() => {
+        if (step === 'analyzing') {
+            setScanComplete(false);
+            scanFlashAnim.setValue(0);
+            scanLineAnim.setValue(0);
+            const loop = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(scanLineAnim, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+                    Animated.timing(scanLineAnim, { toValue: 0, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+                ])
+            );
+            scanLineLoop.current = loop;
+            loop.start();
+        } else {
+            scanLineLoop.current?.stop();
+            scanLineLoop.current = null;
+        }
+    }, [step]);
 
     const loadTodayScanCount = async () => {
         try {
@@ -162,6 +192,8 @@ export default function FoodScannerModal({
         setPortionPercent(100);
         setEditedName('');
         setIsEditing(false);
+        setScanComplete(false);
+        scanFlashAnim.setValue(0);
         // Reset manual fields
         setManualCalories('');
         setManualSugar('');
@@ -179,6 +211,29 @@ export default function FoodScannerModal({
         setEditNaturalSugar('');
         setEditFiber('');
     };
+
+    /** Show green success flash then transition to result step */
+    const showScanSuccess = useCallback((res: AnalysisResult) => {
+        setResult(res);
+        setEditedName(res.foodName);
+        populateEditFields(res);
+        setScanComplete(true);
+
+        // Green flash animation
+        Animated.timing(scanFlashAnim, {
+            toValue: 1,
+            duration: 350,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+        }).start(() => {
+            // Hold green briefly then transition
+            setTimeout(() => {
+                setStep('result');
+                setScanComplete(false);
+                scanFlashAnim.setValue(0);
+            }, 400);
+        });
+    }, []);
 
     // Populate edit fields when result arrives
     const populateEditFields = (res: AnalysisResult) => {
@@ -273,10 +328,7 @@ export default function FoodScannerModal({
         setStep('analyzing');
         try {
             const res = await analyzeFood(imageUri, description);
-            setResult(res);
-            setEditedName(res.foodName);
-            populateEditFields(res);
-            setStep('result');
+            showScanSuccess(res);
         } catch (error: any) {
             const message = error?.message ?? '';
             if (message.includes('GEMINI_API_KEY_MISSING')) {
@@ -355,10 +407,7 @@ export default function FoodScannerModal({
         setStep('analyzing');
         try {
             const res = await analyzeFood('', textOnlyInput.trim());
-            setResult(res);
-            setEditedName(res.foodName);
-            populateEditFields(res);
-            setStep('result');
+            showScanSuccess(res);
         } catch (error: any) {
             const message = error?.message ?? '';
             if (message.includes('GEMINI_API_KEY_MISSING')) {
@@ -869,11 +918,83 @@ export default function FoodScannerModal({
                 );
 
             case 'analyzing':
+                const scanImageHeight = 260;
                 return (
-                    <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color={looviColors.coralOrange} />
-                        <Text style={styles.analyzingTitle}>Analysing with AI...</Text>
-                        <Text style={styles.analyzingSubtitle}>Gemini is identifying sugars & macros</Text>
+                    <View style={styles.analyzingContainer}>
+                        {/* Image or placeholder */}
+                        <View style={styles.scanImageWrapper}>
+                            {imageUri ? (
+                                <Image source={{ uri: imageUri }} style={styles.scanImage} />
+                            ) : (
+                                <View style={[styles.scanImagePlaceholder]}>
+                                    <Feather name="search" size={48} color={looviColors.text.muted} />
+                                </View>
+                            )}
+
+                            {/* Scan line overlay */}
+                            <Animated.View
+                                style={[
+                                    styles.scanLineContainer,
+                                    {
+                                        transform: [{
+                                            translateY: scanLineAnim.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [0, scanImageHeight - 4],
+                                            }),
+                                        }],
+                                    },
+                                ]}
+                            >
+                                <LinearGradient
+                                    colors={[
+                                        'transparent',
+                                        scanComplete ? 'rgba(16, 185, 129, 0.6)' : 'rgba(232, 168, 124, 0.6)',
+                                        scanComplete ? 'rgba(16, 185, 129, 0.9)' : 'rgba(232, 168, 124, 0.9)',
+                                        scanComplete ? 'rgba(16, 185, 129, 0.6)' : 'rgba(232, 168, 124, 0.6)',
+                                        'transparent',
+                                    ]}
+                                    style={styles.scanLineGradient}
+                                />
+                                <View style={[
+                                    styles.scanLineBright,
+                                    scanComplete && styles.scanLineBrightSuccess,
+                                ]} />
+                            </Animated.View>
+
+                            {/* Corner brackets */}
+                            <View style={[styles.scanCorner, styles.scanCornerTL]} />
+                            <View style={[styles.scanCorner, styles.scanCornerTR]} />
+                            <View style={[styles.scanCorner, styles.scanCornerBL]} />
+                            <View style={[styles.scanCorner, styles.scanCornerBR]} />
+
+                            {/* Green success overlay */}
+                            <Animated.View
+                                style={[
+                                    StyleSheet.absoluteFill,
+                                    styles.scanSuccessOverlay,
+                                    { opacity: scanFlashAnim },
+                                ]}
+                                pointerEvents="none"
+                            >
+                                <Feather name="check-circle" size={56} color="#FFF" />
+                            </Animated.View>
+                        </View>
+
+                        {/* Status text */}
+                        <View style={styles.analyzingTextContainer}>
+                            {scanComplete ? (
+                                <>
+                                    <Text style={[styles.analyzingTitle, { color: '#10B981' }]}>Analysis Complete ✓</Text>
+                                    <Text style={styles.analyzingSubtitle}>Preparing your results…</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <ActivityIndicator size="small" color={looviColors.coralOrange} style={{ marginBottom: 8 }} />
+                                    <Text style={styles.analyzingTitle}>Scanning with AI...</Text>
+                                    <Text style={styles.analyzingSubtitle}>Gemini is identifying sugars & macros</Text>
+                                </>
+                            )}
+                        </View>
                     </View>
                 );
 
@@ -1064,7 +1185,65 @@ const styles = StyleSheet.create({
     textOnlyInput: { backgroundColor: '#F9F9F9', borderRadius: 16, padding: spacing.md, fontSize: 18, minHeight: 120, marginHorizontal: spacing.lg, marginBottom: spacing.lg },
     bottomActions: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.lg, marginTop: spacing.md },
     centerContainer: { padding: 60, alignItems: 'center' },
-    analyzingTitle: { fontSize: 18, fontWeight: '600', marginTop: 16, color: looviColors.text.primary },
+
+    // Analyzing / scan effect
+    analyzingContainer: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.xl },
+    scanImageWrapper: {
+        width: '88%',
+        height: 260,
+        borderRadius: 18,
+        overflow: 'hidden',
+        backgroundColor: '#111',
+        alignSelf: 'center',
+    },
+    scanImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+    scanImagePlaceholder: { width: '100%', height: '100%', backgroundColor: '#1A1A2E', alignItems: 'center', justifyContent: 'center' },
+    scanLineContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        height: 4,
+        zIndex: 10,
+    },
+    scanLineGradient: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: -18,
+        height: 40,
+    },
+    scanLineBright: {
+        height: 2,
+        backgroundColor: 'rgba(232, 168, 124, 0.95)',
+        shadowColor: looviColors.coralOrange,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.9,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    scanLineBrightSuccess: {
+        backgroundColor: 'rgba(16, 185, 129, 0.95)',
+        shadowColor: '#10B981',
+    },
+    scanCorner: {
+        position: 'absolute',
+        width: 24,
+        height: 24,
+        borderColor: 'rgba(255,255,255,0.5)',
+    },
+    scanCornerTL: { top: 8, left: 8, borderTopWidth: 2.5, borderLeftWidth: 2.5, borderTopLeftRadius: 6 },
+    scanCornerTR: { top: 8, right: 8, borderTopWidth: 2.5, borderRightWidth: 2.5, borderTopRightRadius: 6 },
+    scanCornerBL: { bottom: 8, left: 8, borderBottomWidth: 2.5, borderLeftWidth: 2.5, borderBottomLeftRadius: 6 },
+    scanCornerBR: { bottom: 8, right: 8, borderBottomWidth: 2.5, borderRightWidth: 2.5, borderBottomRightRadius: 6 },
+    scanSuccessOverlay: {
+        backgroundColor: 'rgba(16, 185, 129, 0.55)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 18,
+    },
+    analyzingTextContainer: { alignItems: 'center', marginTop: spacing.lg },
+    analyzingTitle: { fontSize: 18, fontWeight: '600', color: looviColors.text.primary },
     analyzingSubtitle: { fontSize: 13, color: looviColors.text.tertiary, marginTop: 6, textAlign: 'center' },
 
     // Describe step

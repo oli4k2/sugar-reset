@@ -86,7 +86,9 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const loadData = async () => {
         try {
             if (isMockPost) {
-                // Mock posts only exist client-side — use params data, no Firestore
+                // Mock post: parent doc doesn't exist but comments subcollection does
+                const fetchedComments = await postService.getComments(post.id);
+                setComments(fetchedComments);
                 setLoadingComments(false);
                 return;
             }
@@ -139,37 +141,43 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             // Use onboarding nickname first, then user displayName, then email, fallback            
             const authorName = onboardingData?.nickname || user.displayName || user.username || 'Anonymous';
 
-            if (isMockPost) {
-                // Add comment locally for mock posts (visual-only, not persisted)
-                const localComment: Comment = {
-                    id: `local_comment_${Date.now()}`,
-                    postId: post.id,
-                    authorId: user.id,
-                    authorName,
+            // Persist comments to Firestore for both real and mock posts
+            await postService.addComment(
+                post.id,
+                user.id,
+                authorName,
+                newComment,
+                {
                     photoURL: user.photoURL,
                     avatarType: user.avatarType,
-                    avatarValue: user.avatarValue,
-                    content: newComment.trim(),
-                    createdAt: new Date(),
-                };
-                setComments(prev => [...prev, localComment]);
+                    avatarValue: user.avatarValue
+                }
+            );
+
+            // For mock posts, also update local comment count since parent doc doesn't exist
+            if (isMockPost) {
                 setPost(prev => ({ ...prev, commentCount: prev.commentCount + 1 }));
-                setNewComment('');
-            } else {
-                await postService.addComment(
-                    post.id,
-                    user.id,
-                    authorName,
-                    newComment,
-                    {
-                        photoURL: user.photoURL,
-                        avatarType: user.avatarType,
-                        avatarValue: user.avatarValue
-                    }
-                );
-                setNewComment('');
-                // Refresh comments
-                await loadData();
+            }
+
+            setNewComment('');
+            // Refresh comments from Firestore
+            await loadData();
+
+            // Send notification to post author (if not commenting on own post)
+            if (post.authorId !== user.id && !post.authorId.startsWith('mock_user_')) {
+                try {
+                    const { notificationService } = await import('../services/notificationService');
+                    await notificationService.sendCommentNotification(
+                        user.id,
+                        authorName,
+                        post.authorId,
+                        post.title,
+                        post.id,
+                    );
+                } catch (notifError) {
+                    // Non-critical: don't block the comment if notification fails
+                    console.warn('Failed to send comment notification:', notifError);
+                }
             }
         } catch (error: any) {
             console.error('Error submitting comment:', error);

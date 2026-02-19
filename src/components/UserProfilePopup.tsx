@@ -23,12 +23,14 @@ import { looviColors } from './LooviBackground';
 import { UserAvatar } from './UserAvatar';
 import { friendService } from '../services/friendService';
 import { useAuthContext } from '../context/AuthContext';
+import { useUserData } from '../context/UserDataContext';
 import { UserStats } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { isMockUser, getMockUserStats } from '../services/mockDataService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type FriendStatus = 'loading' | 'self' | 'friend' | 'pending_sent' | 'pending_received' | 'none';
 
@@ -52,6 +54,7 @@ export function UserProfilePopup({
     avatarValue,
 }: UserProfilePopupProps) {
     const { user } = useAuthContext();
+    const { onboardingData } = useUserData();
     const [stats, setStats] = useState<UserStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [friendStatus, setFriendStatus] = useState<FriendStatus>('loading');
@@ -138,7 +141,19 @@ export function UserProfilePopup({
             } else {
                 // Fetch real stats from Firestore
                 friendService.getFriendStats(userId)
-                    .then(fetchedStats => {
+                    .then(async (fetchedStats) => {
+                        // For the current user, overlay local pledge status (more reliable)
+                        if (fetchedStats && user && userId === user.id) {
+                            try {
+                                const pledgeDate = await AsyncStorage.getItem('pledge_date');
+                                const todayStr = new Date().toISOString().split('T')[0];
+                                if (pledgeDate === todayStr) {
+                                    fetchedStats.pledgedToday = true;
+                                }
+                            } catch (e) {
+                                // ignore
+                            }
+                        }
                         setStats(fetchedStats);
                     })
                     .catch(error => {
@@ -173,7 +188,7 @@ export function UserProfilePopup({
 
             await friendService.sendFriendRequest(
                 user.id,
-                user.displayName || 'User',
+                onboardingData?.nickname || user.displayName || user.email || 'User',
                 user.username, // Pass username for GDPR compliance
                 userId,
                 displayName

@@ -73,7 +73,7 @@ Notifications.setNotificationHandler({
 });
 
 export interface NotificationPayload {
-    type: 'sos' | 'low_score' | 'friend_request' | 'encouragement' | 'friend_accepted';
+    type: 'sos' | 'low_score' | 'friend_request' | 'encouragement' | 'friend_accepted' | 'comment';
     title: string;
     body: string;
     data?: Record<string, any>;
@@ -771,6 +771,40 @@ export const notificationService = {
                 type: 'friend_accepted',
             },
         }]);
+    },
+
+    /**
+     * Send notification when someone comments on your post
+     */
+    async sendCommentNotification(
+        fromUserId: string,
+        fromUserName: string,
+        toUserId: string,
+        postTitle: string,
+        postId: string,
+    ): Promise<void> {
+        try {
+            const token = await this.getUserPushToken(toUserId);
+            if (!token) return;
+
+            const truncatedTitle = postTitle.length > 40
+                ? postTitle.substring(0, 40) + '…'
+                : postTitle;
+
+            await this.sendExpoPushNotifications([{
+                to: token,
+                title: '💬 New Comment',
+                body: `${fromUserName} commented on "${truncatedTitle}"`,
+                data: {
+                    type: 'comment',
+                    fromUserId,
+                    fromUserName,
+                    postId,
+                },
+            }]);
+        } catch (error) {
+            console.error('Error sending comment notification:', error);
+        }
     },
 
     /**

@@ -84,6 +84,9 @@ interface UserDataContextType {
     deleteJournalEntry: (id: string) => Promise<void>;
     getLatestJournalEntry: () => JournalEntry | null;
     getJournalEntries: (limit?: number) => JournalEntry[];
+
+    // Logout helper
+    resetForLogout: () => void;
 }
 
 const defaultStreakData: StreakData = {
@@ -165,6 +168,17 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
 
             const needsAuth = await onboardingService.isPostPaywallAuthRequired();
             setPostPaywallAuthRequiredState(needsAuth);
+
+            // Load persisted journal entries from AsyncStorage
+            try {
+                const storedJournal = await AsyncStorage.getItem('journal_entries');
+                if (storedJournal) {
+                    const parsed: JournalEntry[] = JSON.parse(storedJournal);
+                    setJournalEntries(parsed.sort((a, b) => b.createdAt - a.createdAt));
+                }
+            } catch (error) {
+                console.error('Failed to load journal entries:', error);
+            }
 
             // If authenticated, try to load from Firebase with timeout
             if (isAuthenticated && userId) {
@@ -523,10 +537,16 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             createdAt: Date.now(),
         };
 
-        setJournalEntries(prev => [newEntry, ...prev].sort((a, b) => b.createdAt - a.createdAt));
+        const updated = [newEntry, ...journalEntries].sort((a, b) => b.createdAt - a.createdAt);
+        setJournalEntries(updated);
 
-        // TODO: Persist to AsyncStorage and sync to Firebase
-    }, []);
+        // Persist to AsyncStorage
+        try {
+            await AsyncStorage.setItem('journal_entries', JSON.stringify(updated));
+        } catch (error) {
+            console.error('Failed to persist journal entry:', error);
+        }
+    }, [journalEntries]);
 
     const getLatestJournalEntry = useCallback(() => {
         if (journalEntries.length === 0) return null;
@@ -539,15 +559,46 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
     }, [journalEntries]);
 
     const updateJournalEntry = useCallback(async (id: string, updates: Partial<Omit<JournalEntry, 'id' | 'createdAt'>>) => {
-        setJournalEntries(prev => prev.map(entry =>
+        const updated = journalEntries.map(entry =>
             entry.id === id ? { ...entry, ...updates } : entry
-        ));
-        // TODO: Persist to AsyncStorage and sync to Firebase
-    }, []);
+        );
+        setJournalEntries(updated);
+
+        // Persist to AsyncStorage
+        try {
+            await AsyncStorage.setItem('journal_entries', JSON.stringify(updated));
+        } catch (error) {
+            console.error('Failed to persist journal update:', error);
+        }
+    }, [journalEntries]);
 
     const deleteJournalEntry = useCallback(async (id: string) => {
-        setJournalEntries(prev => prev.filter(entry => entry.id !== id));
-        // TODO: Persist to AsyncStorage and sync to Firebase
+        const updated = journalEntries.filter(entry => entry.id !== id);
+        setJournalEntries(updated);
+
+        // Persist to AsyncStorage
+        try {
+            await AsyncStorage.setItem('journal_entries', JSON.stringify(updated));
+        } catch (error) {
+            console.error('Failed to persist journal deletion:', error);
+        }
+    }, [journalEntries]);
+
+    // Reset all in-memory state on logout so navigation doesn't use stale values
+    const resetForLogout = useCallback(() => {
+        setOnboardingData({});
+        setHasCompletedOnboarding(false);
+        setOnboardingCheckpointState(null);
+        setPostPaywallAuthRequiredState(false);
+        setStreakData(null);
+        setStreakResult(null);
+        setTodayCheckIn(null);
+        setCheckInHistory({});
+        setAchievements([]);
+        setJournalEntries([]);
+        setLatestHealthScore(0);
+        setInnerCircle([]);
+        setHasLoadedOnce(false);
     }, []);
 
     const value: UserDataContextType = {
@@ -584,27 +635,37 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         updateHealthScore: setLatestHealthScore,
         innerCircle,
         updateInnerCircle: setInnerCircle,
+        resetForLogout,
     };
 
     // Sync stats to Firestore when they change (Phase 1)
+    // NOTE: pledgedToday is synced separately from HomeScreen when the user actually pledges.
+    // We do NOT overwrite it here, because that would reset it to false.
     useEffect(() => {
         if (isAuthenticated && userId && streakData) {
-            // Debounce sync slightly or just sync on change (firestore handles merge)
-            // We only sync if we have meaningful data
-            userService.syncUserStats(userId, {
-                currentStreak: streakData.currentStreak,
-                healthScore: latestHealthScore,
-                goalAchieved: streakData.currentStreak > 0, // Simplified for now
-                pledgedToday: !!todayCheckIn, // True if user has checked in today
-                updatedAt: new Date(),
-            }).then(() => {
-                // Trigger community stats update in the background
-                communityStatsService.triggerStatsUpdate();
-            }).catch(err => {
-                console.error('Failed to sync user stats:', err);
-            });
+            const syncStats = async () => {
+                try {
+                    // Check if user has pledged today via AsyncStorage
+                    const pledgeDate = await AsyncStorage.getItem('pledge_date');
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const hasPledged = pledgeDate === todayStr;
+
+                    await userService.syncUserStats(userId, {
+                        currentStreak: streakData.currentStreak,
+                        healthScore: latestHealthScore,
+                        goalAchieved: streakData.currentStreak > 0,
+                        pledgedToday: hasPledged,
+                        updatedAt: new Date(),
+                    });
+                    // Trigger community stats update in the background
+                    communityStatsService.triggerStatsUpdate();
+                } catch (err) {
+                    console.error('Failed to sync user stats:', err);
+                }
+            };
+            syncStats();
         }
-    }, [isAuthenticated, userId, streakData, latestHealthScore, todayCheckIn?.mood]);
+    }, [isAuthenticated, userId, streakData, latestHealthScore]);
 
     return (
         <UserDataContext.Provider value={value}>
