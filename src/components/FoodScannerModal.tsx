@@ -1035,7 +1035,7 @@ export default function FoodScannerModal({
                                     <View style={styles.scoreTopRow}>
                                         <View style={styles.scoreLeft}>
                                             <Text style={styles.scoreLabel}>Health Score</Text>
-                                            <Text style={[styles.scoreValue, { color: healthColor }]}>{result?.healthScore}<Text style={styles.scoreTotal}>/10</Text></Text>
+                                            <Text style={[styles.scoreValue, { color: healthColor }]}>{result?.healthScore}<Text style={styles.scoreTotal}>/100</Text></Text>
                                         </View>
                                         <View style={styles.scoreRight}>
                                             <Text style={styles.sugarValue}>{((parseFloat(editSugar) || 0) * pMul).toFixed(1)}g</Text>

@@ -107,8 +107,7 @@ function parseGeminiResponse(text: string, imageUri: string): AnalysisResult {
         confidence: Number(parsed.confidence) || 0.7,
     };
 
-    const rawScore = calculateFoodHealthScore(tempItem);
-    const healthScore = Math.round(rawScore / 10); // convert 0-100 → 0-10
+    const healthScore = calculateFoodHealthScore(tempItem); // Score is 0-100
 
     return {
         foodName: tempItem.name,

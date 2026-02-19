@@ -59,44 +59,83 @@ export interface ComprehensiveHealthScore {
  * - Sodium limitation (FDA recommends <2300mg/day)
  */
 export function calculateFoodHealthScore(item: ScannedItem): number {
-    let score = 70; // Base score
+    // If no calories or all values are zero/empty, return 0 (invalid/unknown food)
+    if (!item.calories || item.calories === 0) {
+        // Check if there's any meaningful nutrition data
+        const hasAnyData = item.protein > 0 || item.carbs > 0 || item.fat > 0 || 
+                          item.fiber > 0 || item.sugar > 0 || item.sodium > 0;
+        if (!hasAnyData) {
+            return 0; // No data = no score
+        }
+        // If there's data but no calories, use a default calorie estimate for calculation
+        // Estimate: protein*4 + carbs*4 + fat*9
+        const estimatedCalories = (item.protein * 4) + (item.carbs * 4) + (item.fat * 9);
+        if (estimatedCalories === 0) return 0;
+        item = { ...item, calories: estimatedCalories };
+    }
 
-    // Protein bonus (up to +15 points)
+    let score = 50; // Lower base score - foods need to earn points
+
+    // Protein bonus (up to +20 points)
     // High protein foods promote satiety and muscle maintenance
-    const proteinRatio = item.protein / (item.calories / 100);
-    if (proteinRatio > 8) score += 15;
-    else if (proteinRatio > 5) score += 10;
-    else if (proteinRatio > 3) score += 5;
+    if (item.calories > 0) {
+        const proteinRatio = item.protein / (item.calories / 100);
+        if (proteinRatio > 8) score += 20;
+        else if (proteinRatio > 5) score += 15;
+        else if (proteinRatio > 3) score += 10;
+        else if (proteinRatio > 1) score += 5;
+    } else if (item.protein > 0) {
+        // If no calories but has protein, give small bonus
+        if (item.protein >= 20) score += 10;
+        else if (item.protein >= 10) score += 5;
+    }
 
-    // Fiber bonus (up to +10 points)
+    // Fiber bonus (up to +15 points)
     // Fiber aids digestion, blood sugar control, and heart health
-    if (item.fiber >= 5) score += 10;
-    else if (item.fiber >= 3) score += 6;
-    else if (item.fiber >= 1) score += 3;
+    if (item.fiber >= 5) score += 15;
+    else if (item.fiber >= 3) score += 10;
+    else if (item.fiber >= 1) score += 5;
 
-    // Sugar penalty (up to -30 points)
+    // Sugar penalty (up to -40 points)
     // WHO recommends limiting added sugars to <10% of total energy intake
     // Differentiate between added sugar (heavily penalized) and natural sugar (lightly penalized)
-    const addedSugar = item.addedSugar !== undefined ? item.addedSugar : item.sugar;
+    const addedSugar = item.addedSugar !== undefined ? item.addedSugar : (item.sugar || 0);
     const naturalSugar = item.naturalSugar || 0;
 
     // Added sugar penalty (primary concern)
-    const addedSugarPercentOfCalories = (addedSugar * 4 / item.calories) * 100;
-    if (addedSugarPercentOfCalories > 30) score -= 30;
-    else if (addedSugarPercentOfCalories > 20) score -= 20;
-    else if (addedSugarPercentOfCalories > 10) score -= 10;
-    else if (addedSugarPercentOfCalories > 5) score -= 5;
+    if (item.calories > 0) {
+        const addedSugarPercentOfCalories = (addedSugar * 4 / item.calories) * 100;
+        if (addedSugarPercentOfCalories > 30) score -= 40;
+        else if (addedSugarPercentOfCalories > 20) score -= 30;
+        else if (addedSugarPercentOfCalories > 10) score -= 20;
+        else if (addedSugarPercentOfCalories > 5) score -= 10;
+    } else if (addedSugar > 0) {
+        // If no calories but has added sugar, penalize based on absolute amount
+        if (addedSugar > 50) score -= 40;
+        else if (addedSugar > 30) score -= 30;
+        else if (addedSugar > 15) score -= 20;
+        else if (addedSugar > 5) score -= 10;
+    }
 
     // Natural sugar penalty (minimal - only for excessive amounts)
-    const naturalSugarPercentOfCalories = (naturalSugar * 4 / item.calories) * 100;
-    if (naturalSugarPercentOfCalories > 40) score -= 5; // Only penalize very high natural sugar
+    if (item.calories > 0) {
+        const naturalSugarPercentOfCalories = (naturalSugar * 4 / item.calories) * 100;
+        if (naturalSugarPercentOfCalories > 40) score -= 5; // Only penalize very high natural sugar
+    }
 
     // Saturated fat penalty (up to -15 points)
     // AHA recommends <7% of calories from saturated fat
-    const satFatPercentOfCalories = (item.fatSaturated * 9 / item.calories) * 100;
-    if (satFatPercentOfCalories > 15) score -= 15;
-    else if (satFatPercentOfCalories > 10) score -= 10;
-    else if (satFatPercentOfCalories > 7) score -= 5;
+    if (item.calories > 0) {
+        const satFatPercentOfCalories = (item.fatSaturated * 9 / item.calories) * 100;
+        if (satFatPercentOfCalories > 15) score -= 15;
+        else if (satFatPercentOfCalories > 10) score -= 10;
+        else if (satFatPercentOfCalories > 7) score -= 5;
+    } else if (item.fatSaturated > 0) {
+        // If no calories but has saturated fat, penalize based on absolute amount
+        if (item.fatSaturated > 20) score -= 15;
+        else if (item.fatSaturated > 10) score -= 10;
+        else if (item.fatSaturated > 5) score -= 5;
+    }
 
     // Sodium penalty (up to -10 points)
     // High sodium linked to hypertension and cardiovascular disease

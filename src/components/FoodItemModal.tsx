@@ -93,6 +93,10 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
 
     const handleSave = async () => {
         if (editedItem) {
+            // Recalculate health score after editing
+            const { calculateFoodHealthScore } = await import('../services/healthScoringService');
+            editedItem.healthScore = calculateFoodHealthScore(editedItem);
+            
             await updateScannedItem(editedItem);
             setIsEditing(false);
             onUpdate(editedItem);
@@ -171,7 +175,7 @@ export function FoodItemModal({ visible, item, onClose, onUpdate }: FoodItemModa
                                 <Text style={[styles.healthScoreValue, { color: healthColor }]}>
                                     {item.healthScore}
                                 </Text>
-                                <Text style={styles.healthScoreLabel}>/ 10 Health Score</Text>
+                                <Text style={styles.healthScoreLabel}>/ 100 Health Score</Text>
                             </View>
 
                             {/* AI Recommendation */}

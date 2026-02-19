@@ -297,7 +297,7 @@ export const analyzeFood = async (
 
     return {
         ...randomFood,
-        healthScore: Math.round(healthScore / 10),
+        healthScore: healthScore, // Score is 0-100
         suggestion: '💡 Demo data — add your Gemini API key in .env to enable real AI analysis.',
     };
 };
