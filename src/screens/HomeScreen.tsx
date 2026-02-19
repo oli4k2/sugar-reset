@@ -65,12 +65,14 @@ import { friendService } from '../services/friendService';
 import { PhaseAnimation } from '../components/PhaseAnimation';
 import StreakInfoModal from '../components/StreakInfoModal';
 import { ReviewPromptModal } from '../components/ReviewPromptModal';
+import CancellationOfferScreen from '../components/CancellationOfferScreen';
 import {
     shouldShowFirstScanPrompt,
     markFirstScanPromptShown,
     shouldShowDayTwoPrompt,
     markDayTwoPromptShown,
 } from '../services/reviewPromptService';
+import { useRevenueCat } from '../hooks/useRevenueCat';
 // Note: Phase preview moved to ProfileScreen dev tools
 
 function formatDuration(ms: number) {
@@ -135,6 +137,17 @@ export default function HomeScreen() {
     const celebrationScale = useRef(new Animated.Value(0)).current;
     const celebrationOpacity = useRef(new Animated.Value(0)).current;
     const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+    
+    // RevenueCat context for subscription and cancellation offers
+    const {
+        isPremium,
+        currentOffering,
+        purchasePackage,
+        findPackageByIdentifier,
+        showCancellationOffer,
+        dismissCancellationOffer,
+    } = useRevenueCat();
+    
     const {
         onboardingData,
         isLoading,
@@ -1178,6 +1191,15 @@ export default function HomeScreen() {
                                             setShowReviewPrompt(true);
                                             markFirstScanPromptShown();
                                         }, 800);
+                                        
+                                        // Schedule celebration notification for first scan
+                                        try {
+                                            const { notificationService } = await import('../services/notificationService');
+                                            await notificationService.scheduleFirstScanCelebration();
+                                            console.log('✅ Scheduled first scan celebration notification');
+                                        } catch (notifError) {
+                                            console.warn('Could not schedule first scan notification:', notifError);
+                                        }
                                     }
                                 } catch (e) {
                                     console.warn('Error checking first scan review prompt:', e);
@@ -1215,6 +1237,69 @@ export default function HomeScreen() {
                         visible={showReviewPrompt}
                         onClose={() => setShowReviewPrompt(false)}
                         variant={reviewPromptVariant}
+                    />
+
+                    {/* Cancellation Offer Screen - Shown when subscription is cancelled */}
+                    <CancellationOfferScreen
+                        visible={showCancellationOffer}
+                        onClose={dismissCancellationOffer}
+                        onAcceptYearly={async (step: 'offer1' | 'offer2' | 'free') => {
+                            try {
+                                let offerPackage: any = null;
+                                
+                                if (step === 'offer1') {
+                                    offerPackage = await findPackageByIdentifier('annual_offer1');
+                                } else if (step === 'offer2') {
+                                    offerPackage = await findPackageByIdentifier('annual_offer2');
+                                }
+                                
+                                // Fallback to regular annual if offer package not found
+                                if (!offerPackage && currentOffering?.annual) {
+                                    offerPackage = currentOffering.annual;
+                                }
+                                
+                                if (offerPackage) {
+                                    await purchasePackage(offerPackage);
+                                    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                    dismissCancellationOffer();
+                                } else {
+                                    Alert.alert('Error', 'Yearly offer not available');
+                                }
+                            } catch (error: any) {
+                                if (error.message !== 'Purchase cancelled') {
+                                    Alert.alert('Error', error.message || 'Purchase failed');
+                                }
+                            }
+                        }}
+                        onAcceptLifetime={async (step: 'offer1' | 'offer2' | 'free') => {
+                            try {
+                                let offerPackage: any = null;
+                                
+                                if (step === 'offer1') {
+                                    offerPackage = await findPackageByIdentifier('lifetime_offer1');
+                                } else if (step === 'offer2') {
+                                    offerPackage = await findPackageByIdentifier('lifetime_offer2');
+                                }
+                                
+                                // Fallback to regular lifetime if offer packages not found
+                                if (!offerPackage && currentOffering?.lifetime) {
+                                    offerPackage = currentOffering.lifetime;
+                                }
+                                
+                                if (offerPackage) {
+                                    await purchasePackage(offerPackage);
+                                    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                    dismissCancellationOffer();
+                                } else {
+                                    Alert.alert('Not Available', 'Lifetime package not configured in RevenueCat.');
+                                }
+                            } catch (error: any) {
+                                if (error.message !== 'Purchase cancelled') {
+                                    Alert.alert('Error', error.message || 'Purchase failed');
+                                }
+                            }
+                        }}
+                        onContinueFree={dismissCancellationOffer}
                     />
                 </SafeAreaView>
             </LooviBackground >

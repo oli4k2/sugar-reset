@@ -82,11 +82,12 @@ export const getScannedItemsForDate = async (date: string): Promise<ScannedItem[
 
 /**
  * Save a new scanned item
+ * Keeps the 500 most recent items (across all time, not per day)
  */
 export const saveScannedItem = async (item: ScannedItem): Promise<void> => {
     try {
         const existing = await getScannedItems();
-        const updated = [item, ...existing].slice(0, 100); // Keep last 100 items
+        const updated = [item, ...existing].slice(0, 500); // Keep last 500 items
         await AsyncStorage.setItem(SCANNED_ITEMS_KEY, JSON.stringify(updated));
     } catch (error) {
         console.error('Error saving scanned item:', error);

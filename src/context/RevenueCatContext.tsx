@@ -16,6 +16,7 @@ interface RevenueCatContextType {
   currentOffering: PurchasesOffering | null;
   customerInfo: CustomerInfo | null;
   error: string | null;
+  showCancellationOffer: boolean; // Trigger for showing cancellation offer
 
   // Methods
   purchasePackage: (pkg: PurchasesPackage) => Promise<CustomerInfo | null>;
@@ -23,6 +24,7 @@ interface RevenueCatContextType {
   refreshData: () => Promise<void>;
   checkPremiumStatus: () => Promise<void>;
   findPackageByIdentifier: (identifier: string) => Promise<PurchasesPackage | null>;
+  dismissCancellationOffer: () => void; // Dismiss the cancellation offer
 }
 
 const RevenueCatContext = createContext<RevenueCatContextType | null>(null);
@@ -42,11 +44,14 @@ interface RevenueCatProviderProps {
 export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const { user, isAuthenticated } = useAuthContext();
   const [isPremium, setIsPremium] = useState(false);
+  const [previousPremium, setPreviousPremium] = useState<boolean | null>(null); // Track previous state
   const [isLoading, setIsLoading] = useState(true);
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showCancellationOffer, setShowCancellationOffer] = useState(false);
+  const [hasShownCancellationOffer, setHasShownCancellationOffer] = useState(false); // Track if we've shown it for this cancellation
 
   // Initialize RevenueCat
   useEffect(() => {
@@ -97,6 +102,20 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         }
       }
 
+      // Detect subscription cancellation: premium changed from true to false
+      // Only show once per cancellation event (not every time app loads)
+      if (previousPremium === true && premium === false && isAuthenticated && !hasShownCancellationOffer) {
+        console.log('⚠️ Subscription cancelled detected - showing cancellation offer');
+        setShowCancellationOffer(true);
+        setHasShownCancellationOffer(true);
+      }
+      
+      // Reset the flag if user becomes premium again (they resubscribed)
+      if (previousPremium === false && premium === true) {
+        setHasShownCancellationOffer(false);
+      }
+      
+      setPreviousPremium(premium);
       setIsPremium(premium);
     } catch (err: any) {
       console.error('Failed to load RevenueCat data:', err);
@@ -104,7 +123,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [isInitialized, user?.id]);
+  }, [isInitialized, user?.id, previousPremium, isAuthenticated, hasShownCancellationOffer]);
 
   // Load data when initialized
   useEffect(() => {
@@ -227,17 +246,26 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     }
   }, [currentOffering]);
 
+  // Dismiss cancellation offer
+  const dismissCancellationOffer = useCallback(() => {
+    setShowCancellationOffer(false);
+    // Note: We keep hasShownCancellationOffer as true so it doesn't show again
+    // until they resubscribe (which resets it)
+  }, []);
+
   const value: RevenueCatContextType = {
     isPremium,
     isLoading,
     currentOffering,
     customerInfo,
     error,
+    showCancellationOffer,
     purchasePackage,
     restorePurchases,
     refreshData,
     checkPremiumStatus,
     findPackageByIdentifier,
+    dismissCancellationOffer,
   };
 
   return <RevenueCatContext.Provider value={value}>{children}</RevenueCatContext.Provider>;

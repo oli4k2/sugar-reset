@@ -667,6 +667,38 @@ export const notificationService = {
     },
 
     /**
+     * Schedule a celebration notification for first food scan
+     * Sends a congratulatory message when user completes their first scan
+     */
+    async scheduleFirstScanCelebration(): Promise<void> {
+        try {
+            // Schedule notification for 5 minutes after first scan (gives user time to see in-app feedback first)
+            const notificationDate = new Date();
+            notificationDate.setMinutes(notificationDate.getMinutes() + 5);
+
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '🎉 First scan complete!',
+                    body: 'Great job logging your first meal! Keep tracking to build your streak.',
+                    sound: true,
+                    data: {
+                        type: 'first_scan_celebration',
+                    },
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: notificationDate,
+                },
+                identifier: 'first-scan-celebration',
+            });
+
+            console.log(`📅 Scheduled first scan celebration notification for ${notificationDate.toLocaleString()}`);
+        } catch (error) {
+            console.error('❌ Failed to schedule first scan celebration:', error);
+        }
+    },
+
+    /**
      * Cancel all grace period warning notifications
      */
     async cancelGracePeriodWarnings(): Promise<void> {
