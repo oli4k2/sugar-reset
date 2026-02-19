@@ -19,6 +19,8 @@ import {
     Linking,
     ActivityIndicator,
     Switch,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as StoreReview from 'expo-store-review';
@@ -115,6 +117,8 @@ export default function ProfileScreen() {
     const [showPhasePreview, setShowPhasePreview] = useState(false);
     const [showPlanPhasesPreview, setShowPlanPhasesPreview] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
+    const editNameInputRef = useRef<TextInput>(null);
+    const editModalScrollRef = useRef<ScrollView>(null);
     const [editNameState, setEditNameState] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
 
@@ -938,13 +942,29 @@ export default function ProfileScreen() {
                         animationType="slide"
                         onRequestClose={() => setShowEditProfile(false)}
                     >
-                        <TouchableOpacity
+                        <KeyboardAvoidingView
                             style={styles.modalOverlay}
-                            activeOpacity={1}
-                            onPress={() => setShowEditProfile(false)}
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
                         >
-                            <TouchableOpacity activeOpacity={1} style={styles.editModalContent}>
-                                <Text style={styles.editModalTitle}>Edit Profile</Text>
+                            <TouchableOpacity
+                                style={styles.modalOverlay}
+                                activeOpacity={1}
+                                onPress={() => setShowEditProfile(false)}
+                            >
+                                <TouchableOpacity 
+                                    activeOpacity={1} 
+                                    style={styles.editModalContent}
+                                    onPress={(e) => e.stopPropagation()}
+                                >
+                                    <ScrollView
+                                        ref={editModalScrollRef}
+                                        style={styles.editModalScrollView}
+                                        contentContainerStyle={styles.editModalScrollContent}
+                                        keyboardShouldPersistTaps="handled"
+                                        showsVerticalScrollIndicator={false}
+                                    >
+                                        <Text style={styles.editModalTitle}>Edit Profile</Text>
 
                                 {/* Avatar Selection */}
                                 <Text style={styles.inputLabel}>Profile Picture</Text>
@@ -1049,35 +1069,51 @@ export default function ProfileScreen() {
                                 )}
 
                                 {/* Display Name */}
-                                <Text style={styles.inputLabel}>Your Name</Text>
-                                <TextInput
-                                    style={styles.editInput}
-                                    value={editNameState}
-                                    onChangeText={setEditNameState}
-                                    placeholder="Your Name"
-                                    placeholderTextColor={looviColors.text.muted}
-                                    autoCapitalize="words"
-                                />
+                                <View>
+                                    <Text style={styles.inputLabel}>Your Name</Text>
+                                    <TextInput
+                                        ref={editNameInputRef}
+                                        style={styles.editInput}
+                                        value={editNameState}
+                                        onChangeText={setEditNameState}
+                                        placeholder="Your Name"
+                                        placeholderTextColor={looviColors.text.muted}
+                                        autoCapitalize="words"
+                                        onFocus={() => {
+                                            // Scroll to input when focused - use a simple delay
+                                            setTimeout(() => {
+                                                editNameInputRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                                                    editModalScrollRef.current?.scrollTo({
+                                                        y: pageY - 100, // Scroll to show input above keyboard
+                                                        animated: true,
+                                                    });
+                                                });
+                                            }, 300);
+                                        }}
+                                    />
+                                </View>
                                 <Text style={styles.fieldHint}>This is how friends can find you in the app</Text>
 
-                                <View style={styles.editModalButtons}>
-                                    <TouchableOpacity
-                                        style={styles.editCancelButton}
-                                        onPress={() => setShowEditProfile(false)}
-                                        disabled={isSavingProfile}
-                                    >
-                                        <Text style={styles.editCancelText}>Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.editSaveButton, isSavingProfile && { opacity: 0.7 }]}
-                                        onPress={handleSaveProfile}
-                                        disabled={isSavingProfile}
-                                    >
-                                        <Text style={styles.editSaveText}>{isSavingProfile ? 'Saving...' : 'Save'}</Text>
-                                    </TouchableOpacity>
-                                </View>
+                                        <View style={styles.editModalButtons}>
+                                            <TouchableOpacity
+                                                style={styles.editCancelButton}
+                                                onPress={() => setShowEditProfile(false)}
+                                                disabled={isSavingProfile}
+                                            >
+                                                <Text style={styles.editCancelText}>Cancel</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[styles.editSaveButton, isSavingProfile && { opacity: 0.7 }]}
+                                                onPress={handleSaveProfile}
+                                                disabled={isSavingProfile}
+                                            >
+                                                <Text style={styles.editSaveText}>{isSavingProfile ? 'Saving...' : 'Save'}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </ScrollView>
+                                </TouchableOpacity>
                             </TouchableOpacity>
-                        </TouchableOpacity>
+                        </KeyboardAvoidingView>
                     </Modal>
 
 
@@ -1386,11 +1422,19 @@ const styles = StyleSheet.create({
         padding: spacing.xl,
         width: '100%',
         maxWidth: 340,
+        maxHeight: '90%', // Limit height to prevent overflow
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.15,
         shadowRadius: 20,
         elevation: 10,
+    },
+    editModalScrollView: {
+        flexGrow: 0, // Don't take full height
+    },
+    editModalScrollContent: {
+        flexGrow: 0, // Don't expand to fill
+        paddingBottom: spacing.sm, // Add some bottom padding
     },
     editModalTitle: {
         fontSize: 18,
