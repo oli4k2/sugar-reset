@@ -35,12 +35,15 @@ import {
     AnalysisResult,
     getHealthScoreColor,
     getScannedItems,
+    getScannedItemsForDate,
     getPinnedItems,
     pinItem,
     unpinItem,
 } from '../services/scannerService';
 import { useUserData } from '../context/UserDataContext';
 import { useRevenueCat } from '../hooks/useRevenueCat';
+
+const DAILY_SCAN_LIMIT = 25;
 
 interface FoodScannerModalProps {
     visible: boolean;
@@ -70,6 +73,16 @@ export default function FoodScannerModal({
     const [isEditing, setIsEditing] = useState(false);
     const [recentFoods, setRecentFoods] = useState<ScannedItem[]>([]);
     const [pinnedFoods, setPinnedFoods] = useState<ScannedItem[]>([]);
+    const [todayScanCount, setTodayScanCount] = useState(0);
+
+    // Editable result fields
+    const [editCalories, setEditCalories] = useState('');
+    const [editProtein, setEditProtein] = useState('');
+    const [editCarbs, setEditCarbs] = useState('');
+    const [editFat, setEditFat] = useState('');
+    const [editSugar, setEditSugar] = useState('');
+    const [editAddedSugar, setEditAddedSugar] = useState('');
+    const [editNaturalSugar, setEditNaturalSugar] = useState('');
 
     // Manual entry state
     const [manualCalories, setManualCalories] = useState('');
@@ -85,10 +98,33 @@ export default function FoodScannerModal({
         if (visible) {
             console.log('FoodScannerModal visible');
             loadRecentFoods();
+            loadTodayScanCount();
             // Always start at select step
             setStep('select');
         }
     }, [visible, isPremium]);
+
+    const loadTodayScanCount = async () => {
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const todayItems = await getScannedItemsForDate(today);
+            setTodayScanCount(todayItems.length);
+        } catch (e) {
+            console.error('Error loading scan count:', e);
+        }
+    };
+
+    const checkDailyLimit = (): boolean => {
+        if (todayScanCount >= DAILY_SCAN_LIMIT) {
+            Alert.alert(
+                'Daily Limit Reached',
+                `You've reached the maximum of ${DAILY_SCAN_LIMIT} scans for today. Come back tomorrow!`,
+                [{ text: 'OK' }]
+            );
+            return false;
+        }
+        return true;
+    };
 
     // Load recent foods when entering text-input step
     useEffect(() => {
@@ -132,6 +168,25 @@ export default function FoodScannerModal({
         setManualProtein('');
         setManualFat('');
         setManualImageUri(null);
+        // Reset editable result fields
+        setEditCalories('');
+        setEditProtein('');
+        setEditCarbs('');
+        setEditFat('');
+        setEditSugar('');
+        setEditAddedSugar('');
+        setEditNaturalSugar('');
+    };
+
+    // Populate edit fields when result arrives
+    const populateEditFields = (res: AnalysisResult) => {
+        setEditCalories(String(res.calories));
+        setEditProtein(String(res.protein));
+        setEditCarbs(String(res.carbs));
+        setEditFat(String(res.fat));
+        setEditSugar(String(res.sugar));
+        setEditAddedSugar(String(res.addedSugar ?? 0));
+        setEditNaturalSugar(String(res.naturalSugar ?? 0));
     };
 
     const pickImageForManual = async () => {
@@ -173,6 +228,8 @@ export default function FoodScannerModal({
     };
 
     const takePhoto = async () => {
+        if (!checkDailyLimit()) return;
+
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
             Alert.alert('Permission Required', 'Camera access is needed.');
@@ -193,6 +250,8 @@ export default function FoodScannerModal({
     };
 
     const pickFromGallery = async () => {
+        if (!checkDailyLimit()) return;
+
         const res = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
@@ -213,9 +272,25 @@ export default function FoodScannerModal({
             const res = await analyzeFood(imageUri, description);
             setResult(res);
             setEditedName(res.foodName);
+            populateEditFields(res);
             setStep('result');
-        } catch (error) {
-            Alert.alert('Error', 'Analysis failed.');
+        } catch (error: any) {
+            const message = error?.message ?? '';
+            if (message.includes('GEMINI_API_KEY_MISSING')) {
+                Alert.alert(
+                    'API Key Required',
+                    'Please add your Gemini API key to the .env file as EXPO_PUBLIC_GEMINI_API_KEY.',
+                    [{ text: 'OK' }]
+                );
+            } else if (message.includes('API Key not found') || message.includes('API_KEY_INVALID')) {
+                Alert.alert(
+                    'API Key Issue',
+                    'The Gemini API key appears invalid or not loaded. Please restart the dev server to pick up .env changes.\n\n(Ctrl+C, then npx expo start --dev-client -c)',
+                    [{ text: 'OK' }]
+                );
+            } else {
+                Alert.alert('Analysis Failed', `Could not analyse the image. ${message ? message : 'Please try again.'}`);
+            }
             resetState();
         }
     };
@@ -225,20 +300,23 @@ export default function FoodScannerModal({
 
         // If we have manual values, skip analysis and go straight to result or save
         if (manualCalories || manualSugar) {
+            const addedSugarVal = parseFloat(manualSugar) || 0;
             const manualResult: AnalysisResult = {
                 foodName: textOnlyInput.trim(),
                 calories: parseInt(manualCalories) || 0,
                 protein: parseFloat(manualProtein) || 0,
                 carbs: parseFloat(manualCarbs) || 0,
-                carbsSugars: parseFloat(manualSugar) || 0,
+                carbsSugars: addedSugarVal,
                 fat: parseFloat(manualFat) || 0,
                 fatSaturated: 0,
                 fiber: 0,
-                sugar: parseFloat(manualSugar) || 0,
+                sugar: addedSugarVal,
+                addedSugar: addedSugarVal,
+                naturalSugar: 0,
                 sodium: 0,
                 healthScore: 0, // Will be calculated
                 confidence: 1.0,
-                suggestion: 'Manually entered'
+                suggestion: 'Manually entered — only added sugar counts toward your streak.'
             };
 
             // Calculate health score for manual entry
@@ -259,18 +337,36 @@ export default function FoodScannerModal({
 
             setResult(manualResult);
             setEditedName(manualResult.foodName);
+            populateEditFields(manualResult);
             setStep('result');
             return;
         }
 
+        if (!checkDailyLimit()) return;
         setStep('analyzing');
         try {
             const res = await analyzeFood('', textOnlyInput.trim());
             setResult(res);
             setEditedName(res.foodName);
+            populateEditFields(res);
             setStep('result');
-        } catch (error) {
-            Alert.alert('Error', 'Analysis failed.');
+        } catch (error: any) {
+            const message = error?.message ?? '';
+            if (message.includes('GEMINI_API_KEY_MISSING')) {
+                Alert.alert(
+                    'API Key Required',
+                    'Please add your Gemini API key to the .env file as EXPO_PUBLIC_GEMINI_API_KEY.',
+                    [{ text: 'OK' }]
+                );
+            } else if (message.includes('API Key not found') || message.includes('API_KEY_INVALID')) {
+                Alert.alert(
+                    'API Key Issue',
+                    'The Gemini API key appears invalid or not loaded. Please restart the dev server to pick up .env changes.\n\n(Ctrl+C, then npx expo start --dev-client -c)',
+                    [{ text: 'OK' }]
+                );
+            } else {
+                Alert.alert('Analysis Failed', `Could not analyse the food. ${message ? message : 'Please try again.'}`);
+            }
             resetState();
         }
     };
@@ -280,20 +376,31 @@ export default function FoodScannerModal({
         const portionMultiplier = portionPercent / 100;
         const timestamp = selectedDate ? new Date(selectedDate + 'T12:00:00').toISOString() : new Date().toISOString();
 
+        // Use edited values instead of raw result
+        const cal = parseFloat(editCalories) || result.calories;
+        const prot = parseFloat(editProtein) || result.protein;
+        const carb = parseFloat(editCarbs) || result.carbs;
+        const fatVal = parseFloat(editFat) || result.fat;
+        const sug = parseFloat(editSugar) || result.sugar;
+        const addSug = parseFloat(editAddedSugar) || (result.addedSugar ?? 0);
+        const natSug = parseFloat(editNaturalSugar) || (result.naturalSugar ?? 0);
+
         const scannedItem: ScannedItem = {
             id: generateScanId(),
             imageUri: imageUri || manualImageUri || '',
             name: editedName || result.foodName,
             timestamp,
             portionPercent,
-            calories: Math.round(result.calories * portionMultiplier),
-            protein: Math.round(result.protein * portionMultiplier * 10) / 10,
-            carbs: Math.round(result.carbs * portionMultiplier * 10) / 10,
-            carbsSugars: Math.round(result.carbsSugars * portionMultiplier * 10) / 10,
-            fat: Math.round(result.fat * portionMultiplier * 10) / 10,
+            calories: Math.round(cal * portionMultiplier),
+            protein: Math.round(prot * portionMultiplier * 10) / 10,
+            carbs: Math.round(carb * portionMultiplier * 10) / 10,
+            carbsSugars: Math.round(sug * portionMultiplier * 10) / 10,
+            fat: Math.round(fatVal * portionMultiplier * 10) / 10,
             fatSaturated: Math.round(result.fatSaturated * portionMultiplier * 10) / 10,
             fiber: Math.round(result.fiber * portionMultiplier * 10) / 10,
-            sugar: Math.round(result.sugar * portionMultiplier * 10) / 10,
+            sugar: Math.round(sug * portionMultiplier * 10) / 10,
+            addedSugar: Math.round(addSug * portionMultiplier * 10) / 10,
+            naturalSugar: Math.round(natSug * portionMultiplier * 10) / 10,
             sodium: Math.round(result.sodium * portionMultiplier),
             healthScore: result.healthScore,
             confidence: result.confidence,
@@ -315,7 +422,7 @@ export default function FoodScannerModal({
         switch (step) {
             case 'select':
                 return (
-                    <ScrollView 
+                    <ScrollView
                         style={styles.scrollContainer}
                         contentContainerStyle={styles.selectContainer}
                         keyboardShouldPersistTaps="handled"
@@ -404,7 +511,7 @@ export default function FoodScannerModal({
                             {/* Text Input / Manual Entry - Available for All */}
                             <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep('text-input')}>
                                 <Feather name="edit-2" size={20} color={looviColors.text.primary} />
-                                <Text style={styles.secondaryText}>{isPremium ? 'Type' : 'Manual Entry'}</Text>
+                                <Text style={styles.secondaryText}>Manual Entry</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -475,10 +582,15 @@ export default function FoodScannerModal({
                     <View style={styles.stepContainer}>
                         <Image source={{ uri: imageUri! }} style={styles.reviewImage} />
                         <View style={styles.reviewContent}>
-                            <Text style={styles.stepTitle}>Any specifics?</Text>
+                            <View style={styles.describeTitleRow}>
+                                <Feather name="message-circle" size={22} color={looviColors.coralOrange} />
+                                <Text style={styles.stepTitle}>Help us get it right! ✨</Text>
+                            </View>
+                            <Text style={styles.describeHint}>Tell us a little about your meal — anything that helps us identify it better, like brand, portion size, or dietary notes.</Text>
                             <TextInput
                                 style={styles.descriptionInput}
-                                placeholder="e.g. 'Low fat', 'No sugar added'..."
+                                placeholder="e.g. 'It's a small portion', 'Sugar-free version', 'Homemade with oat milk'..."
+                                placeholderTextColor={looviColors.text.muted}
                                 value={description}
                                 onChangeText={setDescription}
                                 multiline
@@ -497,7 +609,7 @@ export default function FoodScannerModal({
 
             case 'text-input':
                 return (
-                    <ScrollView 
+                    <ScrollView
                         style={styles.scrollContainer}
                         keyboardShouldPersistTaps="handled"
                         contentContainerStyle={styles.scrollContent}
@@ -525,7 +637,7 @@ export default function FoodScannerModal({
                                 {manualImageUri ? (
                                     <View style={styles.imagePreviewContainer}>
                                         <Image source={{ uri: manualImageUri }} style={styles.imagePreview} />
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={styles.removeImageButton}
                                             onPress={() => setManualImageUri(null)}
                                         >
@@ -533,7 +645,7 @@ export default function FoodScannerModal({
                                         </TouchableOpacity>
                                     </View>
                                 ) : (
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.addImageButton}
                                         onPress={pickImageForManual}
                                     >
@@ -561,7 +673,10 @@ export default function FoodScannerModal({
                                         </View>
                                     </View>
                                     <View style={styles.nutritionRow}>
-                                        <Text style={styles.nutritionLabel}>Sugar (Total)</Text>
+                                        <View>
+                                            <Text style={styles.nutritionLabel}>Added Sugar</Text>
+                                            <Text style={styles.nutritionHint}>Counts toward streak</Text>
+                                        </View>
                                         <View style={styles.nutritionInputContainer}>
                                             <TextInput
                                                 style={styles.nutritionInput}
@@ -685,39 +800,119 @@ export default function FoodScannerModal({
                 return (
                     <View style={styles.centerContainer}>
                         <ActivityIndicator size="large" color={looviColors.coralOrange} />
-                        <Text style={styles.analyzingTitle}>Identifying...</Text>
+                        <Text style={styles.analyzingTitle}>Analysing with AI...</Text>
+                        <Text style={styles.analyzingSubtitle}>Gemini is identifying sugars & macros</Text>
                     </View>
                 );
 
             case 'result':
                 const healthColor = result ? getHealthScoreColor(result.healthScore) : looviColors.accent.success;
+                const pMul = portionPercent / 100;
                 return (
                     <View style={styles.resultContainer}>
-                        <ScrollView showsVerticalScrollIndicator={false}>
+                        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                             <View style={styles.resultHeader}>
                                 {imageUri ? <Image source={{ uri: imageUri }} style={styles.resultImage} /> : <View style={styles.resultPlaceholder}><Feather name="list" size={40} color={looviColors.text.muted} /></View>}
                                 <View style={styles.resultTitleOverlay}>
                                     <Text style={styles.resultFoodName}>{editedName || result?.foodName}</Text>
                                 </View>
                             </View>
+
+                            {/* Editable hint */}
+                            <View style={styles.editHintRow}>
+                                <Feather name="edit-3" size={12} color={looviColors.text.muted} />
+                                <Text style={styles.editHintText}>All values can be edited — tap any number to adjust</Text>
+                            </View>
+
                             <View style={styles.resultBody}>
-                                <View style={styles.scoreCard}>
-                                    <View style={styles.scoreLeft}>
-                                        <Text style={styles.scoreLabel}>Health Score</Text>
-                                        <Text style={[styles.scoreValue, { color: healthColor }]}>{result?.healthScore}<Text style={styles.scoreTotal}>/10</Text></Text>
+                                {/* AI Interpretation */}
+                                {result?.suggestion && result.suggestion !== 'Manually entered' && result.suggestion !== 'Manually entered — only added sugar counts toward your streak.' && (
+                                    <View style={styles.aiInterpretation}>
+                                        <Feather name="cpu" size={14} color={looviColors.text.tertiary} />
+                                        <Text style={styles.aiInterpretationText}>{result.suggestion}</Text>
                                     </View>
-                                    <View style={styles.scoreRight}>
-                                        <Text style={styles.sugarValue}>{(result ? result.sugar * portionPercent / 100 : 0).toFixed(1)}g</Text>
-                                        <Text style={styles.sugarLabel}>Sugar</Text>
+                                )}
+
+                                {/* Portion — always visible */}
+                                <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Portion</Text><Text style={styles.sectionValue}>{portionPercent}%</Text></View>
+                                <Slider style={styles.sliderCompact} minimumValue={0} maximumValue={150} step={10} value={portionPercent} onValueChange={setPortionPercent} minimumTrackTintColor={looviColors.coralOrange} thumbTintColor={looviColors.coralOrange} />
+
+                                {/* Score + Macros combined card */}
+                                <View style={styles.scoreCard}>
+                                    <View style={styles.scoreTopRow}>
+                                        <View style={styles.scoreLeft}>
+                                            <Text style={styles.scoreLabel}>Health Score</Text>
+                                            <Text style={[styles.scoreValue, { color: healthColor }]}>{result?.healthScore}<Text style={styles.scoreTotal}>/10</Text></Text>
+                                        </View>
+                                        <View style={styles.scoreRight}>
+                                            <Text style={styles.sugarValue}>{((parseFloat(editSugar) || 0) * pMul).toFixed(1)}g</Text>
+                                            <Text style={styles.sugarLabel}>Total Sugar</Text>
+                                        </View>
+                                    </View>
+                                    {/* Inline macros row */}
+                                    <View style={styles.inlineMacrosRow}>
+                                        <View style={styles.inlineMacroItem}>
+                                            <TextInput style={styles.inlineMacroValue} value={editCalories} onChangeText={setEditCalories} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroLabel}>kcal</Text>
+                                        </View>
+                                        <View style={styles.inlineMacroDivider} />
+                                        <View style={styles.inlineMacroItem}>
+                                            <TextInput style={styles.inlineMacroValue} value={editProtein} onChangeText={setEditProtein} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroLabel}>Protein</Text>
+                                        </View>
+                                        <View style={styles.inlineMacroDivider} />
+                                        <View style={styles.inlineMacroItem}>
+                                            <TextInput style={styles.inlineMacroValue} value={editCarbs} onChangeText={setEditCarbs} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroLabel}>Carbs</Text>
+                                        </View>
+                                        <View style={styles.inlineMacroDivider} />
+                                        <View style={styles.inlineMacroItem}>
+                                            <TextInput style={styles.inlineMacroValue} value={editFat} onChangeText={setEditFat} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroLabel}>Fat</Text>
+                                        </View>
                                     </View>
                                 </View>
-                                <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Portion</Text><Text style={styles.sectionValue}>{portionPercent}%</Text></View>
-                                <Slider style={styles.slider} minimumValue={0} maximumValue={150} step={10} value={portionPercent} onValueChange={setPortionPercent} minimumTrackTintColor={looviColors.coralOrange} thumbTintColor={looviColors.coralOrange} />
-                                <View style={styles.macrosGrid}>
-                                    <View style={styles.macroBox}><Text style={styles.macroVal}>{Math.round((result?.calories || 0) * portionPercent / 100)}</Text><Text style={styles.macroLbl}>kcal</Text></View>
-                                    <View style={styles.macroBox}><Text style={styles.macroVal}>{((result?.protein || 0) * portionPercent / 100).toFixed(1)}</Text><Text style={styles.macroLbl}>Prot</Text></View>
-                                    <View style={styles.macroBox}><Text style={styles.macroVal}>{((result?.carbs || 0) * portionPercent / 100).toFixed(1)}</Text><Text style={styles.macroLbl}>Carb</Text></View>
-                                    <View style={styles.macroBox}><Text style={styles.macroVal}>{((result?.fat || 0) * portionPercent / 100).toFixed(1)}</Text><Text style={styles.macroLbl}>Fat</Text></View>
+
+                                {/* Sugar Breakdown - Added vs Natural */}
+                                <View style={styles.sugarBreakdownCard}>
+                                    <Text style={styles.sugarBreakdownTitle}>Sugar Breakdown</Text>
+                                    <View style={styles.sugarBreakdownRow}>
+                                        <View style={styles.sugarBreakdownItem}>
+                                            <View style={styles.sugarIconRow}>
+                                                <View style={[styles.sugarDot, { backgroundColor: '#EF4444' }]} />
+                                                <Ionicons name="warning" size={12} color="#EF4444" />
+                                            </View>
+                                            <View style={styles.sugarEditRow}>
+                                                <TextInput
+                                                    style={[styles.sugarBreakdownValue, { color: '#EF4444' }]}
+                                                    value={editAddedSugar}
+                                                    onChangeText={setEditAddedSugar}
+                                                    keyboardType="numeric"
+                                                />
+                                                <Text style={[styles.sugarBreakdownUnit, { color: '#EF4444' }]}>g</Text>
+                                            </View>
+                                            <Text style={styles.sugarBreakdownLabel}>Added Sugar</Text>
+                                            <Text style={styles.sugarStreakHint}>Counts toward streak</Text>
+                                        </View>
+                                        <View style={styles.sugarBreakdownDivider} />
+                                        <View style={styles.sugarBreakdownItem}>
+                                            <View style={styles.sugarIconRow}>
+                                                <View style={[styles.sugarDot, { backgroundColor: '#22C55E' }]} />
+                                                <Ionicons name="leaf" size={12} color="#22C55E" />
+                                            </View>
+                                            <View style={styles.sugarEditRow}>
+                                                <TextInput
+                                                    style={[styles.sugarBreakdownValue, { color: '#22C55E' }]}
+                                                    value={editNaturalSugar}
+                                                    onChangeText={setEditNaturalSugar}
+                                                    keyboardType="numeric"
+                                                />
+                                                <Text style={[styles.sugarBreakdownUnit, { color: '#22C55E' }]}>g</Text>
+                                            </View>
+                                            <Text style={styles.sugarBreakdownLabel}>Natural Sugar</Text>
+                                            <Text style={styles.sugarStreakHint}>From fruit, dairy</Text>
+                                        </View>
+                                    </View>
                                 </View>
                             </View>
                         </ScrollView>
@@ -732,8 +927,8 @@ export default function FoodScannerModal({
 
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-            <KeyboardAvoidingView 
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardAvoidingView}
             >
                 <TouchableWithoutFeedback onPress={handleClose}>
@@ -792,40 +987,88 @@ const styles = StyleSheet.create({
     textOnlyInput: { backgroundColor: '#F9F9F9', borderRadius: 16, padding: spacing.md, fontSize: 18, minHeight: 120, marginHorizontal: spacing.lg, marginBottom: spacing.lg },
     bottomActions: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing.lg, marginTop: spacing.md },
     centerContainer: { padding: 60, alignItems: 'center' },
-    analyzingTitle: { fontSize: 18, fontWeight: '600', marginTop: 16 },
+    analyzingTitle: { fontSize: 18, fontWeight: '600', marginTop: 16, color: looviColors.text.primary },
+    analyzingSubtitle: { fontSize: 13, color: looviColors.text.tertiary, marginTop: 6, textAlign: 'center' },
+
+    // Describe step
+    describeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+    describeHint: { fontSize: 13, color: looviColors.text.tertiary, lineHeight: 18, marginBottom: 12 },
+
     resultContainer: { width: '100%', flex: 1 },
     resultHeader: { width: '100%', height: 200 },
     resultImage: { width: '100%', height: '100%' },
     resultPlaceholder: { width: '100%', height: '100%', backgroundColor: '#EEE', alignItems: 'center', justifyContent: 'center' },
     resultTitleOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, backgroundColor: 'rgba(0,0,0,0.4)' },
     resultFoodName: { fontSize: 22, fontWeight: '700', color: '#FFF' },
-    resultBody: { padding: spacing.lg },
-    scoreCard: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#EEE' },
+    resultBody: { padding: spacing.md },
+
+    // AI interpretation
+    aiInterpretation: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#F9F9F9', borderRadius: 12, marginBottom: 16, gap: 8 },
+    aiInterpretationText: { flex: 1, fontSize: 13, fontStyle: 'italic', color: looviColors.text.tertiary, lineHeight: 18 },
+
+    // Edit hint row below image
+    editHintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, backgroundColor: '#FAFAFA' },
+    editHintText: { fontSize: 11, color: looviColors.text.muted, fontStyle: 'italic' },
+
+    scoreCard: { backgroundColor: '#FFF', borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#EEE' },
+    scoreTopRow: { flexDirection: 'row', marginBottom: 8 },
     scoreLeft: { flex: 1 },
-    scoreLabel: { fontSize: 12, color: looviColors.text.tertiary, fontWeight: '600' },
-    scoreValue: { fontSize: 32, fontWeight: '800' },
-    scoreTotal: { fontSize: 16, color: looviColors.text.muted },
+    scoreLabel: { fontSize: 11, color: looviColors.text.tertiary, fontWeight: '600' },
+    scoreValue: { fontSize: 26, fontWeight: '800' },
+    scoreTotal: { fontSize: 14, color: looviColors.text.muted },
     scoreRight: { alignItems: 'flex-end', justifyContent: 'center' },
-    sugarValue: { fontSize: 18, fontWeight: '700', color: looviColors.text.primary },
-    sugarLabel: { fontSize: 12, color: looviColors.text.muted },
+    sugarValue: { fontSize: 16, fontWeight: '700', color: looviColors.text.primary },
+    sugarLabel: { fontSize: 11, color: looviColors.text.muted },
+
+    // Inline macros row inside scoreCard
+    inlineMacrosRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 8 },
+    inlineMacroItem: { flex: 1, alignItems: 'center' },
+    inlineMacroValue: { fontSize: 14, fontWeight: '700', color: looviColors.text.primary, textAlign: 'center', minWidth: 36, paddingVertical: 0, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)' },
+    inlineMacroLabel: { fontSize: 9, color: looviColors.text.muted, marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.3 },
+    inlineMacroDivider: { width: 1, height: 24, backgroundColor: '#F0F0F0' },
+
+    // Sugar breakdown
+    sugarBreakdownCard: { backgroundColor: '#FFF', borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#EEE' },
+    sugarBreakdownTitle: { fontSize: 11, fontWeight: '700', color: looviColors.text.tertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+    sugarBreakdownRow: { flexDirection: 'row', alignItems: 'center' },
+    sugarBreakdownItem: { flex: 1, alignItems: 'center' },
+    sugarIconRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+    sugarDot: { width: 8, height: 8, borderRadius: 4 },
+    sugarEditRow: { flexDirection: 'row', alignItems: 'baseline' },
+    sugarBreakdownValue: { fontSize: 20, fontWeight: '800', textAlign: 'center', minWidth: 36, paddingVertical: 0 },
+    sugarBreakdownUnit: { fontSize: 12, fontWeight: '600' },
+    sugarBreakdownLabel: { fontSize: 10, color: looviColors.text.tertiary, marginTop: 1 },
+    sugarStreakHint: { fontSize: 8, color: looviColors.text.muted, fontStyle: 'italic', marginTop: 1 },
+    sugarBreakdownDivider: { width: 1, height: 36, backgroundColor: '#EEE' },
+
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    sectionTitle: { 
-        fontSize: 14, 
-        fontWeight: '600', 
-        color: looviColors.text.tertiary, 
-        textTransform: 'uppercase', 
-        letterSpacing: 0.5, 
-        marginBottom: spacing.sm 
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: looviColors.text.tertiary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: spacing.sm
     },
     sectionValue: { fontSize: 15, fontWeight: '700', color: looviColors.coralOrange },
     slider: { width: '100%', height: 40, marginBottom: 20 },
+    sliderCompact: { width: '100%', height: 32, marginBottom: 10 },
+
+    // Editable macros
+    editableMacrosCard: { backgroundColor: '#FFF', borderRadius: 16, padding: 4, paddingHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#EEE' },
+    editMacroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+    editMacroLabel: { fontSize: 15, fontWeight: '500', color: looviColors.text.primary },
+    editMacroInputRow: { flexDirection: 'row', alignItems: 'center' },
+    editMacroInput: { fontSize: 16, fontWeight: '700', color: looviColors.text.primary, minWidth: 50, textAlign: 'right', paddingVertical: 0, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.08)' },
+    editMacroUnit: { fontSize: 12, fontWeight: '500', color: looviColors.text.tertiary, marginLeft: 4 },
+
     macrosGrid: { flexDirection: 'row', justifyContent: 'space-between' },
     macroBox: { alignItems: 'center', flex: 1 },
     macroVal: { fontSize: 16, fontWeight: '700' },
     macroLbl: { fontSize: 11, color: looviColors.text.tertiary },
     resultFooter: { flexDirection: 'row', padding: spacing.lg, gap: 12 },
     retryButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
-    saveButtonFull: { flex: 1, backgroundColor: looviColors.coralOrange, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+    saveButtonFull: { flex: 1, backgroundColor: looviColors.coralOrange, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', paddingVertical: 14 },
     saveButtonText: { color: '#FFF', fontSize: 16, fontWeight: '700', marginRight: 8 },
     // Manual Entry Styles
     scrollContainer: {
@@ -936,4 +1179,5 @@ const styles = StyleSheet.create({
         color: looviColors.text.tertiary,
         marginLeft: 4,
     },
+    nutritionHint: { fontSize: 11, color: looviColors.text.muted, fontStyle: 'italic', marginTop: 1 },
 });
