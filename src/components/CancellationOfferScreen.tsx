@@ -4,7 +4,7 @@
  * Shown when users try to cancel their subscription or after trial expires.
  * Multi-step offer flow:
  * 
- * Offer 1: $12.99/year OR $24.99 lifetime (with X button)
+ * Offer 1: $14.99/year OR $24.99 lifetime (with X button)
  * Offer 2: $14.99 lifetime - Final chance (with X button)
  * Free tier: If they decline everything
  */
@@ -108,7 +108,7 @@ export default function CancellationOfferScreen({
         }
     };
 
-    // Render Offer 1: $12.99/year or $24.99 lifetime
+    // Render Offer 1: $14.99/year or $24.99 lifetime
     const renderOffer1 = () => (
         <View style={styles.offerContent}>
             <Text style={styles.waitTitle}>Wait! Don't Go</Text>

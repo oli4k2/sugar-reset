@@ -45,6 +45,7 @@ import * as Haptics from 'expo-haptics';
 import { NotificationSettingsModal } from '../components/NotificationSettingsModal';
 import CancellationOfferScreen from '../components/CancellationOfferScreen';
 import { PhasePreviewModal } from '../components/PhasePreviewModal';
+import { PlanPhasesPreviewModal } from '../components/PlanPhasesPreviewModal';
 
 interface MenuItem {
     id: string;
@@ -90,6 +91,7 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
             { id: 'migrateUsernames', emoji: '👤', label: 'Migrate Usernames (GDPR)' },
             { id: 'phasePreview', emoji: '🌱', label: 'Phase Animation Preview' },
+            { id: 'planPhasesPreview', emoji: '📋', label: 'Plan Phases Preview' },
         ],
     }] : []),
     {
@@ -109,6 +111,7 @@ export default function ProfileScreen() {
     const navigation = useNavigation<any>();
     const [showCancellationOffer, setShowCancellationOffer] = useState(false);
     const [showPhasePreview, setShowPhasePreview] = useState(false);
+    const [showPlanPhasesPreview, setShowPlanPhasesPreview] = useState(false);
     const [showEditProfile, setShowEditProfile] = useState(false);
     const [editNameState, setEditNameState] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -116,6 +119,7 @@ export default function ProfileScreen() {
     const [selectedAvatarType, setSelectedAvatarType] = useState<'photo' | 'emoji' | 'initial'>('initial');
     const [selectedAvatarValue, setSelectedAvatarValue] = useState<string>('');
     const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+    const [showEmojiModal, setShowEmojiModal] = useState(false);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
@@ -842,6 +846,7 @@ export default function ProfileScreen() {
                                                     case 'cleanupCommunity': handleCleanupCommunityData(); break;
                                                     case 'migrateUsernames': handleMigrateUsernames(); break;
                                                     case 'phasePreview': setShowPhasePreview(true); break;
+                                                    case 'planPhasesPreview': setShowPlanPhasesPreview(true); break;
                                                     case 'privacy': navigation.navigate('PrivacyPolicy'); break;
                                                     case 'terms': navigation.navigate('TermsOfService'); break;
                                                 }
@@ -915,7 +920,11 @@ export default function ProfileScreen() {
                                 <View style={styles.avatarPickerSection}>
                                     <TouchableOpacity
                                         style={styles.currentAvatarPreview}
-                                        onPress={() => setShowAvatarPicker(!showAvatarPicker)}
+                                        onPress={() => {
+                                            // Toggle emoji dropdown
+                                            setShowEmojiModal(!showEmojiModal);
+                                        }}
+                                        activeOpacity={0.7}
                                     >
                                         <UserAvatar
                                             size={56}
@@ -942,26 +951,51 @@ export default function ProfileScreen() {
                                     )}
                                 </View>
 
-                                {/* Emoji Picker Grid */}
-                                {showAvatarPicker && (
-                                    <View style={styles.emojiPickerGrid}>
-                                        <Text style={styles.emojiPickerTitle}>Choose an emoji</Text>
-                                        <View style={styles.emojiGrid}>
-                                            {AVATAR_EMOJIS.map((emoji) => (
-                                                <TouchableOpacity
-                                                    key={emoji}
-                                                    style={[
-                                                        styles.emojiOption,
-                                                        selectedAvatarType === 'emoji' && selectedAvatarValue === emoji && styles.avatarOptionSelected
-                                                    ]}
-                                                    onPress={() => handleSelectAvatar('emoji', emoji)}
-                                                >
-                                                    <Text style={styles.emojiText}>{emoji}</Text>
-                                                </TouchableOpacity>
-                                            ))}
+                                {/* Emoji Picker Dropdown Container */}
+                                <View style={styles.emojiPickerContainer}>
+                                    <TouchableOpacity
+                                        style={styles.emojiPickerButton}
+                                        onPress={() => {
+                                            setShowEmojiModal(!showEmojiModal);
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.emojiPickerButtonText}>Choose an emoji</Text>
+                                        <Ionicons 
+                                            name={showEmojiModal ? "chevron-up" : "chevron-down"} 
+                                            size={18} 
+                                            color={looviColors.text.secondary} 
+                                        />
+                                    </TouchableOpacity>
+
+                                    {/* Emoji Grid Dropdown - Positioned absolutely */}
+                                    {showEmojiModal && (
+                                        <View style={styles.emojiPickerDropdown}>
+                                            <ScrollView
+                                                style={styles.emojiDropdownScroll}
+                                                contentContainerStyle={styles.emojiGrid}
+                                                showsVerticalScrollIndicator={false}
+                                                nestedScrollEnabled={true}
+                                            >
+                                                {AVATAR_EMOJIS.map((emoji) => (
+                                                    <TouchableOpacity
+                                                        key={emoji}
+                                                        style={[
+                                                            styles.emojiOption,
+                                                            selectedAvatarType === 'emoji' && selectedAvatarValue === emoji && styles.avatarOptionSelected
+                                                        ]}
+                                                        onPress={() => {
+                                                            handleSelectAvatar('emoji', emoji);
+                                                            setShowEmojiModal(false);
+                                                        }}
+                                                    >
+                                                        <Text style={styles.emojiText}>{emoji}</Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
                                         </View>
-                                    </View>
-                                )}
+                                    )}
+                                </View>
 
                                 {/* Email (Read-only) */}
                                 <Text style={styles.inputLabel}>Email</Text>
@@ -1014,6 +1048,7 @@ export default function ProfileScreen() {
                             </TouchableOpacity>
                         </TouchableOpacity>
                     </Modal>
+
 
                     {/* Notification Settings Modal */}
                     <NotificationSettingsModal
@@ -1068,6 +1103,14 @@ export default function ProfileScreen() {
                         <PhasePreviewModal
                             visible={showPhasePreview}
                             onClose={() => setShowPhasePreview(false)}
+                        />
+                    )}
+
+                    {/* DEV: Plan Phases Preview */}
+                    {__DEV__ && (
+                        <PlanPhasesPreviewModal
+                            visible={showPlanPhasesPreview}
+                            onClose={() => setShowPlanPhasesPreview(false)}
                         />
                     )}
                 </SafeAreaView>
@@ -1511,20 +1554,52 @@ const styles = StyleSheet.create({
         color: looviColors.text.secondary,
         fontWeight: '500',
     },
-    emojiPickerGrid: {
-        marginBottom: spacing.md,
+    emojiPickerContainer: {
+        position: 'relative',
+        marginTop: spacing.sm,
+        zIndex: 10,
     },
-    emojiPickerTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: looviColors.text.secondary,
-        marginBottom: spacing.sm,
-        textAlign: 'center',
+    emojiPickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        borderRadius: borderRadius.lg,
+    },
+    emojiPickerButtonText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: looviColors.text.primary,
+    },
+    emojiPickerDropdown: {
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        right: 0,
+        maxHeight: 300,
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius.lg,
+        marginTop: spacing.xs,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.1)',
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+        zIndex: 1000,
+    },
+    emojiDropdownScroll: {
+        maxHeight: 300,
     },
     emojiGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center',
+        padding: spacing.md,
         gap: spacing.xs,
     },
     emojiOption: {

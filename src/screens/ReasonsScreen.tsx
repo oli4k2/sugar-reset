@@ -308,7 +308,11 @@ export default function ReasonsScreen({ navigation }: ReasonsScreenProps) {
 
                 {/* Unified Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, { paddingTop: 12 }]}>
+                    <TouchableOpacity 
+                        onPress={() => navigation.goBack()} 
+                        style={styles.closeButton}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                         <Feather name="x" size={24} color={THEME.textMuted} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>MY WHY</Text>
@@ -405,18 +409,14 @@ const styles = StyleSheet.create({
     iconBtn: {
         padding: 8,
     },
-    // Close Button (Removed replaced by header)
     closeButton: {
-        position: 'absolute',
-        top: 60,
-        right: spacing.lg,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         justifyContent: 'center',
         alignItems: 'center',
-        zIndex: 10,
+        marginLeft: spacing.xs,
     },
     // Tap Area
     tapArea: {

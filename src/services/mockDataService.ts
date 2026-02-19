@@ -158,7 +158,7 @@ export function getMockUserStats(userId: string): MockUserStats | null {
  * Posts have realistic dates spanning Nov 2025 – Feb 2026.
  */
 export function getMockPosts(): Post[] {
-    return [
+    const raw: Post[] = [
         {
             id: 'mock_post_1',
             authorId: 'mock_user_0',
@@ -300,6 +300,53 @@ export function getMockPosts(): Post[] {
             updatedAt: new Date('2026-02-05T07:30:00'),
         },
     ];
+
+    // Apply runtime deltas so upvote/comment changes survive reloads
+    return raw.map(post => {
+        const d = mockPostDeltas.get(post.id);
+        if (!d) return post;
+        return {
+            ...post,
+            upvotes: Math.max(0, post.upvotes + d.upvoteDelta),
+            commentCount: Math.max(0, post.commentCount + d.commentDelta),
+        };
+    });
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Runtime delta tracker for mock post interactions
+// ──────────────────────────────────────────────────────────────────
+
+interface MockPostDelta {
+    upvoteDelta: number;
+    commentDelta: number;
+}
+
+const mockPostDeltas = new Map<string, MockPostDelta>();
+
+function getDelta(postId: string): MockPostDelta {
+    if (!mockPostDeltas.has(postId)) {
+        mockPostDeltas.set(postId, { upvoteDelta: 0, commentDelta: 0 });
+    }
+    return mockPostDeltas.get(postId)!;
+}
+
+/** Call when a mock post is upvoted (+1) or un-upvoted (-1). */
+export function adjustMockPostUpvote(postId: string, increment: number): void {
+    const d = getDelta(postId);
+    d.upvoteDelta += increment;
+}
+
+/** Call when a comment is added to a mock post. */
+export function incrementMockPostComment(postId: string): void {
+    const d = getDelta(postId);
+    d.commentDelta += 1;
+}
+
+/** Call when a comment is added (+1) or deleted (-1) from a mock post. */
+export function adjustMockPostComment(postId: string, delta: number): void {
+    const d = getDelta(postId);
+    d.commentDelta += delta;
 }
 
 // ──────────────────────────────────────────────────────────────────

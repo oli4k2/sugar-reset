@@ -164,7 +164,11 @@ export default function InnerCircleScreen() {
                 <LinearGradient colors={THEME.bg as any} style={StyleSheet.absoluteFillObject} />
                 <SafeAreaView style={styles.safeArea}>
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, { paddingTop: 12 }]}>
+                        <TouchableOpacity 
+                            onPress={() => navigation.goBack()} 
+                            style={styles.closeButton}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
                             <Feather name="x" size={24} color={THEME.textDim} />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>INNER CIRCLE</Text>
@@ -191,7 +195,11 @@ export default function InnerCircleScreen() {
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                    <TouchableOpacity 
+                        onPress={() => navigation.goBack()} 
+                        style={styles.closeButton}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                         <Feather name="x" size={24} color={THEME.textDim} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>INNER CIRCLE</Text>
@@ -382,7 +390,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 12, // Consistent padding for status bar
+        paddingTop: 40, // Moved down for better accessibility
         minHeight: 60,
     },
     headerTitle: {

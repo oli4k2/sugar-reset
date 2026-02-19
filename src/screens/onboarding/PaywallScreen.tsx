@@ -7,7 +7,7 @@
  * Step 3: Timeline with plan selection - 3-day free trial
  * 
  * After trial cancellation:
- * - Offer 1: $12.99/year or $24.99 lifetime
+ * - Offer 1: $14.99/year or $24.99 lifetime
  * - Offer 2: $14.99 lifetime (final)
  * - Free tier if declined
  */
@@ -183,7 +183,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
         setIsPurchasing(true);
         try {
             // Try to find the cancellation offer yearly package
-            // Offer 1: 'annual_offer1' for yearly_subscription_offer ($12.99)
+            // Offer 1: 'annual_offer1' for yearly_subscription_offer ($14.99)
             // Offer 2: 'annual_offer2' for yearly_subscription_offer_2 ($14.99) - if exists
             let offerPackage: PurchasesPackage | null = null;
 
@@ -462,7 +462,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     const getYearlyPrice = () => currentOffering?.annual?.product.priceString || '$29.99';
     const getYearlyMonthlyEquivalent = () => {
         const price = currentOffering?.annual?.product.price || 29.99;
-        return `$${(price / 12).toFixed(2)}`;
+        return `$${(Math.floor((price / 12) * 100) / 100).toFixed(2)}`;
     };
 
     // Render Step 1: Intro

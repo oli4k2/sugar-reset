@@ -88,10 +88,16 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
   // Calculate current phase (same as PlanProgressBar)
   const progressPercent = Math.min(100, Math.max(0, Math.round((daysSinceStart / planDuration) * 100)));
   const PHASES = [
-    { minPercent: 0, maxPercent: 25, name: 'Phase 1: Detox', feeling: 'experiencing cravings and adjustment', endFeeling: 'cravings will start to decrease' },
-    { minPercent: 25, maxPercent: 50, name: 'Phase 2: Adaptation', feeling: 'adapting to lower sugar intake', endFeeling: 'energy levels will stabilize' },
-    { minPercent: 50, maxPercent: 75, name: 'Phase 3: Momentum', feeling: 'building healthy habits', endFeeling: 'taste preferences will change' },
-    { minPercent: 75, maxPercent: 100, name: 'Phase 4: Mastery', feeling: 'mastering your sugar-free lifestyle', endFeeling: 'feel in complete control' },
+    { minPercent: 0, maxPercent: 5, name: 'Phase 1: Starting Out', feeling: 'taking your first steps', endFeeling: 'you\'ve begun your journey' },
+    { minPercent: 5, maxPercent: 10, name: 'Phase 2: First Steps', feeling: 'building your foundation', endFeeling: 'establishing new routines' },
+    { minPercent: 10, maxPercent: 15, name: 'Phase 3: Building Foundation', feeling: 'creating healthy habits', endFeeling: 'patterns are forming' },
+    { minPercent: 15, maxPercent: 20, name: 'Phase 4: Early Progress', feeling: 'seeing initial results', endFeeling: 'momentum is building' },
+    { minPercent: 20, maxPercent: 25, name: 'Phase 5: Gaining Momentum', feeling: 'feeling more in control', endFeeling: 'habits are strengthening' },
+    { minPercent: 25, maxPercent: 35, name: 'Phase 6: Detox', feeling: 'experiencing cravings and adjustment', endFeeling: 'cravings will start to decrease' },
+    { minPercent: 35, maxPercent: 50, name: 'Phase 7: Adaptation', feeling: 'adapting to lower sugar intake', endFeeling: 'energy levels will stabilize' },
+    { minPercent: 50, maxPercent: 65, name: 'Phase 8: Momentum', feeling: 'building healthy habits', endFeeling: 'taste preferences will change' },
+    { minPercent: 65, maxPercent: 80, name: 'Phase 9: Strengthening', feeling: 'habits becoming second nature', endFeeling: 'confidence is growing' },
+    { minPercent: 80, maxPercent: 100, name: 'Phase 10: Mastery', feeling: 'mastering your sugar-free lifestyle', endFeeling: 'feel in complete control' },
   ];
   const currentPhase = PHASES.find(
     phase => progressPercent >= phase.minPercent && progressPercent < phase.maxPercent

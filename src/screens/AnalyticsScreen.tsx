@@ -446,6 +446,8 @@ export default function AnalyticsScreen() {
     const [showInsightModal, setShowInsightModal] = useState<InsightType | null>(null);
     const [showNutritionPopup, setShowNutritionPopup] = useState(false);
     const [dailySugarLimit, setDailySugarLimit] = useState<number>(25); // Default to 25g
+    const [hasWellnessToday, setHasWellnessToday] = useState(false);
+    const [todayWellnessData, setTodayWellnessData] = useState<WellnessLog | null>(null);
     const { onboardingData, addJournalEntry, refreshStreakFromFoodLogs } = useUserData();
 
     // Load wellness logs and food data
@@ -469,9 +471,17 @@ export default function AnalyticsScreen() {
                     ]);
 
                     if (storedWellness) {
-                        setWellnessLogs(JSON.parse(storedWellness));
+                        const logs = JSON.parse(storedWellness);
+                        setWellnessLogs(logs);
+                        // Check if today has wellness logged
+                        const todayStr = new Date().toISOString().split('T')[0];
+                        const todayLog = logs.find((log: any) => log.date === todayStr);
+                        setHasWellnessToday(!!todayLog);
+                        setTodayWellnessData(todayLog || null);
                     } else {
                         setWellnessLogs([]);
+                        setHasWellnessToday(false);
+                        setTodayWellnessData(null);
                     }
                     setScannedItems(foodItems);
                 } catch (error) {
@@ -479,8 +489,32 @@ export default function AnalyticsScreen() {
                 }
             };
             loadData();
-        }, [])
+        }, [refreshStreakFromFoodLogs])
     );
+
+    // Reload wellness when modal closes
+    useEffect(() => {
+        if (!showWellnessModal) {
+            const loadWellness = async () => {
+                try {
+                    const stored = await AsyncStorage.getItem('wellness_logs');
+                    if (stored) {
+                        const logs = JSON.parse(stored);
+                        const todayStr = new Date().toISOString().split('T')[0];
+                        const todayLog = logs.find((log: any) => log.date === todayStr);
+                        setHasWellnessToday(!!todayLog);
+                        setTodayWellnessData(todayLog || null);
+                    } else {
+                        setHasWellnessToday(false);
+                        setTodayWellnessData(null);
+                    }
+                } catch (error) {
+                    console.error('Error loading wellness:', error);
+                }
+            };
+            loadWellness();
+        }
+    }, [showWellnessModal]);
 
     // Filter data based on timeframe
     const getTimeframeDays = (tf: Timeframe): number => {
@@ -627,6 +661,13 @@ export default function AnalyticsScreen() {
 
             await AsyncStorage.setItem('wellness_logs', JSON.stringify(logs));
             setWellnessLogs(logs);
+
+            // Update today's wellness state
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (log.date === todayStr) {
+                setHasWellnessToday(true);
+                setTodayWellnessData(log);
+            }
 
             if (log.thoughts && log.thoughts.trim()) {
                 await addJournalEntry(new Date(), {
@@ -864,8 +905,15 @@ export default function AnalyticsScreen() {
                                 onPress={() => setShowWellnessModal(true)}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name="heart" size={22} color={looviColors.coralOrange} />
-                                <Text style={styles.quickActionSecondaryText}>Check-in</Text>
+                                <View style={styles.wellnessIconContainer}>
+                                    <Ionicons name="heart" size={22} color={looviColors.coralOrange} />
+                                    {hasWellnessToday && (
+                                        <View style={styles.wellnessCheckBadge}>
+                                            <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+                                        </View>
+                                    )}
+                                </View>
+                                <Text style={styles.quickActionSecondaryText}>Wellness</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -999,6 +1047,7 @@ export default function AnalyticsScreen() {
                         onClose={() => setShowWellnessModal(false)}
                         onSave={handleWellnessSave}
                         selectedDate={new Date().toISOString().split('T')[0]}
+                        existingData={todayWellnessData}
                     />
 
                     <InsightDetailModal
@@ -1370,6 +1419,22 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: looviColors.coralOrange,
+    },
+    wellnessIconContainer: {
+        position: 'relative',
+    },
+    wellnessCheckBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: looviColors.accent.success,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
     },
     // Nutrition Summary
     nutritionSummaryHeader: {

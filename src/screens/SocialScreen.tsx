@@ -40,7 +40,8 @@ import { useUserData } from '../context/UserDataContext';
 import { useUserProfile } from '../context/UserProfileContext';
 import { UserAvatar } from '../components/UserAvatar';
 import { Friend, FriendRequest, UserStats, User, Post } from '../types';
-import { getMockLeaderboardEntries, getMockPosts } from '../services/mockDataService';
+import { getMockLeaderboardEntries, getMockPosts, adjustMockPostUpvote } from '../services/mockDataService';
+import { useRevenueCat } from '../hooks/useRevenueCat';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -68,6 +69,7 @@ export default function SocialScreen() {
     const { user, isAuthenticated } = useAuthContext();
     const { streakData, latestHealthScore, refreshStreakFromFoodLogs } = useUserData();
     const { showUserProfile } = useUserProfile();
+    const { isPremium } = useRevenueCat();
 
     const [activeTab, setActiveTab] = useState<Tab>('community');
     const [sortFilter, setSortFilter] = useState<'new' | 'hot' | 'top'>('hot');
@@ -474,8 +476,11 @@ export default function SocialScreen() {
                 return newMap;
             });
 
-            // Only persist to Firestore for real posts
-            if (!isMock) {
+            if (isMock) {
+                // Track the delta so it survives loadPosts() re-fetches
+                adjustMockPostUpvote(postId, hasVoted ? -1 : 1);
+            } else {
+                // Persist to Firestore for real posts
                 try {
                     await postService.upvotePost(postId, user.id);
                 } catch (error) {
@@ -1000,7 +1005,20 @@ export default function SocialScreen() {
                     <TouchableOpacity
                         style={styles.floatingFab}
                         activeOpacity={0.9}
-                        onPress={() => setShowCreatePostModal(true)}
+                        onPress={() => {
+                            if (!isPremium) {
+                                Alert.alert(
+                                    'Premium Feature ✨',
+                                    'Creating posts is available for premium members. Upgrade to share your journey with the community!',
+                                    [
+                                        { text: 'Maybe Later', style: 'cancel' },
+                                        { text: 'Learn More', onPress: () => navigation.navigate('Paywall') },
+                                    ]
+                                );
+                                return;
+                            }
+                            setShowCreatePostModal(true);
+                        }}
                     >
                         <Ionicons name="add" size={30} color="#FFFFFF" />
                     </TouchableOpacity>

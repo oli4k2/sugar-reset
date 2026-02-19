@@ -34,7 +34,8 @@ import postService, { Comment } from '../services/postService';
 import { Post } from '../types';
 import { UserAvatar } from '../components/UserAvatar';
 import { adminService } from '../services/adminService';
-// Mock post detection helper (posts exist only client-side)
+import { adjustMockPostUpvote, incrementMockPostComment, adjustMockPostComment } from '../services/mockDataService';
+import { useRevenueCat } from '../hooks/useRevenueCat';
 
 type PostDTO = Omit<Post, 'createdAt' | 'updatedAt'> & {
     createdAt: string;
@@ -52,6 +53,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
     const { user } = useAuthContext();
     const { onboardingData } = useUserData();
     const { showUserProfile } = useUserProfile();
+    const { isPremium } = useRevenueCat();
 
     // Helper to hydrate post from params (handles string dates from serialization)
     const initialPost: Post = {
@@ -121,8 +123,10 @@ export default function PostDetailScreen({ route, navigation }: Props) {
         setPost(prev => ({ ...prev, upvotes: hasVoted ? prev.upvotes - 1 : prev.upvotes + 1 }));
         setHasVoted(!hasVoted);
 
-        // Only persist for real posts
-        if (!isMockPost) {
+        if (isMockPost) {
+            // Track delta so SocialScreen picks it up on reload
+            adjustMockPostUpvote(post.id, hasVoted ? -1 : 1);
+        } else {
             try {
                 await postService.upvotePost(post.id, user.id);
             } catch (error) {
@@ -154,9 +158,10 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                 }
             );
 
-            // For mock posts, also update local comment count since parent doc doesn't exist
+            // For mock posts, update local comment count and track delta
             if (isMockPost) {
                 setPost(prev => ({ ...prev, commentCount: prev.commentCount + 1 }));
+                incrementMockPostComment(post.id);
             }
 
             setNewComment('');
@@ -237,10 +242,26 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            if (isAdmin && user?.id !== comment.authorId) {
-                                await adminService.deleteCommentAsAdmin(post.id, comment.id);
-                            } else if (user) {
-                                await postService.deleteComment(post.id, comment.id, user.id);
+                            if (isMockPost) {
+                                // For mock posts, just delete from Firestore subcollection
+                                // Don't try to update parent post document
+                                const { doc, deleteDoc, getDoc } = await import('firebase/firestore');
+                                const { db } = await import('../config/firebase');
+                                const commentRef = doc(db, 'posts', post.id, 'comments', comment.id);
+                                const commentSnap = await getDoc(commentRef);
+                                
+                                if (commentSnap.exists() && (user?.id === comment.authorId || isAdmin)) {
+                                    await deleteDoc(commentRef);
+                                    // Update local comment count
+                                    adjustMockPostComment(post.id, -1);
+                                }
+                            } else {
+                                // For real posts, use the service
+                                if (isAdmin && user?.id !== comment.authorId) {
+                                    await adminService.deleteCommentAsAdmin(post.id, comment.id);
+                                } else if (user) {
+                                    await postService.deleteComment(post.id, comment.id, user.id);
+                                }
                             }
                             // Refresh comments
                             await loadData();
@@ -409,28 +430,48 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                     />
 
                     {/* Input Area - Solid background for readability */}
-                    <View style={styles.inputContainer}>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Add a comment..."
-                            placeholderTextColor={looviColors.text.tertiary}
-                            value={newComment}
-                            onChangeText={setNewComment}
-                            multiline
-                            maxLength={500}
-                        />
+                    {isPremium ? (
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Add a comment..."
+                                placeholderTextColor={looviColors.text.tertiary}
+                                value={newComment}
+                                onChangeText={setNewComment}
+                                multiline
+                                maxLength={500}
+                            />
+                            <TouchableOpacity
+                                style={[styles.sendButton, (!newComment.trim() || submitting) && styles.sendButtonDisabled]}
+                                onPress={handleAddComment}
+                                disabled={!newComment.trim() || submitting}
+                            >
+                                {submitting ? (
+                                    <ActivityIndicator size="small" color="#FFF" />
+                                ) : (
+                                    <Ionicons name="send" size={20} color="#FFF" />
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
                         <TouchableOpacity
-                            style={[styles.sendButton, (!newComment.trim() || submitting) && styles.sendButtonDisabled]}
-                            onPress={handleAddComment}
-                            disabled={!newComment.trim() || submitting}
+                            style={styles.premiumCommentBar}
+                            onPress={() => {
+                                Alert.alert(
+                                    'Premium Feature ✨',
+                                    'Commenting is available for premium members. Upgrade to join the conversation!',
+                                    [
+                                        { text: 'Maybe Later', style: 'cancel' },
+                                        { text: 'Learn More', onPress: () => navigation.navigate('Paywall') },
+                                    ]
+                                );
+                            }}
+                            activeOpacity={0.7}
                         >
-                            {submitting ? (
-                                <ActivityIndicator size="small" color="#FFF" />
-                            ) : (
-                                <Ionicons name="send" size={20} color="#FFF" />
-                            )}
+                            <Ionicons name="lock-closed" size={16} color={looviColors.text.tertiary} />
+                            <Text style={styles.premiumCommentText}>Upgrade to premium to comment</Text>
                         </TouchableOpacity>
-                    </View>
+                    )}
                 </KeyboardAvoidingView>
             </SafeAreaView>
         </LooviBackground>
@@ -623,5 +664,21 @@ const styles = StyleSheet.create({
     sendButtonDisabled: {
         backgroundColor: looviColors.text.muted,
         opacity: 0.5,
+    },
+    premiumCommentBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        paddingHorizontal: spacing.lg,
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(0,0,0,0.1)',
+    },
+    premiumCommentText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: looviColors.text.tertiary,
     },
 });

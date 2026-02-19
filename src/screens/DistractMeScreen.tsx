@@ -126,7 +126,11 @@ export default function DistractMeScreen() {
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
                 {/* Unified Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, { paddingTop: 8 }]}>
+                    <TouchableOpacity 
+                        onPress={() => navigation.goBack()} 
+                        style={styles.closeButton}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                         <Feather name="x" size={24} color={THEME.textDim} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>DISTRACT ME</Text>
@@ -202,7 +206,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        height: 60,
+        paddingTop: 40, // Moved down for better accessibility
+        minHeight: 60,
     },
     headerTitle: {
         fontSize: 14,
@@ -212,6 +217,15 @@ const styles = StyleSheet.create({
     },
     iconBtn: {
         padding: 8,
+    },
+    closeButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: spacing.xs,
     },
     scrollView: {
         flex: 1,

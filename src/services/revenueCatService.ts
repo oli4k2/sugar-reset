@@ -9,7 +9,6 @@
 
 import Purchases, {
   CustomerInfo,
-  Offerings,
   PurchasesOffering,
   PurchasesPackage,
   LOG_LEVEL,
@@ -28,8 +27,8 @@ const createMockOffering = (): PurchasesOffering => {
       identifier: 'monthly_subscription',
       description: 'Premium Monthly Subscription',
       title: 'Premium Monthly',
-      price: 8.99,
-      priceString: '$8.99',
+      price: 9.99,
+      priceString: '$9.99',
       currencyCode: 'USD',
       introPrice: null,
     },
@@ -43,8 +42,8 @@ const createMockOffering = (): PurchasesOffering => {
       identifier: 'yearly_subscription',
       description: 'Premium Annual Subscription',
       title: 'Premium Annual',
-      price: 14.99,
-      priceString: '$14.99',
+      price: 29.99,
+      priceString: '$29.99',
       currencyCode: 'USD',
       introPrice: {
         price: 0,
@@ -66,8 +65,8 @@ const createMockOffering = (): PurchasesOffering => {
       identifier: 'yearly_subscription_offer',
       description: 'Premium Annual Subscription - Special Offer',
       title: 'Premium Annual - Special Offer',
-      price: 12.99,
-      priceString: '$12.99',
+      price: 14.99,
+      priceString: '$14.99',
       currencyCode: 'USD',
       introPrice: null,
     },
@@ -170,7 +169,7 @@ export interface RevenueCatService {
   /**
    * Get available offerings (subscription packages)
    */
-  getOfferings: () => Promise<Offerings | null>;
+  getOfferings: () => Promise<Awaited<ReturnType<typeof Purchases.getOfferings>> | null>;
 
   /**
    * Get current offering
@@ -249,13 +248,13 @@ class RevenueCatServiceImpl implements RevenueCatService {
     }
   }
 
-  async getOfferings(): Promise<Offerings | null> {
+  async getOfferings() {
     if (USE_MOCK_DATA) {
       const mockOffering = createMockOffering();
       return {
         current: mockOffering,
         all: { default: mockOffering },
-      } as Offerings;
+      } as Awaited<ReturnType<typeof Purchases.getOfferings>>;
     }
 
     try {
