@@ -369,6 +369,7 @@ class RevenueCatServiceImpl implements RevenueCatService {
           hasPremium,
           isAnonymous,
           originalAppUserId: customerInfo.originalAppUserId,
+          // Note: RevenueCat automatically detects sandbox purchases - check RevenueCat Dashboard to verify
           premiumEntitlement: premiumEntitlement ? {
             identifier: premiumEntitlement.identifier,
             isActive: premiumEntitlement.isActive,
