@@ -24,6 +24,7 @@ import {
     Animated,
     Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PurchasesPackage } from 'react-native-purchases';
@@ -37,6 +38,7 @@ import * as Haptics from 'expo-haptics';
 import { usePostHog } from 'posthog-react-native';
 
 import CancellationOfferScreen from '../../components/CancellationOfferScreen';
+import { notificationService, NOTIFICATION_PROMPTED_ONBOARDING_KEY } from '../../services/notificationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -64,6 +66,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
     const [showCancellationOffer, setShowCancellationOffer] = useState(false);
+    const [isRequestingNotifications, setIsRequestingNotifications] = useState(false);
 
     // Check if user can get a trial (hasn't used one before AND account is new)
     // RevenueCat tracks trial usage - check if user has ever had a trial period
@@ -191,6 +194,26 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
         }
         // Removed: intro step back button no longer shows cancellation offer
         // Users must complete the paywall flow to start free trial
+    };
+
+    const handleEnableNotificationsFromOnboarding = async () => {
+        if (isRequestingNotifications) return;
+        setIsRequestingNotifications(true);
+        try {
+            // If this CTA was tapped, do not show the Home fallback nudge later.
+            await AsyncStorage.setItem(NOTIFICATION_PROMPTED_ONBOARDING_KEY, '1');
+            const status = await notificationService.requestNotificationPermissionOnly();
+            if (status === 'granted') {
+                Alert.alert('Nice! 🔔', 'Notifications are on. We will remind you before your trial ends.');
+            } else {
+                Alert.alert('No worries', 'You can enable notifications anytime in Profile > Notifications.');
+            }
+        } catch (error) {
+            console.warn('Failed to request notifications from onboarding:', error);
+            Alert.alert('Error', 'Could not request notifications right now. Please try again later.');
+        } finally {
+            setIsRequestingNotifications(false);
+        }
     };
 
     const handleAcceptYearly = async (step: 'offer1' | 'offer2' | 'free') => {
@@ -526,6 +549,16 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                 <Text style={styles.priceSubtext}>
                     Just {getYearlyPrice()} per year ({getYearlyMonthlyEquivalent()}/mo)
                 </Text>
+                <TouchableOpacity
+                    style={styles.notificationCtaButton}
+                    onPress={handleEnableNotificationsFromOnboarding}
+                    activeOpacity={0.75}
+                    disabled={isRequestingNotifications}
+                >
+                    <Text style={styles.notificationCtaText}>
+                        {isRequestingNotifications ? 'Opening...' : 'Turn on notifications'}
+                    </Text>
+                </TouchableOpacity>
             </View>
         </Animated.View>
     );
@@ -1057,6 +1090,18 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: looviColors.text.tertiary,
         textAlign: 'center',
+    },
+    notificationCtaButton: {
+        marginTop: spacing.xs,
+        alignSelf: 'center',
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+    },
+    notificationCtaText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: looviColors.text.secondary,
+        textDecorationLine: 'underline',
     },
     // Feature List Styles
     featuresContainer: {

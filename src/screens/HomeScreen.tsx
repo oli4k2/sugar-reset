@@ -73,6 +73,7 @@ import {
     markDayTwoPromptShown,
 } from '../services/reviewPromptService';
 import { useRevenueCat } from '../hooks/useRevenueCat';
+import { notificationService, NOTIFICATION_PROMPTED_ONBOARDING_KEY } from '../services/notificationService';
 // Note: Phase preview moved to ProfileScreen dev tools
 
 function formatDuration(ms: number) {
@@ -125,7 +126,9 @@ export default function HomeScreen() {
     const [showStreakInfoModal, setShowStreakInfoModal] = useState(false);
     const [showReviewPrompt, setShowReviewPrompt] = useState(false);
     const [reviewPromptVariant, setReviewPromptVariant] = useState<'first_scan' | 'day_two'>('first_scan');
+    const [showNotificationPermissionNudge, setShowNotificationPermissionNudge] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const hasTriggeredNotificationPermissionRef = useRef(false);
     const fallbackDateRef = useRef(new Date().toISOString()); // Stable fallback
     const navigation = useNavigation<any>(); // Type as any to allow navigation to new modal screens
 
@@ -390,6 +393,43 @@ export default function HomeScreen() {
             checkDayTwoPrompt();
         }
     }, [isLoading, onboardingData.completedAt]);
+
+    // iOS permission coach overlay + native notification prompt on first Home open.
+    // If user already tapped the onboarding CTA, this is skipped.
+    useEffect(() => {
+        const maybePromptNotifications = async () => {
+            if (!user?.id || !isAuthenticated) return;
+            if (hasTriggeredNotificationPermissionRef.current) return;
+            hasTriggeredNotificationPermissionRef.current = true;
+
+            try {
+                const promptedInOnboarding = await AsyncStorage.getItem(NOTIFICATION_PROMPTED_ONBOARDING_KEY);
+                if (promptedInOnboarding === '1') return;
+
+                const currentStatus = await notificationService.getNotificationPermissionStatus();
+
+                // If already resolved, no need to show the coaching nudge.
+                if (currentStatus === 'granted') {
+                    await notificationService.registerForPushNotifications(user.id, { requestPermission: false });
+                    return;
+                }
+                if (currentStatus !== 'undetermined') return;
+
+                if (Platform.OS === 'ios') {
+                    setShowNotificationPermissionNudge(true);
+                }
+                const token = await notificationService.registerForPushNotifications(user.id);
+                if (token) console.log('✅ Notifications enabled from Home prompt');
+            } catch (error) {
+                console.warn('Notification permission prompt failed:', error);
+            } finally {
+                // Hide coaching bubble shortly after system prompt resolves.
+                setTimeout(() => setShowNotificationPermissionNudge(false), 200);
+            }
+        };
+
+        maybePromptNotifications();
+    }, [user?.id, isAuthenticated]);
 
     const duration = formatDuration(timeElapsed);
     const daysSugarFree = duration.days;
@@ -837,6 +877,20 @@ export default function HomeScreen() {
 
 
                     </ScrollView>
+
+                    {showNotificationPermissionNudge && (
+                        <View style={styles.notificationNudgeOverlay} pointerEvents="none">
+                            <View style={styles.notificationNudgeBubble}>
+                                <Text style={styles.notificationNudgeTitle}>Quick tip</Text>
+                                <Text style={styles.notificationNudgeText}>
+                                    People with reminders on are about 3x more likely to hit their sugar and health goals.
+                                </Text>
+                            </View>
+                            <View style={styles.notificationArrowRow}>
+                                <Feather name="corner-down-right" size={34} color="#FFFFFF" />
+                            </View>
+                        </View>
+                    )}
 
 
                     {/* Panic Modal */}
@@ -2568,5 +2622,38 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         color: looviColors.text.tertiary,
         marginTop: 2,
+    },
+    notificationNudgeOverlay: {
+        position: 'absolute',
+        left: spacing.lg,
+        right: spacing.lg,
+        top: 90,
+        zIndex: 999,
+    },
+    notificationNudgeBubble: {
+        backgroundColor: 'rgba(0, 0, 0, 0.84)',
+        borderRadius: 16,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.lg,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.18)',
+    },
+    notificationNudgeTitle: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '700',
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    notificationNudgeText: {
+        color: 'rgba(255,255,255,0.92)',
+        fontSize: 13,
+        lineHeight: 18,
+        textAlign: 'center',
+    },
+    notificationArrowRow: {
+        alignItems: 'flex-end',
+        paddingRight: 26,
+        marginTop: 8,
     },
 });

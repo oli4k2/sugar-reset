@@ -9,7 +9,7 @@
  * Uses expo-store-review for the native review dialog.
  */
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     View,
     Text,
@@ -17,6 +17,7 @@ import {
     Modal,
     TouchableOpacity,
     Platform,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as StoreReview from 'expo-store-review';
@@ -27,7 +28,7 @@ import { looviColors } from './LooviBackground';
 interface ReviewPromptModalProps {
     visible: boolean;
     onClose: () => void;
-    variant: 'first_scan' | 'day_two';
+    variant: 'first_scan' | 'day_two' | 'profile';
 }
 
 const COPY = {
@@ -45,24 +46,46 @@ const COPY = {
         body: "You're building real momentum. If you're enjoying Craveless, a quick review would mean the world to us!",
         reward: '🌟 Your review helps our community grow!',
     },
+    profile: {
+        emoji: '⭐',
+        title: 'Rate Craveless',
+        subtitle: 'How are we doing?',
+        body: 'Your feedback helps us improve your experience and helps others discover the app.',
+        reward: '✨ Tap a star to continue',
+    },
 };
 
 export function ReviewPromptModal({ visible, onClose, variant }: ReviewPromptModalProps) {
     const copy = COPY[variant];
+    const [selectedRating, setSelectedRating] = useState<number>(0);
 
-    const handleReview = async () => {
+    useEffect(() => {
+        if (visible) {
+            setSelectedRating(0);
+        }
+    }, [visible]);
+
+    const shouldAskAppStoreReview = useMemo(() => selectedRating >= 4, [selectedRating]);
+
+    const handleSubmitRating = async () => {
+        if (!selectedRating) return;
         try {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            if (shouldAskAppStoreReview) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-            const isAvailable = await StoreReview.isAvailableAsync();
-            if (isAvailable) {
-                await StoreReview.requestReview();
-            } else {
-                // Fallback: open store URL directly
-                if (Platform.OS === 'ios') {
-                    // Replace with your actual App Store ID
-                    StoreReview.requestReview();
+                const isAvailable = await StoreReview.isAvailableAsync();
+                if (isAvailable) {
+                    await StoreReview.requestReview();
+                } else if (Platform.OS === 'ios') {
+                    // iOS decides whether to show the native sheet.
+                    await StoreReview.requestReview();
                 }
+            } else {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Alert.alert(
+                    'Thanks for your feedback',
+                    "Thanks for rating us. We'll keep improving Craveless for you."
+                );
             }
         } catch (error) {
             console.warn('Error requesting review:', error);
@@ -110,14 +133,38 @@ export function ReviewPromptModal({ visible, onClose, variant }: ReviewPromptMod
                         <Text style={styles.rewardText}>{copy.reward}</Text>
                     </View>
 
-                    {/* Review Button */}
+                    {/* Fake iOS-like rating card */}
+                    <View style={styles.ratingCard}>
+                        <Text style={styles.ratingPrompt}>Tap a star to rate</Text>
+                        <View style={styles.starsRow}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <TouchableOpacity
+                                    key={star}
+                                    style={styles.starButton}
+                                    onPress={() => setSelectedRating(star)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons
+                                        name={selectedRating >= star ? 'star' : 'star-outline'}
+                                        size={30}
+                                        color={selectedRating >= star ? '#FFB400' : '#D1D5DB'}
+                                    />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Continue Button */}
                     <TouchableOpacity
-                        style={styles.reviewButton}
-                        onPress={handleReview}
+                        style={[styles.reviewButton, selectedRating === 0 && styles.reviewButtonDisabled]}
+                        onPress={handleSubmitRating}
+                        disabled={selectedRating === 0}
                         activeOpacity={0.8}
                     >
                         <Ionicons name="star" size={18} color="#FFFFFF" />
-                        <Text style={styles.reviewButtonText}>Leave a Review</Text>
+                        <Text style={styles.reviewButtonText}>
+                            {shouldAskAppStoreReview ? 'Continue to App Store' : 'Submit Rating'}
+                        </Text>
                     </TouchableOpacity>
 
                     {/* Maybe Later */}
@@ -197,6 +244,32 @@ const styles = StyleSheet.create({
         color: '#B45309',
         textAlign: 'center',
     },
+    ratingCard: {
+        width: '100%',
+        borderRadius: 14,
+        backgroundColor: '#F7F7F8',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        marginBottom: spacing.md,
+    },
+    ratingPrompt: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#111827',
+        textAlign: 'center',
+        marginBottom: 6,
+    },
+    starsRow: {
+        width: '100%',
+        flexDirection: 'row',
+        justifyContent: 'center',
+    },
+    starButton: {
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+    },
     reviewButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -212,6 +285,9 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 4,
+    },
+    reviewButtonDisabled: {
+        opacity: 0.6,
     },
     reviewButtonText: {
         fontSize: 16,

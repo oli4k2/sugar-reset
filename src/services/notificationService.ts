@@ -79,11 +79,21 @@ export interface NotificationPayload {
     data?: Record<string, any>;
 }
 
+export const NOTIFICATION_PROMPTED_ONBOARDING_KEY = 'notification_prompted_in_onboarding';
+
 export const notificationService = {
+    async getNotificationPermissionStatus(): Promise<Notifications.PermissionStatus> {
+        const { status } = await Notifications.getPermissionsAsync();
+        return status;
+    },
+
     /**
      * Register for push notifications and store the token
      */
-    async registerForPushNotifications(userId: string): Promise<string | null> {
+    async registerForPushNotifications(
+        userId: string,
+        options?: { requestPermission?: boolean }
+    ): Promise<string | null> {
         if (!Device.isDevice) {
             console.log('Push notifications require a physical device');
             return null;
@@ -95,6 +105,9 @@ export const notificationService = {
 
         // Request permission if not granted
         if (existingStatus !== 'granted') {
+            if (options?.requestPermission === false) {
+                return null;
+            }
             const { status } = await Notifications.requestPermissionsAsync();
             finalStatus = status;
         }
@@ -114,6 +127,10 @@ export const notificationService = {
 
             // Store the token in Firestore
             await this.savePushToken(userId, token);
+
+            // If permission is granted, ensure daily reminders are scheduled.
+            // This is safe to call multiple times (identifiers are reused/cancelled).
+            await this.scheduleAllDailyReminders();
 
             // Configure Android notification channel
             if (Platform.OS === 'android') {
@@ -138,6 +155,24 @@ export const notificationService = {
             console.error('Error getting push token:', error);
             return null;
         }
+    },
+
+    /**
+     * Request permission without requiring a signed-in user.
+     * Useful during onboarding before account creation.
+     */
+    async requestNotificationPermissionOnly(): Promise<Notifications.PermissionStatus> {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        if (existingStatus === 'granted') {
+            await this.scheduleAllDailyReminders();
+            return existingStatus;
+        }
+
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status === 'granted') {
+            await this.scheduleAllDailyReminders();
+        }
+        return status;
     },
 
     /**

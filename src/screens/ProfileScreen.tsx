@@ -23,7 +23,6 @@ import {
     Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as StoreReview from 'expo-store-review';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { spacing, borderRadius } from '../theme';
@@ -130,7 +129,7 @@ export default function ProfileScreen() {
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
     const [showReviewPrompt, setShowReviewPrompt] = useState(false);
-    const [reviewPromptVariant, setReviewPromptVariant] = useState<'first_scan' | 'day_two'>('first_scan');
+    const [reviewPromptVariant, setReviewPromptVariant] = useState<'first_scan' | 'day_two' | 'profile'>('first_scan');
 
     // Fetch pledge status — check AsyncStorage first (instant), then Firestore
     useEffect(() => {
@@ -796,7 +795,10 @@ export default function ProfileScreen() {
                                                     case 'notifications': setShowNotificationSettings(true); break;
                                                     case 'help': Linking.openURL('https://craveless.info/support'); break;
                                                     case 'feedback': Linking.openURL('mailto:hello@craveless.info'); break;
-                                                    case 'rate': StoreReview.requestReview(); break;
+                                                    case 'rate':
+                                                        setReviewPromptVariant('profile');
+                                                        setShowReviewPrompt(true);
+                                                        break;
                                                     case 'viewNotifications': handleViewNotifications(); break;
                                                     case 'scheduleTestNotifications': handleScheduleTestNotifications(); break;
                                                     case 'testPaywall': navigation.navigate('Paywall', { showFullFlow: true }); break;

@@ -135,7 +135,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }
 
                 // Register for push notifications (don't block on this)
-                notificationService.registerForPushNotifications(fbUser.uid)
+                notificationService.registerForPushNotifications(fbUser.uid, { requestPermission: false })
                     .then(token => token && console.log('Push notifications registered'))
                     .catch(() => { });
             } else {
