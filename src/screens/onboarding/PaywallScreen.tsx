@@ -549,16 +549,6 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                 <Text style={styles.priceSubtext}>
                     Just {getYearlyPrice()} per year ({getYearlyMonthlyEquivalent()}/mo)
                 </Text>
-                <TouchableOpacity
-                    style={styles.notificationCtaButton}
-                    onPress={handleEnableNotificationsFromOnboarding}
-                    activeOpacity={0.75}
-                    disabled={isRequestingNotifications}
-                >
-                    <Text style={styles.notificationCtaText}>
-                        {isRequestingNotifications ? 'Opening...' : 'Turn on notifications'}
-                    </Text>
-                </TouchableOpacity>
             </View>
         </Animated.View>
     );
@@ -597,6 +587,16 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                 <Text style={styles.priceSubtext}>
                     Just {getYearlyPrice()} per year ({getYearlyMonthlyEquivalent()}/mo)
                 </Text>
+                <TouchableOpacity
+                    style={styles.notificationCtaButton}
+                    onPress={handleEnableNotificationsFromOnboarding}
+                    activeOpacity={0.75}
+                    disabled={isRequestingNotifications}
+                >
+                    <Text style={styles.notificationCtaText}>
+                        {isRequestingNotifications ? 'Opening...' : 'Turn on notifications'}
+                    </Text>
+                </TouchableOpacity>
             </View>
         </Animated.View>
     );

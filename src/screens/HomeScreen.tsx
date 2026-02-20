@@ -126,7 +126,8 @@ export default function HomeScreen() {
     const [showStreakInfoModal, setShowStreakInfoModal] = useState(false);
     const [showReviewPrompt, setShowReviewPrompt] = useState(false);
     const [reviewPromptVariant, setReviewPromptVariant] = useState<'first_scan' | 'day_two'>('first_scan');
-    const [showNotificationPermissionNudge, setShowNotificationPermissionNudge] = useState(false);
+    const [showNotificationPermissionPrePrompt, setShowNotificationPermissionPrePrompt] = useState(false);
+    const [isRequestingNotificationPermission, setIsRequestingNotificationPermission] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
     const hasTriggeredNotificationPermissionRef = useRef(false);
     const fallbackDateRef = useRef(new Date().toISOString()); // Stable fallback
@@ -394,7 +395,7 @@ export default function HomeScreen() {
         }
     }, [isLoading, onboardingData.completedAt]);
 
-    // iOS permission coach overlay + native notification prompt on first Home open.
+    // Notification pre-permission modal on first Home open.
     // If user already tapped the onboarding CTA, this is skipped.
     useEffect(() => {
         const maybePromptNotifications = async () => {
@@ -415,21 +416,36 @@ export default function HomeScreen() {
                 }
                 if (currentStatus !== 'undetermined') return;
 
-                if (Platform.OS === 'ios') {
-                    setShowNotificationPermissionNudge(true);
-                }
-                const token = await notificationService.registerForPushNotifications(user.id);
-                if (token) console.log('✅ Notifications enabled from Home prompt');
+                // Show an attractive in-app prompt first, then trigger Apple's native prompt.
+                setShowNotificationPermissionPrePrompt(true);
             } catch (error) {
                 console.warn('Notification permission prompt failed:', error);
-            } finally {
-                // Hide coaching bubble shortly after system prompt resolves.
-                setTimeout(() => setShowNotificationPermissionNudge(false), 200);
             }
         };
 
         maybePromptNotifications();
     }, [user?.id, isAuthenticated]);
+
+    const handleNotificationPrePromptContinue = async () => {
+        if (!user?.id || isRequestingNotificationPermission) return;
+        setIsRequestingNotificationPermission(true);
+        try {
+            await AsyncStorage.setItem(NOTIFICATION_PROMPTED_ONBOARDING_KEY, '1');
+            setShowNotificationPermissionPrePrompt(false);
+            const token = await notificationService.registerForPushNotifications(user.id);
+            if (token) console.log('✅ Notifications enabled from Home pre-prompt');
+        } catch (error) {
+            console.warn('Failed to request notifications from Home pre-prompt:', error);
+        } finally {
+            setIsRequestingNotificationPermission(false);
+        }
+    };
+
+    const handleNotificationPrePromptLater = async () => {
+        setShowNotificationPermissionPrePrompt(false);
+        // Prevents this from reappearing every app launch after user already decided here.
+        await AsyncStorage.setItem(NOTIFICATION_PROMPTED_ONBOARDING_KEY, '1');
+    };
 
     const duration = formatDuration(timeElapsed);
     const daysSugarFree = duration.days;
@@ -878,19 +894,46 @@ export default function HomeScreen() {
 
                     </ScrollView>
 
-                    {showNotificationPermissionNudge && (
-                        <View style={styles.notificationNudgeOverlay} pointerEvents="none">
-                            <View style={styles.notificationNudgeBubble}>
-                                <Text style={styles.notificationNudgeTitle}>Quick tip</Text>
-                                <Text style={styles.notificationNudgeText}>
-                                    People with reminders on are about 3x more likely to hit their sugar and health goals.
+                    <Modal
+                        visible={showNotificationPermissionPrePrompt}
+                        transparent
+                        animationType="fade"
+                        onRequestClose={handleNotificationPrePromptLater}
+                    >
+                        <View style={styles.notificationPromptOverlay}>
+                            <View style={styles.notificationPromptCard}>
+                                <View style={styles.notificationPromptIconWrap}>
+                                    <Ionicons name="notifications" size={30} color="#FFFFFF" />
+                                </View>
+                                <Text style={styles.notificationPromptTitle}>Stay on Track 🔔</Text>
+                                <Text style={styles.notificationPromptSubtitle}>
+                                    Users with reminders are about 3x more likely to achieve their sugar and health goals.
                                 </Text>
-                            </View>
-                            <View style={styles.notificationArrowRow}>
-                                <Feather name="corner-down-right" size={34} color="#FFFFFF" />
+                                <View style={styles.notificationPromptStats}>
+                                    <Ionicons name="trending-up" size={14} color="#22C55E" />
+                                    <Text style={styles.notificationPromptStatsText}>Helpful reminders keep momentum high</Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={styles.notificationPromptPrimaryButton}
+                                    onPress={handleNotificationPrePromptContinue}
+                                    disabled={isRequestingNotificationPermission}
+                                    activeOpacity={0.85}
+                                >
+                                    <Text style={styles.notificationPromptPrimaryButtonText}>
+                                        {isRequestingNotificationPermission ? 'Opening...' : 'Turn on reminders'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.notificationPromptSecondaryButton}
+                                    onPress={handleNotificationPrePromptLater}
+                                    disabled={isRequestingNotificationPermission}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.notificationPromptSecondaryButtonText}>Maybe later</Text>
+                                </TouchableOpacity>
                             </View>
                         </View>
-                    )}
+                    </Modal>
 
 
                     {/* Panic Modal */}
@@ -2623,37 +2666,85 @@ const styles = StyleSheet.create({
         color: looviColors.text.tertiary,
         marginTop: 2,
     },
-    notificationNudgeOverlay: {
-        position: 'absolute',
-        left: spacing.lg,
-        right: spacing.lg,
-        top: 90,
-        zIndex: 999,
+    notificationPromptOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.52)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.screen.horizontal,
     },
-    notificationNudgeBubble: {
-        backgroundColor: 'rgba(0, 0, 0, 0.84)',
-        borderRadius: 16,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.lg,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.18)',
+    notificationPromptCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius['2xl'],
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.lg,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.16,
+        shadowRadius: 20,
+        elevation: 10,
     },
-    notificationNudgeTitle: {
+    notificationPromptIconWrap: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: looviColors.coralOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.sm,
+    },
+    notificationPromptTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: looviColors.text.primary,
+        textAlign: 'center',
+        marginBottom: spacing.xs,
+    },
+    notificationPromptSubtitle: {
+        fontSize: 14,
+        lineHeight: 20,
+        color: looviColors.text.secondary,
+        textAlign: 'center',
+        marginBottom: spacing.md,
+    },
+    notificationPromptStats: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        borderRadius: borderRadius.lg,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        marginBottom: spacing.lg,
+    },
+    notificationPromptStatsText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#166534',
+    },
+    notificationPromptPrimaryButton: {
+        width: '100%',
+        backgroundColor: looviColors.accent.primary,
+        borderRadius: borderRadius.lg,
+        paddingVertical: 13,
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    notificationPromptPrimaryButtonText: {
         color: '#FFFFFF',
         fontSize: 15,
         fontWeight: '700',
-        marginBottom: 4,
-        textAlign: 'center',
     },
-    notificationNudgeText: {
-        color: 'rgba(255,255,255,0.92)',
-        fontSize: 13,
-        lineHeight: 18,
-        textAlign: 'center',
+    notificationPromptSecondaryButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 10,
     },
-    notificationArrowRow: {
-        alignItems: 'flex-end',
-        paddingRight: 26,
-        marginTop: 8,
+    notificationPromptSecondaryButtonText: {
+        color: looviColors.text.tertiary,
+        fontSize: 14,
+        fontWeight: '500',
     },
 });
