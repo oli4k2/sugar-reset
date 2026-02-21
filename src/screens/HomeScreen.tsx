@@ -905,13 +905,13 @@ export default function HomeScreen() {
                                 <View style={styles.notificationPromptIconWrap}>
                                     <Ionicons name="notifications" size={30} color="#FFFFFF" />
                                 </View>
-                                <Text style={styles.notificationPromptTitle}>Stay on Track 🔔</Text>
+                                <Text style={styles.notificationPromptTitle}>Turn on Reminders to 3x Your Success Rate</Text>
                                 <Text style={styles.notificationPromptSubtitle}>
-                                    Users with reminders are about 3x more likely to achieve their sugar and health goals.
+                                    Our data shows that users who enable reminders are 3x more likely to stay consistent and hit their goals. Get gentle nudges that help you build lasting habits.
                                 </Text>
                                 <View style={styles.notificationPromptStats}>
                                     <Ionicons name="trending-up" size={14} color="#22C55E" />
-                                    <Text style={styles.notificationPromptStatsText}>Helpful reminders keep momentum high</Text>
+                                    <Text style={styles.notificationPromptStatsText}>Join 85% of successful users who keep reminders on</Text>
                                 </View>
                                 <TouchableOpacity
                                     style={styles.notificationPromptPrimaryButton}

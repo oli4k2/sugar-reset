@@ -93,6 +93,7 @@ const menuSections: { title: string; items: MenuItem[] }[] = [
             { id: 'cleanupCommunity', emoji: '🧹', label: 'Clean Community Data' },
             { id: 'migrateUsernames', emoji: '👤', label: 'Migrate Usernames (GDPR)' },
             { id: 'testReviewPrompt', emoji: '⭐', label: 'Test Review Popup' },
+            { id: 'testNotificationPrompt', emoji: '🔔', label: 'Test Notification Permission Popup' },
             { id: 'phasePreview', emoji: '🌱', label: 'Phase Animation Preview' },
             { id: 'planPhasesPreview', emoji: '📋', label: 'Plan Phases Preview' },
         ],
@@ -130,6 +131,8 @@ export default function ProfileScreen() {
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
     const [showReviewPrompt, setShowReviewPrompt] = useState(false);
     const [reviewPromptVariant, setReviewPromptVariant] = useState<'first_scan' | 'day_two' | 'profile'>('first_scan');
+    const [showNotificationPermissionPrePrompt, setShowNotificationPermissionPrePrompt] = useState(false);
+    const [isRequestingNotificationPermission, setIsRequestingNotificationPermission] = useState(false);
 
     // Fetch pledge status — check AsyncStorage first (instant), then Firestore
     useEffect(() => {
@@ -628,6 +631,25 @@ export default function ProfileScreen() {
         setShowAvatarPicker(false);
     };
 
+    const handleNotificationPrePromptContinue = async () => {
+        if (!user?.id || isRequestingNotificationPermission) return;
+        setIsRequestingNotificationPermission(true);
+        try {
+            const { notificationService } = await import('../services/notificationService');
+            const token = await notificationService.registerForPushNotifications(user.id);
+            if (token) console.log('✅ Notifications enabled from Profile dev test');
+            setShowNotificationPermissionPrePrompt(false);
+        } catch (error) {
+            console.warn('Failed to request notifications from Profile dev test:', error);
+        } finally {
+            setIsRequestingNotificationPermission(false);
+        }
+    };
+
+    const handleNotificationPrePromptLater = () => {
+        setShowNotificationPermissionPrePrompt(false);
+    };
+
     const handleSaveProfile = async () => {
         if (!user) return;
         setIsSavingProfile(true);
@@ -880,6 +902,10 @@ export default function ProfileScreen() {
                                                                 { text: 'Cancel', style: 'cancel' },
                                                             ]
                                                         );
+                                                        break;
+                                                    }
+                                                    case 'testNotificationPrompt': {
+                                                        setShowNotificationPermissionPrePrompt(true);
                                                         break;
                                                     }
                                                     case 'phasePreview': setShowPhasePreview(true); break;
@@ -1173,6 +1199,50 @@ export default function ProfileScreen() {
                         onClose={() => setShowReviewPrompt(false)}
                         variant={reviewPromptVariant}
                     />
+
+                    {/* Notification Permission Pre-Prompt Modal (Developer Testing) */}
+                    {__DEV__ && (
+                        <Modal
+                            visible={showNotificationPermissionPrePrompt}
+                            transparent
+                            animationType="fade"
+                            onRequestClose={handleNotificationPrePromptLater}
+                        >
+                            <View style={styles.notificationPromptOverlay}>
+                                <View style={styles.notificationPromptCard}>
+                                    <View style={styles.notificationPromptIconWrap}>
+                                        <Ionicons name="notifications" size={30} color="#FFFFFF" />
+                                    </View>
+                                    <Text style={styles.notificationPromptTitle}>Turn on Reminders to 3x Your Success Rate</Text>
+                                    <Text style={styles.notificationPromptSubtitle}>
+                                        Our data shows that users who enable reminders are 3x more likely to stay consistent and hit their goals. Get gentle nudges that help you build lasting habits.
+                                    </Text>
+                                    <View style={styles.notificationPromptStats}>
+                                        <Ionicons name="trending-up" size={14} color="#22C55E" />
+                                        <Text style={styles.notificationPromptStatsText}>Join 85% of successful users who keep reminders on</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.notificationPromptPrimaryButton}
+                                        onPress={handleNotificationPrePromptContinue}
+                                        disabled={isRequestingNotificationPermission}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Text style={styles.notificationPromptPrimaryButtonText}>
+                                            {isRequestingNotificationPermission ? 'Opening...' : 'Turn on reminders'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.notificationPromptSecondaryButton}
+                                        onPress={handleNotificationPrePromptLater}
+                                        disabled={isRequestingNotificationPermission}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text style={styles.notificationPromptSecondaryButtonText}>Maybe later</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </Modal>
+                    )}
 
                     {/* DEV: Phase Animation Preview */}
                     {__DEV__ && (
@@ -1780,5 +1850,86 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '700',
         color: '#FFFFFF',
+    },
+    notificationPromptOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.52)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.screen.horizontal,
+    },
+    notificationPromptCard: {
+        width: '100%',
+        maxWidth: 360,
+        backgroundColor: '#FFFFFF',
+        borderRadius: borderRadius['2xl'],
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.lg,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.16,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    notificationPromptIconWrap: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: looviColors.coralOrange,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.sm,
+    },
+    notificationPromptTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: looviColors.text.primary,
+        textAlign: 'center',
+        marginBottom: spacing.xs,
+    },
+    notificationPromptSubtitle: {
+        fontSize: 14,
+        lineHeight: 20,
+        color: looviColors.text.secondary,
+        textAlign: 'center',
+        marginBottom: spacing.md,
+    },
+    notificationPromptStats: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        borderRadius: borderRadius.lg,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        marginBottom: spacing.lg,
+    },
+    notificationPromptStatsText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#166534',
+    },
+    notificationPromptPrimaryButton: {
+        width: '100%',
+        backgroundColor: looviColors.accent.primary,
+        borderRadius: borderRadius.lg,
+        paddingVertical: 13,
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    notificationPromptPrimaryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    notificationPromptSecondaryButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+    },
+    notificationPromptSecondaryButtonText: {
+        color: looviColors.text.tertiary,
+        fontSize: 14,
+        fontWeight: '500',
     },
 });
