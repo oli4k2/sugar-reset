@@ -16,7 +16,8 @@ import Purchases, {
 import { Platform } from 'react-native';
 
 // Development mode flag - set to true to use mocked data
-const USE_MOCK_DATA = __DEV__ && true; // ← ENABLED for development - bypasses real payments
+// IMPORTANT: In production builds, __DEV__ is false, so USE_MOCK_DATA will be false
+const USE_MOCK_DATA = __DEV__ && false; // ← DISABLED - use real RevenueCat in all environments
 
 // Mock data for development
 const createMockOffering = (): PurchasesOffering => {
@@ -327,10 +328,27 @@ class RevenueCatServiceImpl implements RevenueCatService {
     }
 
     try {
-      return await Purchases.restorePurchases();
+      const customerInfo = await Purchases.restorePurchases();
+      
+      // Log restore result in development
+      if (__DEV__) {
+        console.log('🔄 Restore purchases result:', {
+          hasPremium: !!customerInfo.entitlements.active['premium'],
+          activeSubscriptions: customerInfo.activeSubscriptions,
+        });
+      }
+      
+      return customerInfo;
     } catch (error) {
       console.error('❌ Restore purchases failed:', error);
-      throw error;
+      // Don't throw - restore can fail if no purchases exist, which is OK
+      // Return current customer info instead
+      try {
+        return await this.getCustomerInfo();
+      } catch (getInfoError) {
+        // If we can't get customer info either, throw the original error
+        throw error;
+      }
     }
   }
 
@@ -340,7 +358,19 @@ class RevenueCatServiceImpl implements RevenueCatService {
     }
 
     try {
-      return await Purchases.getCustomerInfo();
+      const customerInfo = await Purchases.getCustomerInfo();
+      
+      // Log customer info in development for debugging
+      if (__DEV__) {
+        console.log('📊 RevenueCat Customer Info:', {
+          userId: customerInfo.originalAppUserId,
+          activeEntitlements: Object.keys(customerInfo.entitlements.active),
+          allEntitlements: Object.keys(customerInfo.entitlements.all || {}),
+          activeSubscriptions: customerInfo.activeSubscriptions,
+        });
+      }
+      
+      return customerInfo;
     } catch (error) {
       console.error('❌ Failed to get customer info:', error);
       throw error;
@@ -359,8 +389,7 @@ class RevenueCatServiceImpl implements RevenueCatService {
       const premiumEntitlement = customerInfo.entitlements.active['premium'];
       const hasPremium = premiumEntitlement !== undefined;
       
-      // IMPORTANT: Don't trust anonymous purchases during onboarding
-      // Only trust premium if user is identified (not anonymous)
+      // Check if user is anonymous
       const isAnonymous = customerInfo.originalAppUserId?.startsWith('$RCAnonymousID:') ?? false;
       
       // Debug logging
@@ -381,11 +410,10 @@ class RevenueCatServiceImpl implements RevenueCatService {
         });
       }
       
-      // If user is anonymous, don't trust premium status (likely from previous test)
-      if (isAnonymous && hasPremium) {
-        console.log('⚠️ Premium detected but user is anonymous - ignoring for onboarding flow');
-        return false;
-      }
+      // IMPORTANT: Trust premium status from RevenueCat regardless of anonymous status
+      // RevenueCat properly handles anonymous purchases and will link them when user logs in
+      // The previous check that blocked anonymous premium was too restrictive and caused
+      // legitimate premium users to be downgraded on app reload
       
       // Double-check: entitlement must exist AND be active
       if (hasPremium && premiumEntitlement) {

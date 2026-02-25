@@ -125,50 +125,47 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     }
   }, [isInitialized, user?.id, previousPremium, isAuthenticated, hasShownCancellationOffer]);
 
-  // Load data when initialized
+  // Sync user ID and restore purchases when initialized and authenticated
+  // This ensures premium status is always up-to-date on app reload
   useEffect(() => {
-    if (isInitialized) {
-      loadData();
-    }
-  }, [isInitialized, loadData]);
+    if (!isInitialized) return;
 
-  // Sync user ID when authenticated and restore purchases
-  // This ensures premium status syncs across devices when user logs in
-  useEffect(() => {
-    if (isInitialized && isAuthenticated && user?.id) {
-      const syncUserAndRestore = async () => {
-        try {
-          // Step 1: Identify the user with RevenueCat (links purchases to this user ID)
-          // This is critical for cross-device sync - RevenueCat will link all purchases
-          // made with this user ID, regardless of which device they were purchased on
+    const syncUserAndRestore = async () => {
+      try {
+        // Step 1: If user is authenticated, identify them with RevenueCat
+        // This links purchases to the user ID for cross-device sync
+        if (isAuthenticated && user?.id) {
           await revenueCatService.setUserId(user.id);
           console.log('✅ RevenueCat user ID set:', user.id);
-          
-          // Step 2: Restore purchases from the app store
-          // This ensures any purchases made on this device (before login) are restored
-          // RevenueCat's logIn() already links purchases, but restorePurchases() is
-          // good practice to ensure everything is synced
-          try {
-            await revenueCatService.restorePurchases();
-            console.log('✅ Purchases restored after login');
-          } catch (error) {
-            // Not critical - restorePurchases might fail if no purchases exist
-            console.log('ℹ️ No purchases to restore or restore failed:', error);
-          }
-          
-          // Step 3: Refresh premium status to get the latest subscription state
-          // This will check RevenueCat for the user's active subscriptions
-          await loadData();
-          console.log('✅ Premium status refreshed after login');
-        } catch (error) {
-          console.error('❌ Failed to sync user and restore purchases:', error);
-          // Still try to load data even if sync failed
-          await loadData();
         }
-      };
-      
-      syncUserAndRestore();
-    }
+        
+        // Step 2: Always restore purchases on app start
+        // This ensures any purchases are properly restored, even if user is anonymous
+        // RevenueCat handles both authenticated and anonymous purchases
+        try {
+          await revenueCatService.restorePurchases();
+          console.log('✅ Purchases restored');
+        } catch (error) {
+          // Not critical - restorePurchases might fail if no purchases exist
+          console.log('ℹ️ Restore purchases failed (non-critical):', error);
+        }
+        
+        // Step 3: Load customer info and check premium status
+        // This will get the latest subscription state from RevenueCat
+        await loadData();
+        console.log('✅ Premium status loaded');
+      } catch (error) {
+        console.error('❌ Failed to sync user and restore purchases:', error);
+        // Still try to load data even if sync failed
+        try {
+          await loadData();
+        } catch (loadError) {
+          console.error('❌ Failed to load data after sync error:', loadError);
+        }
+      }
+    };
+    
+    syncUserAndRestore();
   }, [isInitialized, isAuthenticated, user?.id, loadData]);
 
   // Purchase a package
