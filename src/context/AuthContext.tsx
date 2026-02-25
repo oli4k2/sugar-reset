@@ -86,8 +86,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
             },
         });
 
+        let safetyTimeout: NodeJS.Timeout;
+
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             if (!isMounted) return;
+
+            // Clear the safety timeout as we've received an auth state
+            if (safetyTimeout) clearTimeout(safetyTimeout);
 
             console.log('👤 Auth state changed:', fbUser ? `User: ${fbUser.uid} (${fbUser.email || 'no email'})` : 'No user');
             console.log('👤 Auth state details:', {
@@ -146,7 +151,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
 
         // Safety timeout - if nothing happens in 5 seconds, just proceed
-        const safetyTimeout = setTimeout(() => {
+        safetyTimeout = setTimeout(() => {
             if (isMounted && isLoading) {
                 console.log('⏰ Safety timeout - proceeding without waiting');
                 setIsLoading(false);

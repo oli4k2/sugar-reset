@@ -1,11 +1,4 @@
-/**
- * SugarScienceScreen (SugarDangers)
- * 
- * Swipeable slides showing the NEGATIVE effects of sugar.
- * Science-based facts about glucose, cancer, mental/physical health.
- */
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -21,6 +14,7 @@ import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
+import { useUserData } from '../../context/UserDataContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -75,10 +69,15 @@ const scienceSlides: ScienceSlide[] = [
 ];
 
 export default function SugarScienceScreen({ navigation }: SugarScienceScreenProps) {
+    const { setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
     const [currentIndex, setCurrentIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const scrollX = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        setOnboardingCheckpoint('SugarDangers').catch(() => { });
+    }, []);
 
     const handleNext = () => {
         if (currentIndex < scienceSlides.length - 1) {
@@ -93,12 +92,6 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
         }
     };
 
-    const handleSkip = () => {
-        posthog?.capture('onboarding_science_skipped', {
-            at_index: currentIndex
-        });
-        navigation.navigate('FeatureShowcase');
-    };
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
         if (viewableItems.length > 0) {
@@ -184,9 +177,6 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
                     {/* Header with title */}
                     <View style={styles.header}>
                         <Text style={styles.headerTitle}>Learn About Sugar</Text>
-                        <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-                            <Text style={styles.skipText}>Skip</Text>
-                        </TouchableOpacity>
                     </View>
 
                     {/* Slides */}
@@ -270,18 +260,7 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 2,
     },
-    skipButton: {
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-    },
-    skipText: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#FFFFFF',
-        textShadowColor: 'rgba(0, 0, 0, 0.3)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
-    },
+
     slide: {
         width: SCREEN_WIDTH,
     },

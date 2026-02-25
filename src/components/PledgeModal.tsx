@@ -9,7 +9,6 @@ import {
     PanResponder,
     Dimensions,
     Easing,
-    Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -84,7 +83,7 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
     const sensorLightDriver = useRef(new Animated.Value(0)).current;
     const glowFlicker = useRef(new Animated.Value(0)).current;
     const lensBloomDriver = useRef(new Animated.Value(0)).current;
-    
+
     // Swipe to dismiss
     const swipePanResponder = useRef(
         PanResponder.create({
@@ -329,15 +328,6 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
             <View style={styles.container} {...swipePanResponder.panHandlers}>
                 <LooviBackground variant="coralTop">
                     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-                        {/* Close Button */}
-                        {!isCompleted && (
-                            <TouchableOpacity 
-                                style={[styles.closeBtn, { paddingTop: 8 }]} 
-                                onPress={onClose}
-                            >
-                                <Feather name="x" size={20} color={looviColors.text.primary} />
-                            </TouchableOpacity>
-                        )}
 
                         {/* Content Container */}
                         <View style={styles.content}>
@@ -451,6 +441,15 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
                                         </Animated.View>
 
                                     </View>
+
+                                    {/* Cancel link */}
+                                    <TouchableOpacity
+                                        onPress={onClose}
+                                        style={styles.cancelLink}
+                                        hitSlop={{ top: 12, bottom: 12, left: 24, right: 24 }}
+                                    >
+                                        <Text style={styles.cancelLinkText}>Cancel</Text>
+                                    </TouchableOpacity>
                                 </View>
                             )}
 
@@ -525,6 +524,8 @@ export const PledgeModal: React.FC<PledgeModalProps> = ({ visible, onClose, onPl
                                 }
                             ]} />
                         </View>
+
+
                     </SafeAreaView>
                 </LooviBackground>
             </View>
@@ -538,18 +539,6 @@ const styles = StyleSheet.create({
     },
     safeArea: {
         flex: 1,
-    },
-    closeBtn: {
-        position: 'absolute',
-        top: Platform.OS === 'android' ? 24 : 8, // Reduced for SafeAreaView
-        right: 24,
-        zIndex: 50,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.8)',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     content: {
         flex: 1,
@@ -736,5 +725,15 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontWeight: '700',
         fontSize: 18,
+    },
+    cancelLink: {
+        marginTop: 24,
+        alignItems: 'center',
+    },
+    cancelLinkText: {
+        fontSize: 13,
+        color: looviColors.text.tertiary,
+        fontWeight: '500',
+        letterSpacing: 0.3,
     },
 });

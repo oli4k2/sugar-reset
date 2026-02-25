@@ -34,33 +34,41 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { spacing, borderRadius, typography } from '../theme';
 import LooviBackground, { looviColors } from '../components/LooviBackground';
-import { GlassCard } from '../components/GlassCard';
+import {
+    GlassCard,
+    WeekStrip,
+    PlanDetailsModal,
+    CheckInModal,
+    JournalWidget,
+    SwipeableTabView,
+    JournalEntryModal,
+    FoodScannerModal,
+    PlanProgressBar,
+    WellnessTracker,
+    QuickTrackModal,
+    SOSButton,
+    WellnessModal,
+    PledgeModal,
+    PanicModal,
+    EditSavingsModal,
+    CheckInStatusModal,
+    EditGoalsModal
+} from '../components';
 import { useUserData } from '../context/UserDataContext';
-import WeekStrip from '../components/WeekStrip';
-import PlanDetailsModal from '../components/PlanDetailsModal';
-import { CheckInModal } from '../components/CheckInModal';
-import { JournalWidget } from '../components/JournalWidget';
-import { SwipeableTabView } from '../components/SwipeableTabView';
-import JournalEntryModal from '../components/JournalEntryModal';
-import FoodScannerModal from '../components/FoodScannerModal';
 import { getTodayGuidance, PlanType, getPlanDetails, getCurrentWeek } from '../utils/planUtils';
 import { healthService } from '../services/healthService';
-import { PlanProgressBar } from '../components/PlanProgressBar';
-import { WellnessTracker, WellnessData } from '../components/WellnessTracker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppIcon } from '../components/OnboardingIcon';
+import { WellnessLog } from '../components/WellnessModal';
+import { WellnessData } from '../components/WellnessTracker';
 import { getScannedItems, ScannedItem } from '../services/scannerService';
-import { SOSButton } from '../components/SOSButton';
-import { WellnessModal, WellnessLog } from '../components/WellnessModal';
 import {
     aggregateHealthData,
-    WellnessMetrics as HealthWellnessMetrics,
 } from '../services/healthScoringService';
-
-import { PledgeModal } from '../components/PledgeModal';
 import { useAuthContext } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import { MascotTip } from '../components/MascotTip';
+import streakService from '../services/streakService';
 import { friendService } from '../services/friendService';
 import { PhaseAnimation } from '../components/PhaseAnimation';
 import StreakInfoModal from '../components/StreakInfoModal';
@@ -676,6 +684,7 @@ export default function HomeScreen() {
                             daysSinceStart={daysSugarFree}
                             planDuration={90}
                             endDate={new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000)}
+                            onInfoPress={() => setShowStreakInfoModal(true)}
                         />
 
                         {/* Action Buttons: Pledge, Logging, Journal - Daily Journey */}
@@ -937,65 +946,15 @@ export default function HomeScreen() {
 
 
                     {/* Panic Modal */}
-                    <Modal
+                    <PanicModal
                         visible={showPanicModal}
-                        transparent
-                        animationType="fade"
-                        onRequestClose={() => setShowPanicModal(false)}
-                    >
-                        <View style={styles.modalOverlay}>
-                            <View style={styles.modalContent}>
-                                <Text style={styles.modalTitle}>Take a breath</Text>
-                                <Text style={styles.modalText}>
-                                    This craving will pass in 15-20 minutes. Remember why you started:
-                                </Text>
-                                <View style={styles.modalReasons}>
-                                    {reasons.slice(0, 2).map((reason: string, index: number) => (
-                                        <Text key={index} style={styles.modalReason}>{reason}</Text>
-                                    ))}
-                                </View>
-                                <View style={styles.modalStats}>
-                                    <Text style={styles.modalStatText}>
-                                        You've already saved <Text style={styles.modalHighlight}>${moneySaved}</Text>
-                                    </Text>
-                                    <Text style={styles.modalStatText}>
-                                        And avoided <Text style={styles.modalHighlight}>{sugarAvoided}g</Text> of sugar
-                                    </Text>
-                                </View>
-                                <Text style={styles.modalTip}>
-                                    💡 Choose one of these strategies to help manage your craving:
-                                </Text>
-
-                                {/* Action Buttons */}
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.primaryButton]}
-                                    onPress={() => {
-                                        setShowPanicModal(false);
-                                        navigation.navigate('Reasons');
-                                    }}
-                                >
-                                    <Text style={styles.modalButtonText}>💭 Remind Me Why Not</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.secondaryButton]}
-                                    onPress={() => {
-                                        setShowPanicModal(false);
-                                        navigation.navigate('BreathingExercise');
-                                    }}
-                                >
-                                    <Text style={styles.modalButtonText}>🧘 Breathing Exercise</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.modalButton, styles.successButton]}
-                                    onPress={() => setShowPanicModal(false)}
-                                >
-                                    <Text style={styles.modalButtonText}>I've got this 💪</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </Modal>
+                        onClose={() => setShowPanicModal(false)}
+                        reasons={reasons}
+                        moneySaved={moneySaved}
+                        sugarAvoided={sugarAvoided.toString()}
+                        onNavigateToReasons={() => navigation.navigate('Reasons')}
+                        onNavigateToBreathing={() => navigation.navigate('BreathingExercise')}
+                    />
 
                     {/* Enhanced Check-in Modal */}
                     <CheckInModal
@@ -1017,108 +976,24 @@ export default function HomeScreen() {
                     />
 
                     {/* Check-in Status Modal (when already checked in) */}
-                    <Modal
+                    <CheckInStatusModal
                         visible={showCheckInStatusModal}
-                        transparent
-                        animationType="fade"
-                        onRequestClose={() => setShowCheckInStatusModal(false)}
-                    >
-                        <TouchableOpacity
-                            style={styles.modalOverlay}
-                            activeOpacity={1}
-                            onPress={() => setShowCheckInStatusModal(false)}
-                        >
-                            <TouchableOpacity activeOpacity={1} style={styles.checkInStatusCard}>
-                                <Text style={styles.checkInStatusEmoji}>✅</Text>
-                                <Text style={styles.checkInStatusTitle}>Today's Check-In Complete</Text>
-
-                                <View style={styles.checkInStatusInfo}>
-                                    <Text style={styles.checkInStatusLabel}>You logged:</Text>
-                                    <Text style={styles.checkInStatusValue}>
-                                        {todayCheckIn?.sugarFree
-                                            ? '🌟 Sugar-Free Day!'
-                                            : '📊 Had Sugar'}
-                                    </Text>
-                                    {todayCheckIn?.grams !== undefined && (
-                                        <Text style={styles.checkInStatusGrams}>
-                                            {todayCheckIn.grams}g consumed
-                                        </Text>
-                                    )}
-                                </View>
-
-                                <Text style={styles.checkInStatusHint}>
-                                    💡 Consider adding a journal entry to reflect on your day
-                                </Text>
-
-                                <View style={styles.checkInStatusButtons}>
-                                    <TouchableOpacity
-                                        style={styles.checkInStatusButton}
-                                        onPress={() => {
-                                            setShowCheckInStatusModal(false);
-                                            navigation.navigate('Track', { tab: 'journal' });
-                                        }}
-                                    >
-                                        <Text style={styles.checkInStatusButtonText}>📝 Add Journal</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        style={[styles.checkInStatusButton, styles.checkInStatusButtonSecondary]}
-                                        onPress={handleResetCheckIn}
-                                    >
-                                        <Text style={[styles.checkInStatusButtonText, styles.checkInStatusButtonTextSecondary]}>
-                                            🔄 Change Check-In
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <TouchableOpacity
-                                    style={styles.checkInStatusCloseButton}
-                                    onPress={() => setShowCheckInStatusModal(false)}
-                                >
-                                    <Text style={styles.checkInStatusCloseText}>Close</Text>
-                                </TouchableOpacity>
-                            </TouchableOpacity>
-                        </TouchableOpacity>
-                    </Modal>
+                        onClose={() => setShowCheckInStatusModal(false)}
+                        todayCheckIn={todayCheckIn}
+                        onAddJournal={() => navigation.navigate('Track', { tab: 'journal' })}
+                        onResetCheckIn={handleResetCheckIn}
+                    />
 
                     {/* Edit Savings Goal Modal */}
-                    <Modal
+                    <EditSavingsModal
                         visible={showEditSavingsModal}
-                        transparent
-                        animationType="fade"
-                        onRequestClose={() => setShowEditSavingsModal(false)}
-                    >
-                        <TouchableOpacity
-                            style={styles.modalOverlay}
-                            activeOpacity={1}
-                            onPress={() => setShowEditSavingsModal(false)}
-                        >
-                            <TouchableOpacity activeOpacity={1} style={styles.editModalContent}>
-                                <Text style={styles.editModalTitle}>What are you saving for?</Text>
-                                <TextInput
-                                    style={styles.editInput}
-                                    value={editSavingsGoal}
-                                    onChangeText={setEditSavingsGoal}
-                                    placeholder="e.g., A vacation, New phone..."
-                                    placeholderTextColor={looviColors.text.muted}
-                                />
-                                <View style={styles.editModalButtons}>
-                                    <TouchableOpacity
-                                        style={styles.editCancelButton}
-                                        onPress={() => setShowEditSavingsModal(false)}
-                                    >
-                                        <Text style={styles.editCancelText}>Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.editSaveButton}
-                                        onPress={handleSaveSavingsGoal}
-                                    >
-                                        <Text style={styles.editSaveText}>Save</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </TouchableOpacity>
-                        </TouchableOpacity>
-                    </Modal>
+                        onClose={() => setShowEditSavingsModal(false)}
+                        currentGoal={editSavingsGoal}
+                        onSave={async (newGoal: string) => {
+                            await updateOnboardingData({ savingsGoal: newGoal });
+                            setShowEditSavingsModal(false);
+                        }}
+                    />
 
 
 
@@ -1202,68 +1077,15 @@ export default function HomeScreen() {
                         }}
                     />
 
-                    {/* Track Options Modal */}
-                    <Modal
+                    {/* Quick Track Modal */}
+                    <QuickTrackModal
                         visible={showTrackModal}
-                        transparent
-                        animationType="fade"
-                        onRequestClose={() => setShowTrackModal(false)}
-                    >
-                        <TouchableOpacity
-                            style={styles.modalOverlay}
-                            activeOpacity={1}
-                            onPress={() => setShowTrackModal(false)}
-                        >
-                            <TouchableOpacity activeOpacity={1} style={styles.trackModalContent}>
-                                <Text style={styles.trackModalTitle}>Quick Track</Text>
-                                <Text style={styles.trackModalSubtitle}>What would you like to log?</Text>
-
-                                <TouchableOpacity
-                                    style={styles.trackOptionButton}
-                                    onPress={() => {
-                                        setShowTrackModal(false);
-                                        setShowFoodScannerModal(true);
-                                    }}
-                                >
-                                    <View style={styles.trackOptionIconContainer}>
-                                        <AppIcon emoji="🍎" size={32} />
-                                        {scannedItems.length > 0 && (
-                                            <View style={styles.trackOptionBadge}>
-                                                <Text style={styles.trackOptionBadgeText}>{scannedItems.length}</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                    <View style={styles.trackOptionText}>
-                                        <Text style={styles.trackOptionTitle}>What have you eaten?</Text>
-                                        <Text style={styles.trackOptionSubtitle}>Scan or log your food</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={styles.trackOptionButton}
-                                    onPress={() => {
-                                        setShowTrackModal(false);
-                                        setShowWellnessModal(true);
-                                    }}
-                                >
-                                    <View style={styles.trackOptionIconContainer}>
-                                        <AppIcon emoji="💭" size={32} />
-                                        {hasWellnessToday && (
-                                            <View style={styles.trackOptionBadge}>
-                                                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                                            </View>
-                                        )}
-                                    </View>
-                                    <View style={styles.trackOptionText}>
-                                        <Text style={styles.trackOptionTitle}>How are you feeling?</Text>
-                                        <Text style={styles.trackOptionSubtitle}>
-                                            {hasWellnessToday ? "Edit today's wellness" : "Log your wellness"}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            </TouchableOpacity>
-                        </TouchableOpacity>
-                    </Modal>
+                        onClose={() => setShowTrackModal(false)}
+                        onTrackFood={() => setShowFoodScannerModal(true)}
+                        onTrackWellness={() => setShowWellnessModal(true)}
+                        scannedItemsCount={scannedItems.length}
+                        hasWellnessToday={hasWellnessToday}
+                    />
 
                     {/* Food Scanner Modal */}
                     <FoodScannerModal
@@ -1321,6 +1143,17 @@ export default function HomeScreen() {
                         onSave={handleWellnessSave}
                         selectedDate={new Date().toISOString().split('T')[0]}
                         existingData={todayWellnessData}
+                    />
+
+                    {/* Edit Goals/Reasons Modal */}
+                    <EditGoalsModal
+                        visible={showEditReasonsModal}
+                        currentGoals={reasons}
+                        onClose={() => setShowEditReasonsModal(false)}
+                        onSave={async (newGoals) => {
+                            await updateOnboardingData({ goals: newGoals });
+                            setShowEditReasonsModal(false);
+                        }}
                     />
 
                     {/* Streak Info Modal */}

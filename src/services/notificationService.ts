@@ -21,7 +21,7 @@ Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
         // Check if this is a conditional notification that should only show if action not completed
         const notificationType = notification.request.content.data?.type;
-        
+
         if (notificationType === 'food_logging_reminder') {
             // Check if user has already logged food today
             try {
@@ -33,6 +33,8 @@ Notifications.setNotificationHandler({
                         shouldShowAlert: false,
                         shouldPlaySound: false,
                         shouldSetBadge: false,
+                        shouldShowBanner: false,
+                        shouldShowList: false,
                     };
                 }
             } catch (error) {
@@ -53,6 +55,8 @@ Notifications.setNotificationHandler({
                             shouldShowAlert: false,
                             shouldPlaySound: false,
                             shouldSetBadge: false,
+                            shouldShowBanner: false,
+                            shouldShowList: false,
                         };
                     }
                 }
@@ -60,7 +64,7 @@ Notifications.setNotificationHandler({
                 console.error('Error checking wellness check-in status:', error);
             }
         }
-        
+
         // Default: show notification
         return {
             shouldShowAlert: true,
@@ -486,10 +490,10 @@ export const notificationService = {
 
             // Schedule food logging reminder at 15:00 (3 PM)
             await this.scheduleFoodLoggingReminder();
-            
+
             // Schedule wellness check-in reminder at 21:00 (9 PM)
             await this.scheduleWellnessCheckInReminder();
-            
+
             console.log('✅ All daily reminders scheduled');
         } catch (error) {
             console.error('❌ Failed to schedule daily reminders:', error);

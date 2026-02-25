@@ -78,9 +78,13 @@ const SYMPTOMS_DATA: SymptomCategory[] = [
 ];
 
 export default function SymptomsScreen({ navigation }: SymptomsScreenProps) {
-    const { updateOnboardingData } = useUserData();
+    const { updateOnboardingData, setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
     const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+
+    React.useEffect(() => {
+        setOnboardingCheckpoint('Symptoms').catch(() => { });
+    }, []);
 
     const toggleSymptom = (id: string) => {
         setSelectedSymptoms(prev =>

@@ -174,7 +174,7 @@ function FlickeringStars({ count = 10 }: { count?: number }) {
 }
 
 export default function LongScrollablePlanScreen({ navigation }: LongScrollablePlanScreenProps) {
-    const { onboardingData } = useUserData();
+    const { onboardingData, setOnboardingCheckpoint } = useUserData();
     const insets = useSafeAreaInsets();
     const posthog = usePostHog();
 
@@ -204,12 +204,27 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
 
     // Track land
     useEffect(() => {
+        setOnboardingCheckpoint('LongScrollablePlan').catch(() => { });
+
         posthog?.capture('onboarding_plan_view_started', {
             goals: onboardingData?.goals || [],
             triggers: onboardingData?.triggers || [],
             crave_intensity: onboardingData?.craveIntensity || '0',
             nickname: onboardingData?.nickname || ''
         });
+
+        // Trigger notification prompt on page load
+        const requestNotifications = async () => {
+            try {
+                const { notificationService } = await import('../../services/notificationService');
+                await notificationService.requestNotificationPermissionOnly();
+            } catch (error) {
+                console.error('Error requesting notification permissions:', error);
+            }
+        };
+
+        // Small delay to ensure UI is ready
+        setTimeout(requestNotifications, 800);
     }, []);
 
     const GoalPill = ({ label }: { label: string }) => (

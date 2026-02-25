@@ -205,6 +205,55 @@ function InviteLinkHandler() {
     return null;
 }
 
+// Onboarding Flow Navigator
+const OnboardingFlow = React.memo(() => {
+    const { onboardingCheckpoint } = useUserData();
+
+    return (
+        <OnboardingStack.Navigator
+            screenOptions={{
+                headerShown: false,
+                animation: 'fade',
+            }}
+            initialRouteName={onboardingCheckpoint?.routeName ?? 'Welcome'}
+        >
+            {/* Phase 1: Quiz */}
+            <OnboardingStack.Screen name="Welcome" component={WelcomeScreen} />
+            <OnboardingStack.Screen name="QuizIntro" component={QuizIntroScreen} />
+            <OnboardingStack.Screen name="ComprehensiveQuiz" component={ComprehensiveQuizScreen} />
+            <OnboardingStack.Screen name="Symptoms" component={SymptomsScreen} />
+
+            {/* Phase 2: Education & Social Proof */}
+            <OnboardingStack.Screen name="SugarDangers" component={SugarScienceScreen} />
+            <OnboardingStack.Screen name="FeatureShowcase" component={FeatureShowcaseScreen} />
+            <OnboardingStack.Screen name="SuccessStories" component={SuccessStoriesScreen} />
+            <OnboardingStack.Screen name="SugarResetGraph" component={SugarResetGraphScreen} />
+
+            {/* Phase 3: Commitment */}
+            <OnboardingStack.Screen name="Goals" component={GoalsScreen} />
+            <OnboardingStack.Screen name="Promise" component={PromiseScreen} />
+            <OnboardingStack.Screen name="PersonalizedPlan" component={PersonalizedPlanScreen} />
+            <OnboardingStack.Screen name="LongScrollablePlan" component={LongScrollablePlanScreen} />
+            <OnboardingStack.Screen name="Paywall" component={PaywallScreen} />
+        </OnboardingStack.Navigator>
+    );
+});
+
+// Auth Flow Navigator
+const AuthFlow = React.memo(() => {
+    return (
+        <AuthStack.Navigator
+            screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+            }}
+        >
+            <AuthStack.Screen name="Login" component={LoginScreen} />
+            <AuthStack.Screen name="SignUp" component={SignUpScreen} />
+        </AuthStack.Navigator>
+    );
+});
+
 // Loading Screen
 function LoadingScreen() {
     return (
@@ -356,51 +405,10 @@ export default function RootNavigator() {
                 initialRouteName={initialRouteName}
             >
                 {/* Onboarding Flow */}
-                <RootStack.Screen name="Onboarding">
-                    {() => (
-                        <OnboardingStack.Navigator
-                            screenOptions={{
-                                headerShown: false,
-                                animation: 'fade',
-                            }}
-                            initialRouteName={onboardingCheckpoint?.routeName ?? 'Welcome'}
-                        >
-                            {/* Phase 1: Quiz */}
-                            <OnboardingStack.Screen name="Welcome" component={WelcomeScreen} />
-                            <OnboardingStack.Screen name="QuizIntro" component={QuizIntroScreen} />
-                            <OnboardingStack.Screen name="ComprehensiveQuiz" component={ComprehensiveQuizScreen} />
-                            <OnboardingStack.Screen name="Symptoms" component={SymptomsScreen} />
-
-                            {/* Phase 2: Education & Social Proof */}
-                            <OnboardingStack.Screen name="SugarDangers" component={SugarScienceScreen} />
-                            <OnboardingStack.Screen name="FeatureShowcase" component={FeatureShowcaseScreen} />
-                            <OnboardingStack.Screen name="SuccessStories" component={SuccessStoriesScreen} />
-                            <OnboardingStack.Screen name="SugarResetGraph" component={SugarResetGraphScreen} />
-
-                            {/* Phase 3: Commitment */}
-                            <OnboardingStack.Screen name="Goals" component={GoalsScreen} />
-                            <OnboardingStack.Screen name="Promise" component={PromiseScreen} />
-                            <OnboardingStack.Screen name="PersonalizedPlan" component={PersonalizedPlanScreen} />
-                            <OnboardingStack.Screen name="LongScrollablePlan" component={LongScrollablePlanScreen} />
-                            <OnboardingStack.Screen name="Paywall" component={PaywallScreen} />
-                        </OnboardingStack.Navigator>
-                    )}
-                </RootStack.Screen>
+                <RootStack.Screen name="Onboarding" component={OnboardingFlow} />
 
                 {/* Auth Flow */}
-                <RootStack.Screen name="Auth">
-                    {() => (
-                        <AuthStack.Navigator
-                            screenOptions={{
-                                headerShown: false,
-                                animation: 'slide_from_right',
-                            }}
-                        >
-                            <AuthStack.Screen name="Login" component={LoginScreen} />
-                            <AuthStack.Screen name="SignUp" component={SignUpScreen} />
-                        </AuthStack.Navigator>
-                    )}
-                </RootStack.Screen>
+                <RootStack.Screen name="Auth" component={AuthFlow} />
 
                 {/* Main App */}
                 <RootStack.Screen name="Main" component={MainTabNavigator} />

@@ -1,22 +1,27 @@
 /**
  * CreatePostModal
- * 
+ *
  * Modal for creating new community posts.
+ * Gesture-driven bottom sheet: drag handle to dismiss.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     Modal,
     TouchableOpacity,
+    TouchableWithoutFeedback,
     TextInput,
     ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    Animated,
+    PanResponder,
+    Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
@@ -25,6 +30,10 @@ import { postService } from '../services/postService';
 import { useAuthContext } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
 import { handleError, handleValidationError, handleRateLimitError } from '../utils/errorHandler';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.88;
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.3;
 
 interface CreatePostModalProps {
     visible: boolean;
@@ -42,11 +51,72 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [isPosting, setIsPosting] = useState(false);
 
+    // ── Bottom-sheet gesture ──────────────────────────────────────────────────
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+    const currentSnap = useRef(0);
+    const handleCloseRef = useRef(onClose);
+    useEffect(() => { handleCloseRef.current = onClose; });
+
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => handleCloseRef.current());
+    }, [translateY]);
+
+    useEffect(() => {
+        if (visible) {
+            translateY.setValue(SHEET_HEIGHT);
+            currentSnap.current = 0;
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [visible, translateY]);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(currentSnap.current);
+                translateY.setValue(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.5) {
+                    Animated.timing(translateY, {
+                        toValue: SHEET_HEIGHT,
+                        duration: 220,
+                        useNativeDriver: true,
+                    }).start(() => handleCloseRef.current());
+                } else {
+                    currentSnap.current = 0;
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+    // ─────────────────────────────────────────────────────────────────────────
+
     const handleClose = () => {
         setTitle('');
         setContent('');
         setSelectedTags([]);
-        onClose();
+        dismiss();
     };
 
     const toggleTag = (tag: string) => {
@@ -62,12 +132,10 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
             Alert.alert('Error', 'You must be logged in to post');
             return;
         }
-
         if (!title.trim()) {
             Alert.alert('Missing Title', 'Please add a title to your post');
             return;
         }
-
         if (!content.trim()) {
             Alert.alert('Missing Content', 'Please add some content to your post');
             return;
@@ -79,7 +147,7 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
             await postService.createPost(
                 user.id,
                 authorName,
-                undefined, // username no longer used
+                undefined,
                 title.trim(),
                 content.trim(),
                 selectedTags,
@@ -89,7 +157,6 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
                     avatarValue: user.avatarValue
                 }
             );
-
             Alert.alert('Posted!', 'Your post has been shared with the community', [
                 { text: 'OK', onPress: handleClose }
             ]);
@@ -111,17 +178,18 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
     };
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="slide"
-            onRequestClose={handleClose}
-        >
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.overlay}
-            >
-                <View style={styles.container}>
+        <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+            <View style={styles.overlay}>
+                <TouchableWithoutFeedback onPress={handleClose}>
+                    <View style={StyleSheet.absoluteFill} />
+                </TouchableWithoutFeedback>
+
+                <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
+                    {/* Drag handle */}
+                    <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+                        <View style={styles.dragHandle} />
+                    </View>
+
                     {/* Header */}
                     <View style={styles.header}>
                         <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
@@ -141,61 +209,56 @@ export function CreatePostModal({ visible, onClose, onPostCreated }: CreatePostM
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                        {/* Title Input */}
-                        <TextInput
-                            style={styles.titleInput}
-                            placeholder="Title"
-                            placeholderTextColor={looviColors.text.muted}
-                            value={title}
-                            onChangeText={setTitle}
-                            maxLength={100}
-                        />
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
+                    >
+                        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                            <TextInput
+                                style={styles.titleInput}
+                                placeholder="Title"
+                                placeholderTextColor={looviColors.text.muted}
+                                value={title}
+                                onChangeText={setTitle}
+                                maxLength={100}
+                            />
 
-                        {/* Content Input */}
-                        <TextInput
-                            style={styles.contentInput}
-                            placeholder="Share your thoughts, ask for advice, or celebrate a win..."
-                            placeholderTextColor={looviColors.text.muted}
-                            value={content}
-                            onChangeText={setContent}
-                            multiline
-                            maxLength={1000}
-                            textAlignVertical="top"
-                        />
+                            <TextInput
+                                style={styles.contentInput}
+                                placeholder="Share your thoughts, ask for advice, or celebrate a win..."
+                                placeholderTextColor={looviColors.text.muted}
+                                value={content}
+                                onChangeText={setContent}
+                                multiline
+                                maxLength={1000}
+                                textAlignVertical="top"
+                            />
 
-                        {/* Tags */}
-                        <Text style={styles.tagsLabel}>Add tags (up to 3)</Text>
-                        <View style={styles.tagsContainer}>
-                            {SUGGESTED_TAGS.map((tag) => (
-                                <TouchableOpacity
-                                    key={tag}
-                                    style={[
-                                        styles.tag,
-                                        selectedTags.includes(tag) && styles.tagSelected
-                                    ]}
-                                    onPress={() => toggleTag(tag)}
-                                >
-                                    <Text style={[
-                                        styles.tagText,
-                                        selectedTags.includes(tag) && styles.tagTextSelected
-                                    ]}>
-                                        #{tag}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+                            <Text style={styles.tagsLabel}>Add tags (up to 3)</Text>
+                            <View style={styles.tagsContainer}>
+                                {SUGGESTED_TAGS.map((tag) => (
+                                    <TouchableOpacity
+                                        key={tag}
+                                        style={[styles.tag, selectedTags.includes(tag) && styles.tagSelected]}
+                                        onPress={() => toggleTag(tag)}
+                                    >
+                                        <Text style={[styles.tagText, selectedTags.includes(tag) && styles.tagTextSelected]}>
+                                            #{tag}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
 
-                        {/* Guidelines */}
-                        <View style={styles.guidelines}>
-                            <Ionicons name="information-circle-outline" size={16} color={looviColors.text.muted} />
-                            <Text style={styles.guidelinesText}>
-                                Be supportive and respectful. We're all in this together!
-                            </Text>
-                        </View>
-                    </ScrollView>
-                </View>
-            </KeyboardAvoidingView>
+                            <View style={styles.guidelines}>
+                                <Ionicons name="information-circle-outline" size={16} color={looviColors.text.muted} />
+                                <Text style={styles.guidelinesText}>
+                                    Be supportive and respectful. We're all in this together!
+                                </Text>
+                            </View>
+                        </ScrollView>
+                    </KeyboardAvoidingView>
+                </Animated.View>
+            </View>
         </Modal>
     );
 }
@@ -208,16 +271,29 @@ const styles = StyleSheet.create({
     },
     container: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: borderRadius['2xl'],
-        borderTopRightRadius: borderRadius['2xl'],
-        maxHeight: '90%',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        height: SHEET_HEIGHT,
+        width: '100%',
+    },
+    dragHandleArea: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 40,
+    },
+    dragHandle: {
+        width: 44,
+        height: 5,
+        backgroundColor: '#CCCCCC',
+        borderRadius: 3,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
+        paddingBottom: spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(0, 0, 0, 0.05)',
     },

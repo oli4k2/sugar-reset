@@ -241,13 +241,88 @@ const getQuestions = (gender: string | null): Question[] => {
 };
 
 export default function ComprehensiveQuizScreen({ navigation, route }: ComprehensiveQuizScreenProps) {
-    const { updateOnboardingData, onboardingCheckpoint, setOnboardingCheckpoint } = useUserData();
+    const { updateOnboardingData, onboardingCheckpoint, setOnboardingCheckpoint, onboardingData } = useUserData();
     const posthog = usePostHog();
     const skipToUserInfo = !!route.params?.skip;
-    const [currentQuestion, setCurrentQuestion] = useState(0);
-    const [showResult, setShowResult] = useState(false);
+
+    // Answers state - initialize from existing onboardingData to allow resuming
+    const [answers, setAnswers] = useState<Record<string, any>>({
+        gender: onboardingData.gender || null,
+        ageGroup: onboardingData.ageGroup || null,
+        sugarFrequency: onboardingData.sugarFrequency || null,
+        dailySweetTimes: onboardingData.dailySweetTimes || null,
+        unconsciousSugar: onboardingData.unconsciousSugar || null,
+        sugarChoiceFeeling: onboardingData.sugarChoiceFeeling || null,
+        sugarSituations: onboardingData.triggers || [],
+        reduceSugarAttempt: onboardingData.reduceSugarAttempt || null,
+        craveWhenNotHungry: onboardingData.craveWhenNotHungry || null,
+        craveIntensity: onboardingData.craveIntensity || null,
+        avoidSugarDifficulty: onboardingData.avoidSugarDifficulty || null,
+        sugarVisibility: onboardingData.sugarVisibility || null,
+        nickname: onboardingData.nickname || '',
+        age: onboardingData.age || '',
+    });
+
+    const QUESTIONS = getQuestions(answers.gender);
+
+    // Initial current question logic - find the first unanswered question
+    const getInitialQuestionIndex = () => {
+        if (onboardingCheckpoint?.meta?.quizStage === 'results') return 0; // handled by showResult state
+
+        // Find first question where answers doesn't have a value
+        for (let i = 0; i < QUESTIONS.length; i++) {
+            const q = QUESTIONS[i];
+            const answer = answers[q.id === 'sugarSituations' ? 'sugarSituations' : q.id];
+
+            if (answer === null || (Array.isArray(answer) && answer.length === 0)) {
+                return i;
+            }
+        }
+        return QUESTIONS.length - 1; // All answered, go to last
+    };
+
+    // Determine up-front if we're resuming directly to the results stage
+    const isResumingToResults = onboardingCheckpoint?.routeName === 'ComprehensiveQuiz'
+        && onboardingCheckpoint?.meta?.quizStage === 'results';
+
+    const [currentQuestion, setCurrentQuestion] = useState(getInitialQuestionIndex());
+    // Initialize showResult synchronously so we never render a blank question screen first
+    const [showResult, setShowResult] = useState(isResumingToResults);
     const [showUserInfo, setShowUserInfo] = useState(skipToUserInfo);
     const [isCalculating, setIsCalculating] = useState(false);
+
+    // Initialize animation values: if resuming to results, start at final values immediately
+    const fadeAnim = useRef(new Animated.Value(isResumingToResults ? 1 : 0)).current;
+    const slideAnim = useRef(new Animated.Value(0)).current;
+    const resultFade = useRef(new Animated.Value(isResumingToResults ? 1 : 0)).current;
+    const resultScale = useRef(new Animated.Value(isResumingToResults ? 1 : 0.92)).current;
+
+    // Mount effect: run entrance animations for fresh start, set checkpoint
+    useEffect(() => {
+        if (!isResumingToResults) {
+            // Fresh start — animate first question in
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 1500,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 1500,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+
+        // Set checkpoint on mount to ensure we return here if we quit during questions
+        if (!onboardingCheckpoint || onboardingCheckpoint.routeName !== 'ComprehensiveQuiz') {
+            setOnboardingCheckpoint('ComprehensiveQuiz').catch(() => { });
+        }
+    }, []);
+
+    // Swipe gesture tracking
+    const isAnimating = useRef(false);
 
     // Track quiz start
     useEffect(() => {
@@ -265,63 +340,11 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
         }
     }, [currentQuestion, showResult, showUserInfo]);
 
-    // Answers state
-    const [answers, setAnswers] = useState<Record<string, any>>({
-        gender: null,
-        ageGroup: null,
-        sugarFrequency: null,
-        dailySweetTimes: null,
-        unconsciousSugar: null,
-        sugarChoiceFeeling: null,
-        sugarSituations: [],
-        reduceSugarAttempt: null,
-        craveWhenNotHungry: null,
-        craveIntensity: null,
-        avoidSugarDifficulty: null,
-        sugarVisibility: null,
-        nickname: '',
-        age: '',
-    });
-
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(20)).current;
-    const resultFade = useRef(new Animated.Value(0)).current;
-    const resultScale = useRef(new Animated.Value(0.92)).current;
-
-    // Resume from a milestone checkpoint (only set at the end of the quiz flow).
-    useEffect(() => {
-        if (onboardingCheckpoint?.routeName === 'ComprehensiveQuiz' && onboardingCheckpoint?.meta?.quizStage === 'results') {
-            setShowUserInfo(false);
-            setIsCalculating(false);
-            setShowResult(true);
-            resultFade.setValue(1);
-            resultScale.setValue(1);
-        } else {
-            // Initial mount animation for the first question
-            Animated.parallel([
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 1500, // Slow animation for the first question
-                    useNativeDriver: true,
-                }),
-                Animated.timing(slideAnim, {
-                    toValue: 0,
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        }
-    }, [onboardingCheckpoint, resultFade, resultScale]);
-
-    // Swipe gesture tracking
-    const isAnimating = useRef(false);
-
-    const QUESTIONS = getQuestions(answers.gender);
     const question = QUESTIONS[currentQuestion];
     const progress = (currentQuestion + 1) / QUESTIONS.length;
 
-    // Safety check: ensure question exists and currentQuestion is within bounds
-    if (!question || currentQuestion < 0 || currentQuestion >= QUESTIONS.length) {
+    // Safety check: skip if not on a valid question AND not showing results/userInfo
+    if (!showResult && !showUserInfo && (!question || currentQuestion < 0 || currentQuestion >= QUESTIONS.length)) {
         return (
             <LooviBackground variant="coralTop">
                 <SafeAreaView style={styles.container}>
@@ -560,7 +583,19 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
             category_scores: getCategoryScores()
         });
 
-        Animated.spring(resultScale, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
+        Animated.parallel([
+            Animated.timing(resultFade, {
+                toValue: 1,
+                duration: 600,
+                useNativeDriver: true,
+            }),
+            Animated.spring(resultScale, {
+                toValue: 1,
+                friction: 8,
+                tension: 40,
+                useNativeDriver: true,
+            })
+        ]).start();
     };
 
     const handleContinue = () => {

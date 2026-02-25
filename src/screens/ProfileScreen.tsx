@@ -22,6 +22,8 @@ import {
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -980,8 +982,8 @@ export default function ProfileScreen() {
                                 activeOpacity={1}
                                 onPress={() => setShowEditProfile(false)}
                             >
-                                <TouchableOpacity 
-                                    activeOpacity={1} 
+                                <TouchableOpacity
+                                    activeOpacity={1}
                                     style={styles.editModalContent}
                                     onPress={(e) => e.stopPropagation()}
                                 >
@@ -994,133 +996,133 @@ export default function ProfileScreen() {
                                     >
                                         <Text style={styles.editModalTitle}>Edit Profile</Text>
 
-                                {/* Avatar Selection */}
-                                <Text style={styles.inputLabel}>Profile Picture</Text>
-                                <View style={styles.avatarPickerSection}>
-                                    <TouchableOpacity
-                                        style={styles.currentAvatarPreview}
-                                        onPress={() => {
-                                            // Toggle emoji dropdown
-                                            setShowEmojiModal(!showEmojiModal);
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <UserAvatar
-                                            size={56}
-                                            photoURL={selectedAvatarType === 'photo' ? selectedAvatarValue : undefined}
-                                            avatarType={selectedAvatarType}
-                                            avatarValue={selectedAvatarValue}
-                                            name={name}
-                                        />
-                                        <Text style={styles.changeAvatarText}>Tap to change</Text>
-                                    </TouchableOpacity>
-
-                                    {/* Google/Apple Photo Option */}
-                                    {firebaseUser?.photoURL && (
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.photoOption,
-                                                selectedAvatarType === 'photo' && selectedAvatarValue === firebaseUser.photoURL && styles.avatarOptionSelected
-                                            ]}
-                                            onPress={() => handleSelectAvatar('photo', firebaseUser.photoURL!)}
-                                        >
-                                            <UserAvatar size={40} photoURL={firebaseUser.photoURL} avatarType="photo" avatarValue={firebaseUser.photoURL} name={name} />
-                                            <Text style={styles.photoOptionText}>Use {authProvider === 'google' ? 'Google' : 'Apple'} photo</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-
-                                {/* Emoji Picker Dropdown Container */}
-                                <View style={styles.emojiPickerContainer}>
-                                    <TouchableOpacity
-                                        style={styles.emojiPickerButton}
-                                        onPress={() => {
-                                            setShowEmojiModal(!showEmojiModal);
-                                        }}
-                                        activeOpacity={0.7}
-                                    >
-                                        <Text style={styles.emojiPickerButtonText}>Choose an emoji</Text>
-                                        <Ionicons 
-                                            name={showEmojiModal ? "chevron-up" : "chevron-down"} 
-                                            size={18} 
-                                            color={looviColors.text.secondary} 
-                                        />
-                                    </TouchableOpacity>
-
-                                    {/* Emoji Grid Dropdown - Positioned absolutely */}
-                                    {showEmojiModal && (
-                                        <View style={styles.emojiPickerDropdown}>
-                                            <ScrollView
-                                                style={styles.emojiDropdownScroll}
-                                                contentContainerStyle={styles.emojiGrid}
-                                                showsVerticalScrollIndicator={false}
-                                                nestedScrollEnabled={true}
+                                        {/* Avatar Selection */}
+                                        <Text style={styles.inputLabel}>Profile Picture</Text>
+                                        <View style={styles.avatarPickerSection}>
+                                            <TouchableOpacity
+                                                style={styles.currentAvatarPreview}
+                                                onPress={() => {
+                                                    // Toggle emoji dropdown
+                                                    setShowEmojiModal(!showEmojiModal);
+                                                }}
+                                                activeOpacity={0.7}
                                             >
-                                                {AVATAR_EMOJIS.map((emoji) => (
-                                                    <TouchableOpacity
-                                                        key={emoji}
-                                                        style={[
-                                                            styles.emojiOption,
-                                                            selectedAvatarType === 'emoji' && selectedAvatarValue === emoji && styles.avatarOptionSelected
-                                                        ]}
-                                                        onPress={() => {
-                                                            handleSelectAvatar('emoji', emoji);
-                                                            setShowEmojiModal(false);
-                                                        }}
+                                                <UserAvatar
+                                                    size={56}
+                                                    photoURL={selectedAvatarType === 'photo' ? selectedAvatarValue : undefined}
+                                                    avatarType={selectedAvatarType}
+                                                    avatarValue={selectedAvatarValue}
+                                                    name={name}
+                                                />
+                                                <Text style={styles.changeAvatarText}>Tap to change</Text>
+                                            </TouchableOpacity>
+
+                                            {/* Google/Apple Photo Option */}
+                                            {firebaseUser?.photoURL && (
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.photoOption,
+                                                        selectedAvatarType === 'photo' && selectedAvatarValue === firebaseUser.photoURL && styles.avatarOptionSelected
+                                                    ]}
+                                                    onPress={() => handleSelectAvatar('photo', firebaseUser.photoURL!)}
+                                                >
+                                                    <UserAvatar size={40} photoURL={firebaseUser.photoURL} avatarType="photo" avatarValue={firebaseUser.photoURL} name={name} />
+                                                    <Text style={styles.photoOptionText}>Use {authProvider === 'google' ? 'Google' : 'Apple'} photo</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+
+                                        {/* Emoji Picker Dropdown Container */}
+                                        <View style={styles.emojiPickerContainer}>
+                                            <TouchableOpacity
+                                                style={styles.emojiPickerButton}
+                                                onPress={() => {
+                                                    setShowEmojiModal(!showEmojiModal);
+                                                }}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={styles.emojiPickerButtonText}>Choose an emoji</Text>
+                                                <Ionicons
+                                                    name={showEmojiModal ? "chevron-up" : "chevron-down"}
+                                                    size={18}
+                                                    color={looviColors.text.secondary}
+                                                />
+                                            </TouchableOpacity>
+
+                                            {/* Emoji Grid Dropdown - Positioned absolutely */}
+                                            {showEmojiModal && (
+                                                <View style={styles.emojiPickerDropdown}>
+                                                    <ScrollView
+                                                        style={styles.emojiDropdownScroll}
+                                                        contentContainerStyle={styles.emojiGrid}
+                                                        showsVerticalScrollIndicator={false}
+                                                        nestedScrollEnabled={true}
                                                     >
-                                                        <Text style={styles.emojiText}>{emoji}</Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </ScrollView>
+                                                        {AVATAR_EMOJIS.map((emoji) => (
+                                                            <TouchableOpacity
+                                                                key={emoji}
+                                                                style={[
+                                                                    styles.emojiOption,
+                                                                    selectedAvatarType === 'emoji' && selectedAvatarValue === emoji && styles.avatarOptionSelected
+                                                                ]}
+                                                                onPress={() => {
+                                                                    handleSelectAvatar('emoji', emoji);
+                                                                    setShowEmojiModal(false);
+                                                                }}
+                                                            >
+                                                                <Text style={styles.emojiText}>{emoji}</Text>
+                                                            </TouchableOpacity>
+                                                        ))}
+                                                    </ScrollView>
+                                                </View>
+                                            )}
                                         </View>
-                                    )}
-                                </View>
 
-                                {/* Email (Read-only) */}
-                                <Text style={styles.inputLabel}>Email</Text>
-                                <View style={styles.readOnlyField}>
-                                    <Text style={styles.readOnlyText}>{email}</Text>
-                                    {(authProvider === 'google' || authProvider === 'apple') && (
-                                        <Text style={styles.readOnlyHint}>Managed by {authProvider === 'google' ? 'Google' : 'Apple'}</Text>
-                                    )}
-                                </View>
-
-                                {/* Username (Read-only) */}
-                                {user?.username && (
-                                    <>
-                                        <Text style={styles.inputLabel}>Username</Text>
+                                        {/* Email (Read-only) */}
+                                        <Text style={styles.inputLabel}>Email</Text>
                                         <View style={styles.readOnlyField}>
-                                            <Text style={styles.readOnlyText}>@{user.username}</Text>
-                                            <Text style={styles.readOnlyHint}>This helps friends find you. Cannot be changed.</Text>
+                                            <Text style={styles.readOnlyText}>{email}</Text>
+                                            {(authProvider === 'google' || authProvider === 'apple') && (
+                                                <Text style={styles.readOnlyHint}>Managed by {authProvider === 'google' ? 'Google' : 'Apple'}</Text>
+                                            )}
                                         </View>
-                                    </>
-                                )}
 
-                                {/* Display Name */}
-                                <View>
-                                    <Text style={styles.inputLabel}>Your Name</Text>
-                                    <TextInput
-                                        ref={editNameInputRef}
-                                        style={styles.editInput}
-                                        value={editNameState}
-                                        onChangeText={setEditNameState}
-                                        placeholder="Your Name"
-                                        placeholderTextColor={looviColors.text.muted}
-                                        autoCapitalize="words"
-                                        onFocus={() => {
-                                            // Scroll to input when focused - use a simple delay
-                                            setTimeout(() => {
-                                                editNameInputRef.current?.measure((x, y, width, height, pageX, pageY) => {
-                                                    editModalScrollRef.current?.scrollTo({
-                                                        y: pageY - 100, // Scroll to show input above keyboard
-                                                        animated: true,
-                                                    });
-                                                });
-                                            }, 300);
-                                        }}
-                                    />
-                                </View>
-                                <Text style={styles.fieldHint}>This is how friends can find you in the app</Text>
+                                        {/* Username (Read-only) */}
+                                        {user?.username && (
+                                            <>
+                                                <Text style={styles.inputLabel}>Username</Text>
+                                                <View style={styles.readOnlyField}>
+                                                    <Text style={styles.readOnlyText}>@{user.username}</Text>
+                                                    <Text style={styles.readOnlyHint}>This helps friends find you. Cannot be changed.</Text>
+                                                </View>
+                                            </>
+                                        )}
+
+                                        {/* Display Name */}
+                                        <View>
+                                            <Text style={styles.inputLabel}>Your Name</Text>
+                                            <TextInput
+                                                ref={editNameInputRef}
+                                                style={styles.editInput}
+                                                value={editNameState}
+                                                onChangeText={setEditNameState}
+                                                placeholder="Your Name"
+                                                placeholderTextColor={looviColors.text.muted}
+                                                autoCapitalize="words"
+                                                onFocus={() => {
+                                                    // Scroll to input when focused - use a simple delay
+                                                    setTimeout(() => {
+                                                        editNameInputRef.current?.measure((x, y, width, height, pageX, pageY) => {
+                                                            editModalScrollRef.current?.scrollTo({
+                                                                y: pageY - 100, // Scroll to show input above keyboard
+                                                                animated: true,
+                                                            });
+                                                        });
+                                                    }, 300);
+                                                }}
+                                            />
+                                        </View>
+                                        <Text style={styles.fieldHint}>This is how friends can find you in the app</Text>
 
                                         <View style={styles.editModalButtons}>
                                             <TouchableOpacity

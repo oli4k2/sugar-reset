@@ -5,12 +5,13 @@
  * Displays: percentage, phase labels, and phase description.
  */
 
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
 import { GlassCard } from './GlassCard';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Phase definitions based on plan progress - More granular phases, especially early on
 const PHASES = [
@@ -103,13 +104,26 @@ export function PlanProgressBar({
     endDate,
     onInfoPress,
 }: PlanProgressBarProps) {
+    const animatedWidth = useRef(new Animated.Value(0)).current;
+
     // Calculate progress percentage (capped at 100%)
     const progressPercent = Math.min(100, Math.round((daysSinceStart / planDuration) * 100));
 
-    // Find current phase
-    const currentPhase = PHASES.find(
+    useEffect(() => {
+        Animated.spring(animatedWidth, {
+            toValue: progressPercent,
+            useNativeDriver: false,
+            tension: 20,
+            friction: 7,
+        }).start();
+    }, [progressPercent]);
+
+    // Find current phase index
+    const currentPhaseIndex = PHASES.findIndex(
         phase => progressPercent >= phase.minPercent && progressPercent < phase.maxPercent
-    ) || PHASES[PHASES.length - 1];
+    );
+    const safePhaseIndex = currentPhaseIndex === -1 ? PHASES.length - 1 : currentPhaseIndex;
+    const currentPhase = PHASES[safePhaseIndex];
 
     // Format end date
     const endDateFormatted = endDate
@@ -118,112 +132,175 @@ export function PlanProgressBar({
 
     return (
         <GlassCard variant="light" style={styles.container}>
-            {/* Header Label with Info Button */}
+            {/* Header Row: Title and Percentage */}
             <View style={styles.headerRow}>
-                <Text style={styles.headerLabel}>Habit Formation Progress</Text>
-                {onInfoPress && (
-                    <TouchableOpacity onPress={onInfoPress} activeOpacity={0.7}>
-                        <Ionicons name="information-circle" size={18} color={looviColors.text.tertiary} />
-                    </TouchableOpacity>
-                )}
+                <View style={styles.titleGroup}>
+                    <Text style={styles.phasePrefix}>Phase {safePhaseIndex + 1}</Text>
+                    <Text style={styles.phaseName}>{currentPhase.name}</Text>
+                </View>
+                <View style={styles.percentGroup}>
+                    <Text style={styles.percentText}>{progressPercent}%</Text>
+                    {onInfoPress && (
+                        <TouchableOpacity onPress={onInfoPress} activeOpacity={0.7} style={styles.infoButton}>
+                            <Ionicons name="information-circle-outline" size={16} color={looviColors.text.tertiary} />
+                        </TouchableOpacity>
+                    )}
+                </View>
             </View>
 
-            {/* Phase Title - Above Progress Bar */}
-            <Text style={styles.phaseTitle}>{currentPhase.name}</Text>
+            {/* Segmented Progress Bar Track */}
+            <View style={styles.progressContainer}>
+                <View style={styles.progressTrack}>
+                    <Animated.View
+                        style={[
+                            styles.progressFillContainer,
+                            {
+                                width: animatedWidth.interpolate({
+                                    inputRange: [0, 100],
+                                    outputRange: ['0%', '100%']
+                                })
+                            }
+                        ]}
+                    >
+                        <LinearGradient
+                            colors={[looviColors.coralOrange, '#EB6E5F']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.progressFill}
+                        />
+                    </Animated.View>
+                </View>
 
-            {/* Progress Bar */}
-            <View style={styles.progressTrack}>
-                <View
-                    style={[
-                        styles.progressFill,
-                        { width: `${progressPercent}%` }
-                    ]}
-                />
+                {/* Visual Phase Ticks/Markers */}
+                <View style={[StyleSheet.absoluteFill, styles.markerOverlay]}>
+                    {[25, 50, 75].map((pos) => (
+                        <View
+                            key={`marker-${pos}`}
+                            style={[
+                                styles.marker,
+                                { left: `${pos}%` },
+                                progressPercent >= pos && styles.markerActive
+                            ]}
+                        />
+                    ))}
+                </View>
             </View>
 
-            {/* Progress Percentage and End Date - Below Progress Bar */}
-            <View style={styles.progressLabelsRow}>
-                <Text style={styles.percentText}>{progressPercent}%</Text>
+            {/* Footer Row: Hint and End Date */}
+            <View style={styles.footerRow}>
+                <Text style={styles.phaseHint} numberOfLines={1}>
+                    {currentPhase.feeling} → {currentPhase.endFeeling}
+                </Text>
                 {endDateFormatted && (
-                    <Text style={styles.endDateLabel}>Complete by {endDateFormatted}</Text>
+                    <Text style={styles.endDateLabel}>Ends {endDateFormatted}</Text>
                 )}
             </View>
-
-            {/* Phase Description - Compact single line */}
-            <Text style={styles.phaseHint}>
-                {currentPhase.feeling.charAt(0).toUpperCase() + currentPhase.feeling.slice(1)} → {currentPhase.endFeeling}
-            </Text>
         </GlassCard>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing.xs,
-        paddingBottom: spacing.sm,
+        marginHorizontal: spacing.md,
+        padding: spacing.md,
+        borderRadius: borderRadius.xl,
+        marginTop: spacing.sm,
     },
     headerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         marginBottom: spacing.xs,
     },
-    headerLabel: {
-        fontSize: 11,
-        fontWeight: '600',
+    titleGroup: {
+        flexDirection: 'column',
+    },
+    phasePrefix: {
+        fontSize: 10,
+        fontWeight: '700',
         color: looviColors.text.tertiary,
         textTransform: 'uppercase',
         letterSpacing: 1,
+        marginBottom: 2,
     },
-    phaseTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: looviColors.accent.primary,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        marginBottom: spacing.xs,
-        textShadowColor: 'rgba(217, 123, 102, 0.25)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
+    phaseName: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+        letterSpacing: -0.5,
+    },
+    percentGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    percentText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: looviColors.coralOrange,
+    },
+    infoButton: {
+        marginLeft: spacing.xs,
+    },
+    progressContainer: {
+        height: 12,
+        justifyContent: 'center',
+        marginVertical: 6,
     },
     progressTrack: {
-        height: 10,
-        backgroundColor: 'rgba(0,0,0,0.08)',
-        borderRadius: 5,
+        height: 6,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressFillContainer: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 3,
         overflow: 'hidden',
     },
     progressFill: {
-        height: '100%',
-        backgroundColor: looviColors.coralOrange,
-        borderRadius: 5,
+        flex: 1,
     },
-    progressLabelsRow: {
+    markerOverlay: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        pointerEvents: 'none',
+    },
+    marker: {
+        position: 'absolute',
+        width: 1.5,
+        height: 8,
+        backgroundColor: 'rgba(0,0,0,0.06)',
+        marginLeft: -0.75,
+    },
+    markerActive: {
+        backgroundColor: 'rgba(255,255,255,0.4)',
+    },
+    footerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
         marginTop: 4,
     },
-    percentText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: looviColors.accent.primary,
-        textShadowColor: 'rgba(217, 123, 102, 0.2)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
-    },
-    endDateLabel: {
+    phaseHint: {
         fontSize: 11,
         fontWeight: '500',
-        color: looviColors.text.tertiary,
-    },
-    phaseHint: {
-        fontSize: 12,
-        fontWeight: '500',
         color: looviColors.text.secondary,
-        fontStyle: 'italic',
-        marginTop: spacing.sm,
-        textAlign: 'center',
-        alignSelf: 'center',
+        flex: 1,
+        marginRight: spacing.sm,
+    },
+    endDateLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: looviColors.text.tertiary,
+        backgroundColor: 'rgba(0,0,0,0.04)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        overflow: 'hidden',
+        textTransform: 'uppercase',
     },
 });
 
