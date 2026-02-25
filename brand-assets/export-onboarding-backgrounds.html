@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Export onboarding backgrounds (9:16)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; padding: 24px; background: #1a1a1a; color: #eee; }
+    h1 { font-size: 1.25rem; margin-bottom: 8px; }
+    p { color: #999; margin-bottom: 24px; }
+    .previews { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; }
+    .card { background: #2a2a2a; border-radius: 12px; padding: 16px; }
+    .card h2 { font-size: 1rem; margin: 0 0 12px 0; font-weight: 600; }
+    .preview-wrap { border-radius: 8px; overflow: hidden; border: 1px solid #444; margin-bottom: 12px; }
+    .preview-wrap canvas { display: block; width: 100%; height: auto; max-width: 270px; }
+    button { background: #E8A87C; color: #1a1a1a; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #EEC4A0; }
+  </style>
+</head>
+<body>
+  <h1>Onboarding background exports (9:16)</h1>
+  <p>Same gradients as LooviBackground (coralTop = orange, blueDominant = blue). Click to download PNG.</p>
+  <div class="previews">
+    <div class="card">
+      <h2>Coral / Orange</h2>
+      <div class="preview-wrap"><canvas id="previewCoral" width="270" height="480"></canvas></div>
+      <button type="button" id="dlCoral">Download coral (9:16 PNG)</button>
+    </div>
+    <div class="card">
+      <h2>Blue / Violet</h2>
+      <div class="preview-wrap"><canvas id="previewBlue" width="270" height="480"></canvas></div>
+      <button type="button" id="dlBlue">Download blue (9:16 PNG)</button>
+    </div>
+  </div>
+
+  <script>
+    const BASE = '#F5F0EB';
+    const W = 1080, H = 1920; // 9:16 high-res
+
+    function drawLayer(ctx, w, h, start, end, stops) {
+      const x0 = start.x * w, y0 = start.y * h, x1 = end.x * w, y1 = end.y * h;
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      stops.forEach(([loc, color]) => g.addColorStop(loc, color));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    function renderCoral(canvas) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.fillStyle = BASE;
+      ctx.fillRect(0, 0, w, h);
+      drawLayer(ctx, w, h, { x: 0, y: 0 }, { x: 1, y: 0.8 }, [
+        [0, 'rgba(232, 168, 124, 0.95)'],
+        [0.2, 'rgba(238, 196, 160, 0.7)'],
+        [0.4, 'rgba(242, 228, 216, 0.4)'],
+        [0.6, 'rgba(245, 240, 235, 0.1)'],
+        [1, 'transparent'],
+      ]);
+      drawLayer(ctx, w, h, { x: 0, y: 0 }, { x: 1, y: 1 }, [
+        [0, 'transparent'],
+        [0.5, 'transparent'],
+        [0.75, 'rgba(197, 228, 240, 0.2)'],
+        [1, 'rgba(168, 216, 232, 0.35)'],
+      ]);
+    }
+
+    function renderBlue(canvas) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.fillStyle = BASE;
+      ctx.fillRect(0, 0, w, h);
+      drawLayer(ctx, w, h, { x: 0.8, y: 0 }, { x: 0.2, y: 1 }, [
+        [0, 'rgba(168, 216, 232, 0.8)'],
+        [0.3, 'rgba(197, 228, 240, 0.6)'],
+        [0.55, 'rgba(197, 228, 240, 0.35)'],
+        [1, 'rgba(245, 240, 235, 0.1)'],
+      ]);
+      drawLayer(ctx, w, h, { x: 0.5, y: 0 }, { x: 0, y: 1 }, [
+        [0, 'transparent'],
+        [0.5, 'transparent'],
+        [0.75, 'rgba(232, 168, 124, 0.25)'],
+        [1, 'rgba(238, 196, 160, 0.4)'],
+      ]);
+    }
+
+    function download(canvas, filename) {
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      if (filename.includes('coral')) renderCoral(c);
+      else renderBlue(c);
+      const a = document.createElement('a');
+      a.download = filename;
+      a.href = c.toDataURL('image/png');
+      a.click();
+    }
+
+    const previewCoral = document.getElementById('previewCoral');
+    const previewBlue = document.getElementById('previewBlue');
+    renderCoral(previewCoral);
+    renderBlue(previewBlue);
+
+    document.getElementById('dlCoral').onclick = () => download(previewCoral, 'onboarding-background-coral-9x16.png');
+    document.getElementById('dlBlue').onclick = () => download(previewBlue, 'onboarding-background-blue-9x16.png');
+  </script>
+</body>
+</html>

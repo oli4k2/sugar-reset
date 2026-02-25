@@ -51,7 +51,7 @@ const FEATURES: Feature[] = [
         title: 'Break old patterns',
         description: 'Turn your sugar dependency into a journey of recovery. Replace old habits with science-backed rituals.',
         descriptionBold: ['dependency', 'recovery', 'rituals'],
-        image: require('../../../assets/images/onboarding/break_patterns.png'),
+        image: require('../../../assets/images/onboarding/break-patterns.png'),
     },
     {
         id: '1',
