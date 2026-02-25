@@ -502,8 +502,27 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     const getMonthlyPrice = () => currentOffering?.monthly?.product.priceString || '$9.99';
     const getYearlyPrice = () => currentOffering?.annual?.product.priceString || '$29.99';
     const getYearlyMonthlyEquivalent = () => {
-        const price = currentOffering?.annual?.product.price || 29.99;
-        return `$${(Math.floor((price / 12) * 100) / 100).toFixed(2)}`;
+        const annualPkg = currentOffering?.annual;
+        if (!annualPkg) return '$2.50';
+        
+        const price = annualPkg.product.price || 29.99;
+        const currencyCode = annualPkg.product.currencyCode || 'USD';
+        const monthlyPrice = price / 12;
+        
+        // Format based on currency
+        if (currencyCode === 'USD') {
+            return `$${monthlyPrice.toFixed(2)}`;
+        } else {
+            // For other currencies, use the same format as the yearly price but divide by 12
+            // RevenueCat provides priceString in local format, so we'll calculate and format similarly
+            const formatted = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currencyCode,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(monthlyPrice);
+            return formatted;
+        }
     };
 
     // Render Step 1: Intro
@@ -543,7 +562,13 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                     onPress={handleNextStep}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.primaryButtonText}>Try for $0.00</Text>
+                    <Text style={styles.primaryButtonText}>
+                        Try for {currentOffering?.annual?.product?.currencyCode === 'USD' 
+                            ? '$0.00' 
+                            : currentOffering?.annual?.product?.currencyCode 
+                                ? `0.00 ${currentOffering.annual.product.currencyCode}` 
+                                : '$0.00'}
+                    </Text>
                 </TouchableOpacity>
 
                 <Text style={styles.priceSubtext}>

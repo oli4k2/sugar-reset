@@ -157,7 +157,10 @@ export function useAuth(): UseAuthReturn {
             console.log('✅ OTP sent successfully');
             return true;
         } catch (err: any) {
-            console.error('❌ Send OTP error:', err.message);
+            // Only log errors in development, not production
+            if (__DEV__) {
+                console.error('❌ Send OTP error:', err.message);
+            }
 
             setError({
                 code: err.code || 'otp-send-failed',
@@ -250,11 +253,23 @@ export function useAuth(): UseAuthReturn {
             console.log('✅ OTP verification and sign-in complete');
             return true;
         } catch (err: any) {
-            console.error('❌ Verify OTP error:', err.message);
+            // Only log errors in development, not production
+            if (__DEV__) {
+                console.error('❌ Verify OTP error:', err.message);
+            }
+
+            // Extract user-friendly error message
+            let errorMessage = err.message || getErrorMessage('otp-verify-failed');
+            
+            // For reviewer email, provide a more helpful message if verification fails
+            const normalizedEmail = email.trim().toLowerCase();
+            if (normalizedEmail === 'reviewer@craveless.info' && errorMessage.includes('Incorrect code')) {
+                errorMessage = 'Reviewer login failed. Please ensure you are using code 555555.';
+            }
 
             setError({
                 code: err.code || 'otp-verify-failed',
-                message: err.message || getErrorMessage('otp-verify-failed'),
+                message: errorMessage,
             });
             return false;
         } finally {

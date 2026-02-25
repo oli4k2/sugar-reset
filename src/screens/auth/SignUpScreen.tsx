@@ -17,6 +17,7 @@ import {
     ActivityIndicator,
     Dimensions,
     Image,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -534,9 +535,24 @@ export default function SignUpScreen({ navigation }: SignUpScreenProps) {
 
                         {/* Terms */}
                         {step !== 'otp' && (
-                            <Text style={styles.terms}>
-                                By signing up, you agree to our Terms of Service and Privacy Policy
-                            </Text>
+                            <View style={styles.termsContainer}>
+                                <Text style={styles.terms}>
+                                    By signing up, you agree to our{' '}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => Linking.openURL('https://www.craveless.info/terms-of-service')}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.termsLink}>Terms of Service</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.terms}> and </Text>
+                                <TouchableOpacity
+                                    onPress={() => Linking.openURL('https://www.craveless.info/privacy-policy')}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.termsLink}>Privacy Policy</Text>
+                                </TouchableOpacity>
+                            </View>
                         )}
 
                         {/* Login Link */}
@@ -767,12 +783,26 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: spacing.lg,
     },
+    termsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: spacing.md,
+        marginBottom: spacing.sm,
+        paddingHorizontal: spacing.md,
+    },
     terms: {
         fontSize: 12,
         fontWeight: '400',
         color: looviColors.text.tertiary,
         textAlign: 'center',
-        marginBottom: spacing.xl,
+    },
+    termsLink: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: looviColors.accent.primary,
+        textDecorationLine: 'underline',
     },
     loginRow: {
         flexDirection: 'row',

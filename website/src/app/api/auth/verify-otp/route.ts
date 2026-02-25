@@ -66,22 +66,24 @@ export async function POST(request: NextRequest) {
         const isReviewerEmail = normalizedEmail === REVIEWER_EMAIL;
         const isReviewerCode = normalizedCode === '555555';
 
-        // Look up OTP in Firestore
+        // Look up OTP in Firestore (for cleanup later, even if reviewer)
         const otpRef = db.collection("otp_codes").doc(normalizedEmail);
         const otpDoc = await otpRef.get();
 
-        // For reviewer email with code 555555, skip Firestore check
-        if (!otpDoc.exists && !(isReviewerEmail && isReviewerCode)) {
-            return NextResponse.json(
-                { error: "No verification code found. Please request a new one.", success: false },
-                { status: 400 }
-            );
-        }
-
-        // For reviewer email with code 555555, skip all validation
+        // For reviewer email with code 555555, skip all validation and Firestore checks
+        // This works for both sign-up and sign-in - no email verification needed
         if (isReviewerEmail && isReviewerCode) {
             console.log("✅ Reviewer OTP verified (bypassing normal validation)");
+            // Skip all validation - proceed directly to user creation/login
         } else {
+
+            // Check if OTP exists
+            if (!otpDoc.exists) {
+                return NextResponse.json(
+                    { error: "No verification code found. Please request a new one.", success: false },
+                    { status: 400 }
+                );
+            }
             const otpData = otpDoc.data()!;
 
             // Check if already used
