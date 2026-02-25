@@ -20,6 +20,9 @@ import { OnboardingStackParamList } from '../../types';
 import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 
+import { useUserData } from '../../context/UserDataContext';
+import { useEffect } from 'react';
+
 const graphSource = require('../../../assets/images/illustrations/sugar-reset-graph.png');
 
 type SugarResetGraphScreenProps = {
@@ -27,7 +30,12 @@ type SugarResetGraphScreenProps = {
 };
 
 export default function SugarResetGraphScreen({ navigation }: SugarResetGraphScreenProps) {
+    const { setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
+
+    useEffect(() => {
+        setOnboardingCheckpoint('SugarResetGraph').catch(() => { });
+    }, []);
     const handleContinue = () => {
         posthog?.capture('onboarding_graph_completed');
         navigation.navigate('Goals');

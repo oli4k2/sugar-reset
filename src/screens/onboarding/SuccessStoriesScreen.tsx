@@ -22,6 +22,7 @@ import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
+import { useUserData } from '../../context/UserDataContext';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 
@@ -74,11 +75,14 @@ const EXPERT_QUOTES: ExpertQuote[] = [
 ];
 
 export default function SuccessStoriesScreen({ navigation }: SuccessStoriesScreenProps) {
+    const { setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
 
     useEffect(() => {
+        setOnboardingCheckpoint('SuccessStories').catch(() => { });
+
         // Animate content in
         Animated.parallel([
             Animated.timing(fadeAnim, {

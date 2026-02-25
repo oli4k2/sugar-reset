@@ -22,7 +22,7 @@ type PersonalizedPlanScreenProps = {
 };
 
 export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanScreenProps) {
-    const { onboardingData } = useUserData();
+    const { onboardingData, setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
     const [displayedText, setDisplayedText] = useState('');
     const [showButton, setShowButton] = useState(false);
@@ -42,6 +42,8 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
     ];
 
     useEffect(() => {
+        setOnboardingCheckpoint('PersonalizedPlan').catch(() => { });
+
         // Track sequence start
         posthog?.capture('onboarding_personalized_intro_started');
 
@@ -95,6 +97,7 @@ export default function PersonalizedPlanScreen({ navigation }: PersonalizedPlanS
                         })
                     ]).start();
                 }
+
 
                 // Wait for step duration (minus fade out time if not last step)
                 if (i < steps.length - 1) {

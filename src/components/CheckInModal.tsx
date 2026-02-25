@@ -1,10 +1,11 @@
 /**
  * CheckInModal Component
- * 
+ *
  * Bottom sheet modal for daily sugar check-in.
+ * Gesture-driven: drag handle to expand/collapse, swipe down to dismiss.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -14,12 +15,18 @@ import {
     TouchableWithoutFeedback,
     TextInput,
     Keyboard,
+    Animated,
+    PanResponder,
+    Dimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Button } from './Button';
-import { GlassCard } from './GlassCard';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { getCurrentDayLimit } from '../utils/planUtils';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.55;
+const TRANSLATE_PEEK = 0;           // fully visible (sheet is compact)
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.4;
 
 interface CheckInModalProps {
     visible: boolean;
@@ -49,61 +56,98 @@ export function CheckInModal({
     const [sugarGrams, setSugarGrams] = useState<string>('');
     const [step, setStep] = useState<'choice' | 'success'>('choice');
 
-    // Calculate dynamic daily limit based on current week for gradual plan
     const currentLimit = planType === 'gradual'
         ? getCurrentDayLimit(planType, startDate)
         : null;
     const dailyLimit = currentLimit?.dailyGrams || 0;
-    const weekTitle = currentLimit?.title || '';
     const isColdTurkey = planType === 'cold_turkey';
 
-    // Handle gram input change - auto-select within/exceeded based on value
+    // ── Bottom-sheet gesture ──────────────────────────────────────────────────
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+    const currentSnap = useRef(TRANSLATE_PEEK);
+
+    const handleCloseRef = useRef(onClose);
+    useEffect(() => { handleCloseRef.current = onClose; });
+
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => handleCloseRef.current());
+    }, [translateY]);
+
+    useEffect(() => {
+        if (visible) {
+            translateY.setValue(SHEET_HEIGHT);
+            currentSnap.current = TRANSLATE_PEEK;
+            Animated.spring(translateY, {
+                toValue: TRANSLATE_PEEK,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [visible, translateY]);
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 8,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(currentSnap.current);
+                translateY.setValue(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.5) {
+                    Animated.timing(translateY, {
+                        toValue: SHEET_HEIGHT,
+                        duration: 220,
+                        useNativeDriver: true,
+                    }).start(() => handleCloseRef.current());
+                } else {
+                    currentSnap.current = TRANSLATE_PEEK;
+                    Animated.spring(translateY, {
+                        toValue: TRANSLATE_PEEK,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+    // ─────────────────────────────────────────────────────────────────────────
+
     const handleGramsChange = (value: string) => {
         setSugarGrams(value);
-
-        // Auto-select choice based on entered grams
         if (value && !isColdTurkey) {
             const grams = parseInt(value, 10) || 0;
-            if (grams <= dailyLimit) {
-                setSugarFree(true); // Within limit
-            } else {
-                setSugarFree(false); // Exceeded limit
-            }
+            setSugarFree(grams <= dailyLimit);
         }
     };
 
     const handleChoice = async (choice: boolean) => {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setSugarFree(choice);
-
-        // For gradual plan with gram input, just mark the selection
-        // Submit will happen when user taps "Complete Check-In"
-        if (!isColdTurkey) {
-            // Stay on choice step to allow gram entry
-            return;
-        }
-
-        // For cold turkey, submit immediately
+        if (!isColdTurkey) return;
         await submitCheckIn(choice);
     };
 
     const submitCheckIn = async (sugarFreeValue: boolean) => {
         const extras: CheckInExtras = {};
-
-        // Add sugar grams for gradual plan
         if (!isColdTurkey && sugarGrams) {
             extras.sugarGrams = parseInt(sugarGrams, 10) || 0;
         }
-
         await onCheckIn(sugarFreeValue, Object.keys(extras).length > 0 ? extras : undefined);
-
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setStep('success');
-
-        // Auto close after success animation
-        setTimeout(() => {
-            handleClose();
-        }, 1500);
+        setTimeout(() => handleClose(), 1500);
     };
 
     const handleSubmit = async () => {
@@ -112,89 +156,68 @@ export function CheckInModal({
     };
 
     const handleClose = () => {
-        // Reset state
         setSugarFree(null);
         setSugarGrams('');
         setStep('choice');
-        onClose();
+        dismiss();
     };
 
-    const renderChoice = () => {
-        return (
-            <View style={styles.choiceContainer}>
-                <Text style={styles.title}>How was today?</Text>
-                <Text style={styles.subtitle}>Be honest with yourself</Text>
-
-                <View style={styles.choiceButtons}>
-                    <TouchableOpacity
-                        style={[
-                            styles.choiceButton,
-                            styles.sugarFreeButton,
-                            sugarFree === true && styles.choiceButtonSelected,
-                        ]}
-                        onPress={() => handleChoice(true)}
-                    >
-                        <Text style={styles.choiceEmoji}>✅</Text>
-                        <Text style={styles.choiceLabel}>Sugar-Free</Text>
-                        <Text style={styles.choiceSubtext}>No added sugar today</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.choiceButton,
-                            styles.hadSugarButton,
-                            sugarFree === false && styles.choiceButtonSelected,
-                        ]}
-                        onPress={() => handleChoice(false)}
-                    >
-                        <Text style={styles.choiceEmoji}>🍬</Text>
-                        <Text style={styles.choiceLabel}>Had Sugar</Text>
-                        <Text style={styles.choiceSubtext}>Reset tomorrow</Text>
-                    </TouchableOpacity>
-                </View>
+    const renderChoice = () => (
+        <View style={styles.choiceContainer}>
+            <Text style={styles.title}>How was today?</Text>
+            <Text style={styles.subtitle}>Be honest with yourself</Text>
+            <View style={styles.choiceButtons}>
+                <TouchableOpacity
+                    style={[styles.choiceButton, styles.sugarFreeButton, sugarFree === true && styles.choiceButtonSelected]}
+                    onPress={() => handleChoice(true)}
+                >
+                    <Text style={styles.choiceEmoji}>✅</Text>
+                    <Text style={styles.choiceLabel}>Sugar-Free</Text>
+                    <Text style={styles.choiceSubtext}>No added sugar today</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.choiceButton, styles.hadSugarButton, sugarFree === false && styles.choiceButtonSelected]}
+                    onPress={() => handleChoice(false)}
+                >
+                    <Text style={styles.choiceEmoji}>🍬</Text>
+                    <Text style={styles.choiceLabel}>Had Sugar</Text>
+                    <Text style={styles.choiceSubtext}>Reset tomorrow</Text>
+                </TouchableOpacity>
             </View>
-        );
-    };
+        </View>
+    );
 
     const renderSuccess = () => (
         <View style={styles.successContainer}>
             <Text style={styles.successEmoji}>{sugarFree ? '🎉' : '💪'}</Text>
-            <Text style={styles.successTitle}>
-                {sugarFree ? 'Streak continues!' : 'Logged!'}
-            </Text>
-            <Text style={styles.successText}>
-                {sugarFree
-                    ? 'Keep up the great work!'
-                    : 'Every day is a fresh start'}
-            </Text>
+            <Text style={styles.successTitle}>{sugarFree ? 'Streak continues!' : 'Logged!'}</Text>
+            <Text style={styles.successText}>{sugarFree ? 'Keep up the great work!' : 'Every day is a fresh start'}</Text>
         </View>
     );
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="slide"
-            onRequestClose={handleClose}
-        >
-            <TouchableWithoutFeedback onPress={handleClose}>
-                <View style={styles.overlay}>
-                    <TouchableWithoutFeedback>
-                        <View style={styles.modalContent}>
-                            <View style={styles.handle} />
+        <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
+            <View style={styles.overlay}>
+                <TouchableWithoutFeedback onPress={handleClose}>
+                    <View style={StyleSheet.absoluteFill} />
+                </TouchableWithoutFeedback>
 
-                            {step === 'choice' && renderChoice()}
-                            {step === 'success' && renderSuccess()}
+                <Animated.View style={[styles.modalContent, { transform: [{ translateY }] }]}>
+                    {/* Drag handle */}
+                    <View style={styles.dragHandleArea} {...panResponder.panHandlers}>
+                        <View style={styles.handle} />
+                    </View>
 
-                            {step !== 'success' && (
-                                <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-                                    <Text style={styles.closeText}>Cancel</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-                    </TouchableWithoutFeedback>
-                </View>
-            </TouchableWithoutFeedback>
+                    {step === 'choice' && renderChoice()}
+                    {step === 'success' && renderSuccess()}
+
+                    {step !== 'success' && (
+                        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+                            <Text style={styles.closeText}>Cancel</Text>
+                        </TouchableOpacity>
+                    )}
+                </Animated.View>
+            </View>
         </Modal>
     );
 }
@@ -203,26 +226,27 @@ const styles = StyleSheet.create({
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: spacing.lg,
+        justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: borderRadius['2xl'],
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
         paddingHorizontal: spacing.lg,
         paddingBottom: spacing.xl,
-        paddingTop: spacing.lg,
+        height: SHEET_HEIGHT,
+    },
+    dragHandleArea: {
         width: '100%',
-        maxWidth: 360,
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 40,
     },
     handle: {
-        width: 40,
-        height: 4,
-        backgroundColor: colors.glass.strong,
-        borderRadius: 2,
-        alignSelf: 'center',
-        marginBottom: spacing.xl,
+        width: 44,
+        height: 5,
+        backgroundColor: '#CCCCCC',
+        borderRadius: 3,
     },
     title: {
         ...typography.styles.h2,
@@ -236,7 +260,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: spacing.xl,
     },
-    // Choice step
     choiceContainer: {
         alignItems: 'center',
     },
@@ -277,10 +300,6 @@ const styles = StyleSheet.create({
         color: '#666677',
         textAlign: 'center',
     },
-    submitButton: {
-        marginTop: spacing.lg,
-    },
-    // Success step
     successContainer: {
         alignItems: 'center',
         paddingVertical: spacing['3xl'],
@@ -307,7 +326,6 @@ const styles = StyleSheet.create({
         ...typography.styles.body,
         color: '#666677',
     },
-    // Gram input for gradual plan
     gramInputContainer: {
         marginTop: spacing.xl,
         width: '100%',

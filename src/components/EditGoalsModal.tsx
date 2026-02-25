@@ -1,11 +1,4 @@
-/**
- * EditGoalsModal
- * 
- * Modal for editing user's goals/reasons.
- * Uses same options as IntentSelectionScreen from onboarding.
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -13,11 +6,19 @@ import {
     TouchableOpacity,
     ScrollView,
     Modal,
+    Animated,
+    PanResponder,
+    Dimensions,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing, borderRadius } from '../theme';
-import { skyColors } from '../components/SkyBackground';
-import { GlassCard } from '../components/GlassCard';
+import { looviColors } from './LooviBackground';
+import { GlassCard } from './GlassCard';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.8;
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.4;
 
 interface EditGoalsModalProps {
     visible: boolean;
@@ -45,13 +46,30 @@ const goalOptions: GoalOption[] = [
     { id: 'savings', emoji: '💰', label: 'Financial savings' },
 ];
 
-export default function EditGoalsModal({ visible, currentGoals, onSave, onClose }: EditGoalsModalProps) {
+export function EditGoalsModal({ visible, currentGoals, onSave, onClose }: EditGoalsModalProps) {
     const [selectedGoals, setSelectedGoals] = useState<string[]>(currentGoals);
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
 
-    // Update local state when currentGoals changes
     useEffect(() => {
-        setSelectedGoals(currentGoals);
+        if (visible) {
+            setSelectedGoals(currentGoals);
+            translateY.setValue(SHEET_HEIGHT);
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
     }, [currentGoals, visible]);
+
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => onClose());
+    }, [onClose]);
 
     const toggleGoal = (id: string) => {
         setSelectedGoals(prev =>
@@ -63,33 +81,63 @@ export default function EditGoalsModal({ visible, currentGoals, onSave, onClose 
 
     const handleSave = () => {
         onSave(selectedGoals);
-        onClose();
+        dismiss();
     };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.0) {
+                    dismiss();
+                } else {
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
 
     return (
         <Modal
             visible={visible}
-            animationType="slide"
-            presentationStyle="pageSheet"
-            onRequestClose={onClose}
+            transparent={true}
+            animationType="none"
+            onRequestClose={dismiss}
         >
-            <View style={styles.modalBackground}>
-                <SafeAreaView style={styles.container}>
+            <View style={styles.overlay}>
+                <TouchableWithoutFeedback onPress={dismiss}>
+                    <View style={StyleSheet.absoluteFill} />
+                </TouchableWithoutFeedback>
+
+                <Animated.View
+                    style={[
+                        styles.sheet,
+                        { transform: [{ translateY }] }
+                    ]}
+                >
+                    <View {...panResponder.panHandlers} style={styles.handleContainer}>
+                        <View style={styles.handle} />
+                    </View>
+
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
-                            <Text style={styles.cancelText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.title}>My Goals</Text>
-                        <TouchableOpacity
-                            onPress={handleSave}
-                            style={styles.saveButton}
-                            disabled={selectedGoals.length === 0}
-                        >
-                            <Text style={[
-                                styles.saveText,
-                                selectedGoals.length === 0 && styles.saveTextDisabled
-                            ]}>Save</Text>
-                        </TouchableOpacity>
+                        <Text style={styles.title}>Update Your Goals</Text>
+                        <Text style={styles.subtitle}>
+                            Select the reminders you want to see when things get tough.
+                        </Text>
                     </View>
 
                     <ScrollView
@@ -97,10 +145,6 @@ export default function EditGoalsModal({ visible, currentGoals, onSave, onClose 
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                     >
-                        <Text style={styles.subtitle}>
-                            Select all that apply to you. These will appear as your personal reminders.
-                        </Text>
-
                         <View style={styles.optionsGrid}>
                             {goalOptions.map((option) => {
                                 const isSelected = selectedGoals.includes(option.id);
@@ -113,10 +157,10 @@ export default function EditGoalsModal({ visible, currentGoals, onSave, onClose 
                                         <GlassCard
                                             variant={isSelected ? 'dark' : 'light'}
                                             padding="md"
-                                            style={{
-                                                ...styles.optionCard,
-                                                ...(isSelected ? styles.optionCardSelected : {}),
-                                            }}
+                                            style={[
+                                                styles.optionCard,
+                                                isSelected && styles.optionCardSelected
+                                            ]}
                                         >
                                             <Text style={styles.optionEmoji}>{option.emoji}</Text>
                                             <Text style={[
@@ -135,72 +179,81 @@ export default function EditGoalsModal({ visible, currentGoals, onSave, onClose 
                                 );
                             })}
                         </View>
+                        <View style={{ height: 100 }} />
                     </ScrollView>
-                </SafeAreaView>
+
+                    <View style={styles.bottomContainer}>
+                        <TouchableOpacity
+                            style={[
+                                styles.saveButton,
+                                selectedGoals.length === 0 && styles.saveButtonDisabled
+                            ]}
+                            onPress={handleSave}
+                            disabled={selectedGoals.length === 0}
+                        >
+                            <Text style={styles.saveButtonText}>Save Changes</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.cancelButton} onPress={dismiss}>
+                            <Text style={styles.cancelText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Animated.View>
             </View>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
-    modalBackground: {
+    overlay: {
         flex: 1,
-        backgroundColor: '#E0F2FE',
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        justifyContent: 'flex-end',
     },
-    container: {
-        flex: 1,
+    sheet: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        width: '100%',
+        maxHeight: SHEET_HEIGHT,
+        overflow: 'hidden',
+    },
+    handleContainer: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
     },
     header: {
-        flexDirection: 'row',
+        paddingHorizontal: spacing.xl,
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-    },
-    cancelButton: {
-        padding: spacing.xs,
-    },
-    cancelText: {
-        fontSize: 16,
-        fontWeight: '400',
-        color: skyColors.text.secondary,
+        marginBottom: spacing.md,
     },
     title: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: skyColors.text.primary,
+        fontSize: 22,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+        marginBottom: 4,
     },
-    saveButton: {
-        padding: spacing.xs,
-    },
-    saveText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: skyColors.accent.primary,
-    },
-    saveTextDisabled: {
-        color: skyColors.text.muted,
+    subtitle: {
+        fontSize: 14,
+        fontWeight: '400',
+        color: looviColors.text.tertiary,
+        textAlign: 'center',
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
-        paddingHorizontal: spacing.lg,
-        paddingTop: spacing.lg,
-        paddingBottom: spacing.xl,
-    },
-    subtitle: {
-        fontSize: 14,
-        fontWeight: '400',
-        color: skyColors.text.secondary,
-        textAlign: 'center',
-        marginBottom: spacing.xl,
-        lineHeight: 20,
+        paddingHorizontal: spacing.xl,
+        paddingTop: spacing.md,
     },
     optionsGrid: {
-        gap: spacing.md,
+        gap: spacing.sm,
     },
     optionCard: {
         flexDirection: 'row',
@@ -209,7 +262,7 @@ const styles = StyleSheet.create({
     },
     optionCardSelected: {
         borderWidth: 2,
-        borderColor: skyColors.accent.primary,
+        borderColor: looviColors.accent.primary,
     },
     optionEmoji: {
         fontSize: 24,
@@ -218,24 +271,57 @@ const styles = StyleSheet.create({
     optionLabel: {
         fontSize: 16,
         fontWeight: '500',
-        color: skyColors.text.primary,
+        color: looviColors.text.primary,
         flex: 1,
     },
     optionLabelSelected: {
         fontWeight: '600',
-        color: skyColors.accent.primary,
+        color: looviColors.accent.primary,
     },
     checkmark: {
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: skyColors.accent.primary,
+        backgroundColor: looviColors.accent.primary,
         justifyContent: 'center',
         alignItems: 'center',
     },
     checkmarkText: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '700',
         color: '#FFFFFF',
     },
+    bottomContainer: {
+        padding: spacing.xl,
+        paddingTop: spacing.md,
+        backgroundColor: '#FFFFFF',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.05)',
+    },
+    saveButton: {
+        backgroundColor: looviColors.accent.primary,
+        paddingVertical: 16,
+        borderRadius: 30,
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+    },
+    saveButtonDisabled: {
+        opacity: 0.5,
+    },
+    saveButtonText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FFFFFF',
+    },
+    cancelButton: {
+        paddingVertical: spacing.sm,
+        alignItems: 'center',
+    },
+    cancelText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: looviColors.text.tertiary,
+    },
 });
+
+export default EditGoalsModal;

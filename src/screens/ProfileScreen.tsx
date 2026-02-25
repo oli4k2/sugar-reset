@@ -19,7 +19,13 @@ import {
     Linking,
     ActivityIndicator,
     Switch,
+    Animated,
+    PanResponder,
+    TouchableWithoutFeedback,
+    Platform,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as StoreReview from 'expo-store-review';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -123,6 +129,46 @@ export default function ProfileScreen() {
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
     const [hasPledgedToday, setHasPledgedToday] = useState(false);
+    const [showRatingModal, setShowRatingModal] = useState(false);
+    const [selectedRating, setSelectedRating] = useState(0);
+    const [ratingSubmitted, setRatingSubmitted] = useState(false);
+    const SHEET_HEIGHT = Dimensions.get('window').height * 0.55;
+    const ratingSheetAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+
+    const ratingPanResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
+            onPanResponderGrant: () => {
+                ratingSheetAnim.stopAnimation();
+                ratingSheetAnim.setOffset(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                ratingSheetAnim.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                ratingSheetAnim.flattenOffset();
+                if (gs.dy > SHEET_HEIGHT * 0.3 || gs.vy > 0.8) {
+                    closeRatingModal();
+                } else {
+                    Animated.spring(ratingSheetAnim, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 12,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    const closeRatingModal = () => {
+        Animated.timing(ratingSheetAnim, {
+            toValue: SHEET_HEIGHT,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => setShowRatingModal(false));
+    };
 
     // Fetch pledge status — check AsyncStorage first (instant), then Firestore
     useEffect(() => {
@@ -895,6 +941,123 @@ export default function ProfileScreen() {
                     </ScrollView>
 
 
+                    {/* ── Rating Modal (Bottom Sheet Refactor) ── */}
+                    <Modal
+                        visible={showRatingModal}
+                        transparent
+                        animationType="none"
+                        onRequestClose={closeRatingModal}
+                    >
+                        <View style={styles.sheetOverlay}>
+                            <TouchableWithoutFeedback onPress={closeRatingModal}>
+                                <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            </TouchableWithoutFeedback>
+
+                            <Animated.View
+                                style={[
+                                    styles.ratingSheet,
+                                    { transform: [{ translateY: ratingSheetAnim }] }
+                                ]}
+                            >
+                                {/* Drag Handle */}
+                                <View {...ratingPanResponder.panHandlers} style={styles.sheetHandleContainer}>
+                                    <View style={styles.sheetHandle} />
+                                </View>
+
+                                <View style={styles.ratingContent}>
+                                    {!ratingSubmitted ? (
+                                        <>
+                                            {/* Icon Header */}
+                                            <View style={styles.ratingIconContainer}>
+                                                <LinearGradient
+                                                    colors={[looviColors.coralOrange, '#E8A87C']}
+                                                    style={styles.ratingIconGradient}
+                                                >
+                                                    <Text style={styles.ratingIconEmoji}>⭐</Text>
+                                                </LinearGradient>
+                                            </View>
+
+                                            <Text style={styles.ratingSheetTitle}>Enjoying Craveless?</Text>
+                                            <Text style={styles.ratingSheetSubtitle}>
+                                                Your feedback helps us create a better experience for everyone.
+                                            </Text>
+
+                                            {/* Stars Section */}
+                                            <View style={styles.ratingStarsBox}>
+                                                <View style={styles.starsRow}>
+                                                    {[1, 2, 3, 4, 5].map((star) => (
+                                                        <TouchableOpacity
+                                                            key={star}
+                                                            onPress={async () => {
+                                                                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                                setSelectedRating(star);
+                                                            }}
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <Ionicons
+                                                                name={selectedRating >= star ? "star" : "star-outline"}
+                                                                size={44}
+                                                                color={selectedRating >= star ? looviColors.accent.warning : 'rgba(0,0,0,0.1)'}
+                                                            />
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                </View>
+                                            </View>
+
+                                            {/* Actions */}
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.ratingSubmitAction,
+                                                    selectedRating === 0 && styles.ratingSubmitActionDisabled,
+                                                ]}
+                                                disabled={selectedRating === 0}
+                                                activeOpacity={0.8}
+                                                onPress={async () => {
+                                                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                    if (selectedRating >= 4) {
+                                                        closeRatingModal();
+                                                        setTimeout(() => {
+                                                            StoreReview.requestReview();
+                                                        }, 500);
+                                                    } else {
+                                                        setRatingSubmitted(true);
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={styles.ratingSubmitActionText}>Submit Feedback</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity
+                                                onPress={closeRatingModal}
+                                                style={styles.ratingLaterBtn}
+                                            >
+                                                <Text style={styles.ratingLaterText}>Maybe Later</Text>
+                                            </TouchableOpacity>
+                                        </>
+                                    ) : (
+                                        /* Thank-you state */
+                                        <View style={styles.ratingThankContainer}>
+                                            <View style={styles.ratingThankIcon}>
+                                                <Ionicons name="checkmark-circle" size={80} color={looviColors.accent.success} />
+                                            </View>
+                                            <Text style={styles.ratingSheetTitle}>Thank You!</Text>
+                                            <Text style={styles.ratingSheetSubtitle}>
+                                                We really appreciate you sharing your thoughts. Every bit of feedback helps us improve.
+                                            </Text>
+                                            <TouchableOpacity
+                                                style={styles.ratingSubmitAction}
+                                                activeOpacity={0.8}
+                                                onPress={closeRatingModal}
+                                            >
+                                                <Text style={styles.ratingSubmitActionText}>Done</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </View>
+                            </Animated.View>
+                        </View>
+                    </Modal>
+
 
                     {/* Edit Savings Goal Modal */}
 
@@ -961,10 +1124,10 @@ export default function ProfileScreen() {
                                         activeOpacity={0.7}
                                     >
                                         <Text style={styles.emojiPickerButtonText}>Choose an emoji</Text>
-                                        <Ionicons 
-                                            name={showEmojiModal ? "chevron-up" : "chevron-down"} 
-                                            size={18} 
-                                            color={looviColors.text.secondary} 
+                                        <Ionicons
+                                            name={showEmojiModal ? "chevron-up" : "chevron-down"}
+                                            size={18}
+                                            color={looviColors.text.secondary}
                                         />
                                     </TouchableOpacity>
 
@@ -1696,5 +1859,113 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '700',
         color: '#FFFFFF',
+    },
+
+    // ── Rating Bottom Sheet ──
+    sheetOverlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+    },
+    ratingSheet: {
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 36,
+        borderTopRightRadius: 36,
+        width: '100%',
+        paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 25,
+    },
+    sheetHandleContainer: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+    },
+    sheetHandle: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
+    },
+    ratingContent: {
+        paddingHorizontal: spacing.xl,
+        alignItems: 'center',
+    },
+    ratingIconContainer: {
+        marginBottom: 20,
+    },
+    ratingIconGradient: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: looviColors.coralOrange,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+    },
+    ratingIconEmoji: {
+        fontSize: 32,
+    },
+    ratingSheetTitle: {
+        fontSize: 26,
+        fontWeight: '800',
+        color: looviColors.text.primary,
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    ratingSheetSubtitle: {
+        fontSize: 16,
+        color: looviColors.text.secondary,
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 28,
+        paddingHorizontal: 10,
+    },
+    ratingStarsBox: {
+        width: '100%',
+        backgroundColor: 'rgba(242, 228, 216, 0.3)',
+        paddingVertical: 24,
+        borderRadius: 24,
+        marginBottom: 28,
+        alignItems: 'center',
+    },
+    starsRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    ratingSubmitAction: {
+        width: '100%',
+        backgroundColor: looviColors.accent.primary,
+        borderRadius: 30,
+        paddingVertical: 18,
+        alignItems: 'center',
+    },
+    ratingSubmitActionDisabled: {
+        backgroundColor: 'rgba(0,0,0,0.05)',
+    },
+    ratingSubmitActionText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    ratingLaterBtn: {
+        marginTop: 16,
+        paddingVertical: 8,
+    },
+    ratingLaterText: {
+        fontSize: 15,
+        color: looviColors.text.tertiary,
+        fontWeight: '600',
+    },
+    ratingThankContainer: {
+        alignItems: 'center',
+        paddingVertical: 20,
+    },
+    ratingThankIcon: {
+        marginBottom: 20,
     },
 });

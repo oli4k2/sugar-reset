@@ -21,7 +21,7 @@ Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
         // Check if this is a conditional notification that should only show if action not completed
         const notificationType = notification.request.content.data?.type;
-        
+
         if (notificationType === 'food_logging_reminder') {
             // Check if user has already logged food today
             try {
@@ -33,6 +33,8 @@ Notifications.setNotificationHandler({
                         shouldShowAlert: false,
                         shouldPlaySound: false,
                         shouldSetBadge: false,
+                        shouldShowBanner: false,
+                        shouldShowList: false,
                     };
                 }
             } catch (error) {
@@ -53,6 +55,8 @@ Notifications.setNotificationHandler({
                             shouldShowAlert: false,
                             shouldPlaySound: false,
                             shouldSetBadge: false,
+                            shouldShowBanner: false,
+                            shouldShowList: false,
                         };
                     }
                 }
@@ -60,7 +64,7 @@ Notifications.setNotificationHandler({
                 console.error('Error checking wellness check-in status:', error);
             }
         }
-        
+
         // Default: show notification
         return {
             shouldShowAlert: true,
@@ -89,18 +93,8 @@ export const notificationService = {
             return null;
         }
 
-        // Check existing permissions
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-
-        // Request permission if not granted
-        if (existingStatus !== 'granted') {
-            const { status } = await Notifications.requestPermissionsAsync();
-            finalStatus = status;
-        }
-
-        if (finalStatus !== 'granted') {
-            console.log('Push notification permission not granted');
+        const status = await this.requestPermissions();
+        if (status !== 'granted') {
             return null;
         }
 
@@ -138,6 +132,25 @@ export const notificationService = {
             console.error('Error getting push token:', error);
             return null;
         }
+    },
+
+    /**
+     * Request push notification permissions
+     */
+    async requestPermissions(): Promise<Notifications.PermissionStatus> {
+        if (!Device.isDevice) {
+            return Notifications.PermissionStatus.UNDETERMINED;
+        }
+
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+
+        if (existingStatus !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+        }
+
+        return finalStatus;
     },
 
     /**
@@ -451,10 +464,10 @@ export const notificationService = {
 
             // Schedule food logging reminder at 15:00 (3 PM)
             await this.scheduleFoodLoggingReminder();
-            
+
             // Schedule wellness check-in reminder at 21:00 (9 PM)
             await this.scheduleWellnessCheckInReminder();
-            
+
             console.log('✅ All daily reminders scheduled');
         } catch (error) {
             console.error('❌ Failed to schedule daily reminders:', error);

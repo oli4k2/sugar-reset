@@ -3,9 +3,10 @@
  * 
  * A simple line chart showing sugar consumption over time for the gradual plan.
  * Includes a scrollable popup for viewing all-time data.
+ * Refactored to a gesture-driven bottom sheet.
  */
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
     View,
     Text,
@@ -16,10 +17,18 @@ import {
     ScrollView,
     NativeScrollEvent,
     NativeSyntheticEvent,
+    Animated,
+    PanResponder,
+    Platform,
+    TouchableWithoutFeedback,
 } from 'react-native';
 import Svg, { Path, Line, Circle, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.6;
+const DISMISS_THRESHOLD = SHEET_HEIGHT * 0.4;
 
 // Chart color theme using coral/orange from app theme
 const CHART_COLORS = {
@@ -40,7 +49,6 @@ interface ConsumptionChartProps {
 
 const CHART_HEIGHT = 200;
 const CHART_PADDING = { top: 25, right: 30, bottom: 45, left: 50 };
-const MODAL_CHART_HEIGHT = 250;
 
 export function ConsumptionChart({
     checkInHistory,
@@ -50,66 +58,73 @@ export function ConsumptionChart({
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [historyPage, setHistoryPage] = useState(0);
     const screenWidth = Dimensions.get('window').width - 60;
-    const modalWidth = Dimensions.get('window').width - 40;
+    const modalWidth = Dimensions.get('window').width;
     const chartWidth = screenWidth - CHART_PADDING.left - CHART_PADDING.right;
     const chartHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
 
-    // Prepare data points - start from first entry, show 14 days forward
-    // Only slide to show latest 14 days after 14+ days of data exist
+    const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+
+    const dismiss = useCallback(() => {
+        Animated.timing(translateY, {
+            toValue: SHEET_HEIGHT,
+            duration: 220,
+            useNativeDriver: true,
+        }).start(() => setShowHistoryModal(false));
+    }, [translateY]);
+
+    useEffect(() => {
+        if (showHistoryModal) {
+            translateY.setValue(SHEET_HEIGHT);
+            Animated.spring(translateY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 3,
+                speed: 14,
+            }).start();
+        }
+    }, [showHistoryModal]);
+
+    // Prepare data points
     const dataPoints = useMemo(() => {
         const points: { date: string; grams: number | null; isWithinLimit: boolean }[] = [];
         const allDates = Object.keys(checkInHistory).sort();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // If we have data, start from first entry date
-        // Otherwise start from today
         let startDate: Date;
         if (allDates.length > 0) {
             const firstEntryDate = new Date(allDates[0]);
             const daysSinceFirst = Math.floor((today.getTime() - firstEntryDate.getTime()) / (1000 * 60 * 60 * 24));
-
-            // If 14+ days have passed since first entry, show latest 14 days
-            // Otherwise, show from first entry date (entries grow from left)
             if (daysSinceFirst >= daysToShow) {
-                // Slide to show latest 14 days
                 startDate = new Date(today);
                 startDate.setDate(today.getDate() - (daysToShow - 1));
             } else {
-                // Show from first entry date (data starts from left)
                 startDate = firstEntryDate;
             }
         } else {
-            // No data - just show today forward
             startDate = today;
         }
 
-        // Generate points for 14 days starting from startDate
         for (let i = 0; i < daysToShow; i++) {
             const date = new Date(startDate);
             date.setDate(startDate.getDate() + i);
             const dateKey = date.toISOString().split('T')[0];
             const entry = checkInHistory[dateKey];
-
             points.push({
                 date: dateKey,
                 grams: entry?.grams ?? null,
-                isWithinLimit: entry?.status === 'sugar_free',
+                isWithinLimit: entry?.status === 'sugar_free' || (entry?.grams || 0) <= dailyLimit,
             });
         }
-
         return points;
-    }, [checkInHistory, daysToShow]);
+    }, [checkInHistory, daysToShow, dailyLimit]);
 
     // Get all historical data grouped by 14-day periods
     const historyData = useMemo(() => {
         const allDates = Object.keys(checkInHistory).sort();
         if (allDates.length === 0) return [];
-
         const periods: { startDate: string; endDate: string; data: typeof dataPoints }[] = [];
         const today = new Date();
-
-        // Calculate number of 14-day periods needed
         const firstDate = new Date(allDates[0]);
         const daysDiff = Math.ceil((today.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
         const numPeriods = Math.ceil(daysDiff / 14);
@@ -117,20 +132,17 @@ export function ConsumptionChart({
         for (let period = 0; period < Math.max(numPeriods, 1); period++) {
             const periodPoints: typeof dataPoints = [];
             const endOffset = period * 14;
-
             for (let i = 13 + endOffset; i >= endOffset; i--) {
                 const date = new Date(today);
                 date.setDate(date.getDate() - i);
                 const dateKey = date.toISOString().split('T')[0];
                 const entry = checkInHistory[dateKey];
-
                 periodPoints.push({
                     date: dateKey,
                     grams: entry?.grams ?? null,
-                    isWithinLimit: entry?.status === 'sugar_free',
+                    isWithinLimit: entry?.status === 'sugar_free' || (entry?.grams || 0) <= dailyLimit,
                 });
             }
-
             if (periodPoints.some(p => p.grams !== null)) {
                 periods.push({
                     startDate: periodPoints[0].date,
@@ -139,11 +151,9 @@ export function ConsumptionChart({
                 });
             }
         }
-
         return periods;
-    }, [checkInHistory]);
+    }, [checkInHistory, dailyLimit]);
 
-    // Calculate Y axis range
     const maxGrams = useMemo(() => {
         const gramsValues = dataPoints
             .map(p => p.grams)
@@ -152,53 +162,30 @@ export function ConsumptionChart({
         return Math.ceil(maxData / 20) * 20 + 20;
     }, [dataPoints, dailyLimit]);
 
-    // Convert data to SVG coordinates
-    const getX = (index: number, width: number = chartWidth) => {
-        return CHART_PADDING.left + (index / (daysToShow - 1)) * width;
-    };
+    const getX = (index: number, width: number = chartWidth) => CHART_PADDING.left + (index / (daysToShow - 1)) * width;
+    const getY = (grams: number, height: number = chartHeight) => CHART_PADDING.top + height - (grams / maxGrams) * height;
 
-    const getY = (grams: number, height: number = chartHeight) => {
-        return CHART_PADDING.top + height - (grams / maxGrams) * height;
-    };
-
-    // Generate path for the line
     const linePath = useMemo(() => {
         const validPoints = dataPoints
             .map((p, i) => (p.grams !== null ? { x: getX(i), y: getY(p.grams) } : null))
             .filter((p): p is { x: number; y: number } => p !== null);
-
         if (validPoints.length < 2) return '';
-
-        return validPoints
-            .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
-            .join(' ');
+        return validPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
     }, [dataPoints, daysToShow, maxGrams]);
 
-    // Generate filled area path
     const areaPath = useMemo(() => {
         const validPoints = dataPoints
-            .map((p, i) => (p.grams !== null ? { x: getX(i), y: getY(p.grams), index: i } : null))
-            .filter((p): p is { x: number; y: number; index: number } => p !== null);
-
+            .map((p, i) => (p.grams !== null ? { x: getX(i), y: getY(p.grams) } : null))
+            .filter((p): p is { x: number; y: number } => p !== null);
         if (validPoints.length < 2) return '';
-
-        const firstPoint = validPoints[0];
-        const lastPoint = validPoints[validPoints.length - 1];
         const baseY = CHART_PADDING.top + chartHeight;
-
-        let path = `M ${firstPoint.x} ${baseY}`;
-        validPoints.forEach(p => {
-            path += ` L ${p.x} ${p.y}`;
-        });
-        path += ` L ${lastPoint.x} ${baseY} Z`;
-
+        let path = `M ${validPoints[0].x} ${baseY}`;
+        validPoints.forEach(p => { path += ` L ${p.x} ${p.y}`; });
+        path += ` L ${validPoints[validPoints.length - 1].x} ${baseY} Z`;
         return path;
     }, [dataPoints, daysToShow, maxGrams]);
 
-    // Y axis labels
     const yLabels = [0, Math.round(maxGrams / 2), maxGrams];
-
-    // Check if there's any data with grams
     const hasGramsData = dataPoints.some(p => p.grams !== null);
 
     const handleModalScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -206,17 +193,40 @@ export function ConsumptionChart({
         setHistoryPage(page);
     };
 
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 10,
+            onPanResponderGrant: () => {
+                translateY.stopAnimation();
+                translateY.setOffset(0);
+            },
+            onPanResponderMove: (_, gs) => {
+                translateY.setValue(Math.max(0, gs.dy));
+            },
+            onPanResponderRelease: (_, gs) => {
+                translateY.flattenOffset();
+                if (gs.dy > DISMISS_THRESHOLD || gs.vy > 1.0) {
+                    dismiss();
+                } else {
+                    Animated.spring(translateY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        bounciness: 4,
+                        speed: 14,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
     if (!hasGramsData) {
         return (
             <View style={styles.container}>
                 <Text style={styles.title}>Sugar Consumption</Text>
                 <View style={styles.noDataContainer}>
-                    <Text style={styles.noDataText}>
-                        No consumption data yet.
-                    </Text>
-                    <Text style={styles.noDataSubtext}>
-                        Start logging your daily grams to see trends here.
-                    </Text>
+                    <Text style={styles.noDataText}>No consumption data yet.</Text>
+                    <Text style={styles.noDataSubtext}>Start logging your daily grams to see trends here.</Text>
                 </View>
             </View>
         );
@@ -224,10 +234,7 @@ export function ConsumptionChart({
 
     return (
         <View style={styles.container}>
-            <TouchableOpacity
-                onPress={() => setShowHistoryModal(true)}
-                activeOpacity={0.8}
-            >
+            <TouchableOpacity onPress={() => setShowHistoryModal(true)} activeOpacity={0.8}>
                 <View style={styles.headerRow}>
                     <View>
                         <Text style={styles.title}>Sugar Consumption</Text>
@@ -243,185 +250,76 @@ export function ConsumptionChart({
                             <Stop offset="100%" stopColor={CHART_COLORS.line} stopOpacity="0.05" />
                         </LinearGradient>
                     </Defs>
-
-                    {/* Grid lines */}
                     {yLabels.map((label, i) => (
-                        <Line
-                            key={`grid-${i}`}
-                            x1={CHART_PADDING.left}
-                            y1={getY(label)}
-                            x2={screenWidth - CHART_PADDING.right}
-                            y2={getY(label)}
-                            stroke="rgba(255,255,255,0.1)"
-                            strokeWidth={1}
-                        />
+                        <Line key={`grid-${i}`} x1={CHART_PADDING.left} y1={getY(label)} x2={screenWidth - CHART_PADDING.right} y2={getY(label)} stroke="rgba(0,0,0,0.05)" strokeWidth={1} />
                     ))}
-
-                    {/* Daily limit reference line */}
-                    <Line
-                        x1={CHART_PADDING.left}
-                        y1={getY(dailyLimit)}
-                        x2={screenWidth - CHART_PADDING.right}
-                        y2={getY(dailyLimit)}
-                        stroke={CHART_COLORS.line}
-                        strokeWidth={1.5}
-                        strokeDasharray="5,5"
-                    />
-                    <SvgText
-                        x={CHART_PADDING.left + 5}
-                        y={getY(dailyLimit) - 5}
-                        fill={CHART_COLORS.line}
-                        fontSize={10}
-                        textAnchor="start"
-                    >
-                        Limit: {dailyLimit}g
-                    </SvgText>
-
-                    {/* Filled area under line */}
-                    {areaPath && (
-                        <Path
-                            d={areaPath}
-                            fill="url(#areaGradient)"
-                        />
-                    )}
-
-                    {/* Line connecting data points */}
-                    {linePath && (
-                        <Path
-                            d={linePath}
-                            stroke={CHART_COLORS.line}
-                            strokeWidth={2.5}
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    )}
-
-                    {/* Data points */}
-                    {dataPoints.map((point, i) => {
-                        if (point.grams === null) return null;
-                        return (
-                            <Circle
-                                key={`point-${i}`}
-                                cx={getX(i)}
-                                cy={getY(point.grams)}
-                                r={5}
-                                fill={point.isWithinLimit ? CHART_COLORS.success : CHART_COLORS.error}
-                                stroke="#FFFFFF"
-                                strokeWidth={2}
-                            />
-                        );
-                    })}
-
-                    {/* Y axis labels */}
+                    <Line x1={CHART_PADDING.left} y1={getY(dailyLimit)} x2={screenWidth - CHART_PADDING.right} y2={getY(dailyLimit)} stroke={CHART_COLORS.line} strokeWidth={1.5} strokeDasharray="5,5" />
+                    <SvgText x={CHART_PADDING.left + 5} y={getY(dailyLimit) - 5} fill={CHART_COLORS.line} fontSize={10} textAnchor="start">Limit: {dailyLimit}g</SvgText>
+                    {areaPath && <Path d={areaPath} fill="url(#areaGradient)" />}
+                    {linePath && <Path d={linePath} stroke={CHART_COLORS.line} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+                    {dataPoints.map((point, i) => point.grams !== null && (
+                        <Circle key={`point-${i}`} cx={getX(i)} cy={getY(point.grams)} r={5} fill={point.isWithinLimit ? CHART_COLORS.success : CHART_COLORS.error} stroke="#FFFFFF" strokeWidth={2} />
+                    ))}
                     {yLabels.map((label, i) => (
-                        <SvgText
-                            key={`y-label-${i}`}
-                            x={CHART_PADDING.left - 10}
-                            y={getY(label) + 4}
-                            fill={colors.text.secondary}
-                            fontSize={11}
-                            textAnchor="end"
-                        >
-                            {label}g
-                        </SvgText>
+                        <SvgText key={`y-label-${i}`} x={CHART_PADDING.left - 10} y={getY(label) + 4} fill={looviColors.text.tertiary} fontSize={11} textAnchor="end">{label}g</SvgText>
                     ))}
-
-                    {/* X axis labels */}
                     {dataPoints.map((point, i) => {
                         if (i % Math.ceil(daysToShow / 5) !== 0 && i !== daysToShow - 1) return null;
                         const date = new Date(point.date);
-                        const label = `${date.getDate()}/${date.getMonth() + 1}`;
-                        return (
-                            <SvgText
-                                key={`x-label-${i}`}
-                                x={getX(i)}
-                                y={CHART_HEIGHT - 10}
-                                fill={colors.text.tertiary}
-                                fontSize={10}
-                                textAnchor="middle"
-                            >
-                                {label}
-                            </SvgText>
-                        );
+                        return <SvgText key={`x-label-${i}`} x={getX(i)} y={CHART_HEIGHT - 10} fill={looviColors.text.tertiary} fontSize={10} textAnchor="middle">{`${date.getDate()}/${date.getMonth() + 1}`}</SvgText>;
                     })}
                 </Svg>
             </TouchableOpacity>
 
-            {/* History Modal */}
-            <Modal
-                visible={showHistoryModal}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setShowHistoryModal(false)}
-            >
+            <Modal visible={showHistoryModal} transparent animationType="none" onRequestClose={dismiss}>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <TouchableWithoutFeedback onPress={dismiss}>
+                        <View style={StyleSheet.absoluteFill} />
+                    </TouchableWithoutFeedback>
+
+                    <Animated.View style={[styles.modalContent, { transform: [{ translateY }] }]}>
+                        <View {...panResponder.panHandlers} style={styles.handleContainer}>
+                            <View style={styles.handle} />
+                        </View>
+
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Consumption History</Text>
-                            <TouchableOpacity onPress={() => setShowHistoryModal(false)}>
-                                <Text style={styles.modalClose}>✕</Text>
+                            <TouchableOpacity onPress={dismiss}>
+                                <Ionicons name="close" size={24} color={looviColors.text.tertiary} />
                             </TouchableOpacity>
                         </View>
 
-                        <Text style={styles.modalSubtitle}>
-                            Swipe to see previous periods
-                        </Text>
+                        <Text style={styles.modalSubtitle}>Swipe to see previous periods</Text>
 
                         <ScrollView
                             horizontal
                             pagingEnabled
                             showsHorizontalScrollIndicator={false}
                             onMomentumScrollEnd={handleModalScroll}
-                            style={styles.modalScrollView}
                         >
-                            {historyData.map((period, periodIndex) => {
-                                const periodMaxGrams = Math.max(
-                                    ...period.data.filter(p => p.grams !== null).map(p => p.grams!),
-                                    dailyLimit
-                                ) + 20;
-
-                                return (
-                                    <View key={periodIndex} style={[styles.modalPage, { width: modalWidth }]}>
-                                        <Text style={styles.periodLabel}>
-                                            {new Date(period.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                            {' - '}
-                                            {new Date(period.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                        </Text>
-
-                                        <View style={styles.periodStats}>
-                                            {period.data.filter(p => p.grams !== null).map((p, i) => (
-                                                <View key={i} style={styles.periodStat}>
-                                                    <Text style={[
-                                                        styles.periodGrams,
-                                                        p.isWithinLimit ? styles.gramsGood : styles.gramsBad
-                                                    ]}>
-                                                        {p.grams}g
-                                                    </Text>
-                                                    <Text style={styles.periodDate}>
-                                                        {new Date(p.date).getDate()}
-                                                    </Text>
-                                                </View>
-                                            ))}
-                                        </View>
+                            {historyData.map((period, periodIndex) => (
+                                <View key={periodIndex} style={[styles.modalPage, { width: modalWidth }]}>
+                                    <Text style={styles.periodLabel}>
+                                        {new Date(period.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(period.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    </Text>
+                                    <View style={styles.periodStats}>
+                                        {period.data.filter(p => p.grams !== null).map((p, i) => (
+                                            <View key={i} style={styles.periodStat}>
+                                                <Text style={[styles.periodGrams, p.isWithinLimit ? styles.gramsGood : styles.gramsBad]}>{p.grams}g</Text>
+                                                <Text style={styles.periodDate}>{new Date(p.date).getDate()}</Text>
+                                            </View>
+                                        ))}
                                     </View>
-                                );
-                            })}
+                                </View>
+                            ))}
                         </ScrollView>
 
-                        {/* Page indicator */}
                         <View style={styles.pageIndicator}>
                             {historyData.map((_, i) => (
-                                <View
-                                    key={i}
-                                    style={[
-                                        styles.pageDot,
-                                        i === historyPage && styles.pageDotActive
-                                    ]}
-                                />
+                                <View key={i} style={[styles.pageDot, i === historyPage && styles.pageDotActive]} />
                             ))}
                         </View>
-                    </View>
+                    </Animated.View>
                 </View>
             </Modal>
         </View>
@@ -439,12 +337,13 @@ const styles = StyleSheet.create({
         marginBottom: spacing.sm,
     },
     title: {
-        ...typography.styles.h3,
+        fontSize: 18,
+        fontWeight: '700',
         color: looviColors.text.primary,
-        marginBottom: spacing.xs,
+        marginBottom: 2,
     },
     subtitle: {
-        ...typography.styles.bodySm,
+        fontSize: 13,
         color: looviColors.text.secondary,
     },
     expandIcon: {
@@ -452,64 +351,67 @@ const styles = StyleSheet.create({
     },
     noDataContainer: {
         alignItems: 'center',
-        paddingVertical: spacing['2xl'],
+        paddingVertical: spacing.xl,
     },
     noDataText: {
-        ...typography.styles.body,
-        color: colors.text.secondary,
-        marginBottom: spacing.xs,
+        fontSize: 14,
+        color: looviColors.text.secondary,
+        marginBottom: 4,
     },
     noDataSubtext: {
-        ...typography.styles.bodySm,
-        color: colors.text.tertiary,
+        fontSize: 12,
+        color: looviColors.text.tertiary,
         textAlign: 'center',
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
         justifyContent: 'flex-end',
     },
     modalContent: {
-        backgroundColor: colors.background.primary,
-        borderTopLeftRadius: borderRadius['2xl'],
-        borderTopRightRadius: borderRadius['2xl'],
-        paddingTop: spacing.lg,
-        paddingBottom: spacing['2xl'],
-        maxHeight: '70%',
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        height: SHEET_HEIGHT,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    },
+    handleContainer: {
+        width: '100%',
+        alignItems: 'center',
+        paddingVertical: 14,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 3,
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: spacing.lg,
-        marginBottom: spacing.sm,
+        paddingHorizontal: spacing.xl,
+        marginBottom: 4,
     },
     modalTitle: {
-        ...typography.styles.h2,
-        color: colors.text.primary,
-    },
-    modalClose: {
-        fontSize: 24,
-        color: colors.text.tertiary,
-        padding: spacing.sm,
+        fontSize: 22,
+        fontWeight: '700',
+        color: looviColors.text.primary,
     },
     modalSubtitle: {
-        ...typography.styles.bodySm,
-        color: colors.text.secondary,
-        paddingHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-    },
-    modalScrollView: {
-        flexGrow: 0,
+        fontSize: 13,
+        color: looviColors.text.tertiary,
+        paddingHorizontal: spacing.xl,
+        marginBottom: spacing.xl,
     },
     modalPage: {
-        paddingHorizontal: spacing.lg,
+        paddingHorizontal: spacing.xl,
     },
     periodLabel: {
-        ...typography.styles.body,
-        color: colors.text.primary,
+        fontSize: 16,
         fontWeight: '600',
-        marginBottom: spacing.md,
+        color: looviColors.text.primary,
+        marginBottom: spacing.lg,
         textAlign: 'center',
     },
     periodStats: {
@@ -521,39 +423,40 @@ const styles = StyleSheet.create({
     periodStat: {
         alignItems: 'center',
         padding: spacing.sm,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(0,0,0,0.03)',
         borderRadius: borderRadius.md,
-        minWidth: 50,
+        minWidth: 55,
     },
     periodGrams: {
-        ...typography.styles.body,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
     },
     gramsGood: {
-        color: colors.accent.success,
+        color: looviColors.accent.success,
     },
     gramsBad: {
-        color: colors.accent.error,
+        color: looviColors.accent.error,
     },
     periodDate: {
-        ...typography.styles.bodySm,
-        color: colors.text.tertiary,
+        fontSize: 11,
+        color: looviColors.text.tertiary,
         marginTop: 2,
     },
     pageIndicator: {
         flexDirection: 'row',
         justifyContent: 'center',
-        paddingTop: spacing.lg,
-        gap: spacing.sm,
+        marginTop: spacing.xl,
+        gap: 8,
     },
     pageDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: 'rgba(0,0,0,0.1)',
     },
     pageDotActive: {
-        backgroundColor: colors.accent.primary,
+        backgroundColor: looviColors.accent.primary,
+        width: 20,
     },
 });
 
