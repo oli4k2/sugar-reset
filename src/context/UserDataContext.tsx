@@ -7,7 +7,8 @@
  */
 
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onboardingService, OnboardingData, OnboardingCheckpoint } from '../services/onboardingService';
 import { useAuthContext } from './AuthContext';
@@ -120,7 +121,7 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 if (stored) {
                     const parsed = JSON.parse(stored);
                     const notificationsEnabled = parsed.allEnabled ?? (parsed.pledge ?? parsed.journal ?? parsed.streak ?? parsed.community ?? false);
-                    
+
                     if (notificationsEnabled) {
                         const { notificationService } = await import('../services/notificationService');
                         await notificationService.scheduleAllDailyReminders();
@@ -131,7 +132,7 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 console.error('Failed to schedule reminders on start:', error);
             }
         };
-        
+
         scheduleRemindersOnStart();
     }, []);
     const { user, isAuthenticated } = useAuthContext();
@@ -180,40 +181,25 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 console.error('Failed to load journal entries:', error);
             }
 
-            // If authenticated, try to load from Firebase with timeout
+            // Don't load stale streak data from Firebase - let refreshStreakFromFoodLogs calculate it fresh
+            // This prevents showing cached/incorrect values when the app opens
             if (isAuthenticated && userId) {
-                // Use Promise.race for timeout - don't block if Firestore is slow
-                const profilePromise = Promise.race([
-                    userService.getUserProfile(userId),
-                    new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
-                ]);
-
-                const profile = await profilePromise;
-                if (profile) {
-                    setStreakData(profile.streak);
-                }
-
                 // Non-blocking check-in fetch - don't wait for it
                 userService.getTodayCheckIn(userId)
                     .then(checkIn => setTodayCheckIn(checkIn))
                     .catch(() => { }); // Silently ignore errors
+            }
+            
+            // Initialize with minimal default - refreshStreakFromFoodLogs will calculate the real values
+            // This ensures we always show fresh data, not cached values
+            if (localOnboarding.startDate) {
+                const startDate = new Date(localOnboarding.startDate);
+                setStreakData({
+                    ...defaultStreakData,
+                    startDate: startDate,
+                });
             } else {
-                // Use local streak data from onboarding
-                if (localOnboarding.startDate) {
-                    const startDate = new Date(localOnboarding.startDate);
-                    const now = new Date();
-                    const daysDiff = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-
-                    setStreakData({
-                        currentStreak: daysDiff,
-                        longestStreak: daysDiff,
-                        lastCheckIn: null,
-                        startDate,
-                        totalDaysSugarFree: daysDiff,
-                    });
-                } else {
-                    setStreakData(defaultStreakData);
-                }
+                setStreakData(defaultStreakData);
             }
         } catch (error) {
             console.error('Error loading user data:', error);
@@ -236,7 +222,22 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             // Use refreshStreakFromFoodLogs for consistent effective start date logic
             refreshStreakFromFoodLogs();
         }
-    }, [hasLoadedOnce, onboardingData?.startDate, onboardingData?.plan]);
+    }, [hasLoadedOnce, onboardingData?.startDate, onboardingData?.plan, refreshStreakFromFoodLogs]);
+
+    // Refresh streak when app comes to foreground to ensure fresh data
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+            if (nextAppState === 'active' && hasLoadedOnce && onboardingData?.startDate) {
+                // App came to foreground - refresh streak to get latest data
+                // This prevents showing cached/incorrect values when reopening the app
+                refreshStreakFromFoodLogs();
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [hasLoadedOnce, onboardingData?.startDate, refreshStreakFromFoodLogs]);
 
     // Update onboarding data
     const updateOnboardingData = useCallback(async (data: Partial<OnboardingData>) => {
@@ -305,44 +306,55 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             setStreakResult(result);
 
             // Calculate effective start date for the timer
-            let effectiveStartDate = new Date();
+            // Check if there's a reset timestamp stored (from resetStreak)
+            const storedBrokenAt = await AsyncStorage.getItem('streak_broken_at');
+            let effectiveStartDate: Date;
 
             // Determine if the user is currently "on track" today
-            // (either under target with food logged, or no food yet = grace period / not broken)
             const todayOnTrack = result.todayStatus
                 ? (!result.todayStatus.hasLogs || result.todayStatus.isUnderTarget)
                 : true;
 
+            const onboardingStart = onboardingData.startDate ? new Date(onboardingData.startDate) : new Date();
+            const msSinceStart = Date.now() - onboardingStart.getTime();
+            const daysSinceStart = Math.floor(msSinceStart / (1000 * 60 * 60 * 24));
+
+            // Check if streak was just broken today (exceeded sugar limit)
+            const streakJustBroken = result.currentStreak === 0 && 
+                result.todayStatus?.hasLogs && 
+                !result.todayStatus.isUnderTarget;
+
             if (result.currentStreak > 0) {
-                // Streak has completed days - count from streak beginning
+                // Streak is active - clear any reset timestamp
                 await AsyncStorage.removeItem('streak_broken_at');
 
-                const onboardingStart = new Date(onboardingData.startDate || new Date());
-                const daysSinceStart = Math.floor((Date.now() - onboardingStart.getTime()) / (1000 * 60 * 60 * 24));
-
-                // If streak matches the full time since onboarding (approx), use original start date
-                if (Math.abs(result.currentStreak - daysSinceStart) <= 1) {
+                // If streak matches the full time since onboarding, use original start date for perfect precision
+                if (result.currentStreak >= daysSinceStart) {
                     effectiveStartDate = onboardingStart;
                 } else {
-                    effectiveStartDate.setDate(effectiveStartDate.getDate() - result.currentStreak);
+                    // Streak was broken and restarted. 
+                    // Calculate start date based on when the streak actually started (N days ago)
+                    const newBase = new Date();
+                    newBase.setDate(newBase.getDate() - result.currentStreak);
+                    newBase.setHours(0, 0, 0, 0); // Start of day
+                    effectiveStartDate = newBase;
                 }
+            } else if (storedBrokenAt) {
+                // Streak is 0 and there's a reset timestamp - use it as the new start (Day 0)
+                // This happens when resetStreak was called or streak was broken previously
+                effectiveStartDate = new Date(storedBrokenAt);
+            } else if (streakJustBroken) {
+                // Streak was just broken today - store timestamp now (this is Day 0)
+                effectiveStartDate = new Date();
+                await AsyncStorage.setItem('streak_broken_at', effectiveStartDate.toISOString());
             } else if (todayOnTrack) {
-                // currentStreak is 0 but user is on track today (no completed day yet)
-                // Use the plan start date so the timer counts from when they started
-                await AsyncStorage.removeItem('streak_broken_at');
-                effectiveStartDate = new Date(onboardingData.startDate || new Date());
+                // currentStreak is 0 but user is on track today (no reset yet)
+                // Use current time as Day 0
+                effectiveStartDate = new Date();
             } else {
-                // Streak is truly broken (user exceeded sugar target today or past days broke it).
-                // Only set the broken timestamp ONCE when the streak first breaks.
-                // On subsequent refreshes, re-use the stored timestamp so the timer
-                // continues counting up from the moment the streak broke.
-                const storedBrokenAt = await AsyncStorage.getItem('streak_broken_at');
-                if (storedBrokenAt) {
-                    effectiveStartDate = new Date(storedBrokenAt);
-                } else {
-                    effectiveStartDate = new Date();
-                    await AsyncStorage.setItem('streak_broken_at', effectiveStartDate.toISOString());
-                }
+                // Streak is broken (grace period exceeded) - create reset timestamp (Day 0)
+                effectiveStartDate = new Date();
+                await AsyncStorage.setItem('streak_broken_at', effectiveStartDate.toISOString());
             }
 
             // Convert to legacy StreakData format for backward compatibility
@@ -384,6 +396,8 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         } catch (error) {
             console.error('Error calculating streak from food logs:', error);
         }
+        // Note: We intentionally don't include streakData in dependencies to avoid infinite loops.
+        // We only read streakData for stability calculations, and the actual streak is calculated from food logs.
     }, [onboardingData?.plan, onboardingData?.startDate, isAuthenticated, userId]);
 
     // Record a check-in
@@ -457,7 +471,21 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         }));
 
         // Store the streak broken timestamp so the timer counts from this moment
+        // This is the NEW start timestamp for the reset streak
         await AsyncStorage.setItem('streak_broken_at', now.toISOString());
+
+        // Update the start date in onboarding data to the reset timestamp
+        await onboardingService.saveOnboardingData({
+            startDate: now.toISOString(),
+        });
+
+        // Update local state immediately with the new start timestamp
+        setStreakData({
+            ...defaultStreakData,
+            currentStreak: 0,
+            startDate: now,
+            lastCheckIn: now,
+        });
 
         if (isAuthenticated && userId) {
             await userService.updateStreak(userId, {
@@ -465,20 +493,12 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 startDate: now,
                 lastCheckIn: now,
             });
-            setHasLoadedOnce(false);
-        } else {
-            // Update locally - reset currentStreak to 0
-            await onboardingService.saveOnboardingData({
-                startDate: now.toISOString(),
-            });
-            setStreakData({
-                ...defaultStreakData,
-                currentStreak: 0,
-                startDate: now,
-                lastCheckIn: now,
-            });
         }
-    }, [isAuthenticated, userId, checkInHistory]);
+
+        // Trigger recalculation to ensure everything is in sync
+        // This will respect the new start timestamp we just set
+        await refreshStreakFromFoodLogs();
+    }, [isAuthenticated, userId, checkInHistory, refreshStreakFromFoodLogs]);
 
     // Record check-in for a specific date (retroactive)
     const recordCheckInForDate = useCallback(async (date: Date, sugarFree: boolean, grams?: number) => {

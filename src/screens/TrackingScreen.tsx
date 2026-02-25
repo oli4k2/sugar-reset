@@ -228,22 +228,30 @@ export default function TrackingScreen() {
                             <Text style={styles.subtitle}>Log your food & feelings</Text>
                         </View>
 
-                        {/* Two Big Action Buttons - ALWAYS reference TODAY */}
-                        {/* Two Big Action Buttons - MATCHING ANALYTICS STYLE */}
+                        {/* Two Big Action Buttons - Use selected date from calendar */}
                         <View style={styles.quickActionsRow}>
                             <TouchableOpacity
                                 style={[styles.quickActionButton, styles.quickActionPrimary]}
                                 onPress={() => {
-                                    handleDateSelect(todayStr);
                                     setShowScannerModal(true);
                                 }}
                                 activeOpacity={0.8}
                             >
                                 <Ionicons name="scan" size={22} color="#FFFFFF" />
-                                <Text style={styles.quickActionPrimaryText}>Log Food</Text>
-                                {todayFoods.length > 0 && (
+                                <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+                                    <Text style={styles.quickActionPrimaryText}>Log Food</Text>
+                                    {selectedDate !== todayStr && (
+                                        <Text style={styles.quickActionDateText}>{selectedDateFormatted}</Text>
+                                    )}
+                                </View>
+                                {selectedDate === todayStr && todayFoods.length > 0 && (
                                     <View style={styles.buttonBadge}>
                                         <Text style={styles.buttonBadgeText}>{todayFoods.length}</Text>
+                                    </View>
+                                )}
+                                {selectedDate !== todayStr && selectedDayFoods.length > 0 && (
+                                    <View style={styles.buttonBadge}>
+                                        <Text style={styles.buttonBadgeText}>{selectedDayFoods.length}</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -251,14 +259,18 @@ export default function TrackingScreen() {
                             <TouchableOpacity
                                 style={[styles.quickActionButton, styles.quickActionSecondary]}
                                 onPress={() => {
-                                    handleDateSelect(todayStr);
                                     setShowWellnessModal(true);
                                 }}
                                 activeOpacity={0.8}
                             >
                                 <Ionicons name="heart" size={22} color={looviColors.coralOrange} />
-                                <Text style={styles.quickActionSecondaryText}>Wellness</Text>
-                                {wellnessDates.includes(todayStr) && (
+                                    <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+                                    <Text style={styles.quickActionSecondaryText}>Wellness</Text>
+                                    {selectedDate !== todayStr && (
+                                        <Text style={[styles.quickActionDateText, { color: 'rgba(232, 168, 124, 0.7)' }]}>{selectedDateFormatted}</Text>
+                                    )}
+                                </View>
+                                {wellnessDates.includes(selectedDate) && (
                                     <View style={[styles.buttonBadge, { backgroundColor: looviColors.accent.success }]}>
                                         <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                                     </View>
@@ -745,6 +757,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: looviColors.coralOrange,
+    },
+    quickActionDateText: {
+        fontSize: 11,
+        fontWeight: '400',
+        color: 'rgba(255, 255, 255, 0.7)',
+        marginTop: 2,
     },
     seeAllJournalsButton: {
         marginTop: spacing.sm,

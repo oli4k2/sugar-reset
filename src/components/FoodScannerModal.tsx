@@ -66,7 +66,24 @@ export default function FoodScannerModal({
     selectedDate,
     onShowPaywall,
 }: FoodScannerModalProps) {
-    const { isPremium } = useRevenueCat();
+    const { isPremium, isLoading: isPremiumLoading } = useRevenueCat();
+    
+    // Debug premium status - log when modal opens to help diagnose premium access issues
+    useEffect(() => {
+        if (visible && !isPremiumLoading) {
+            console.log('🔍 FoodScannerModal - Premium status:', { 
+                isPremium, 
+                isPremiumLoading, 
+                selectedDate,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Warn if premium check seems incorrect
+            if (!isPremium && visible) {
+                console.warn('⚠️ Camera feature may be blocked - isPremium is false');
+            }
+        }
+    }, [visible, isPremium, isPremiumLoading, selectedDate]);
     const [step, setStep] = useState<ScanStep>('select');
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [description, setDescription] = useState('');
@@ -88,13 +105,17 @@ export default function FoodScannerModal({
     const [editAddedSugar, setEditAddedSugar] = useState('');
     const [editNaturalSugar, setEditNaturalSugar] = useState('');
     const [editFiber, setEditFiber] = useState('');
+    const [editSodium, setEditSodium] = useState('');
 
     // Manual entry state
     const [manualCalories, setManualCalories] = useState('');
     const [manualSugar, setManualSugar] = useState('');
+    const [manualNaturalSugar, setManualNaturalSugar] = useState('');
     const [manualCarbs, setManualCarbs] = useState('');
     const [manualProtein, setManualProtein] = useState('');
     const [manualFat, setManualFat] = useState('');
+    const [manualFiber, setManualFiber] = useState('');
+    const [manualSodium, setManualSodium] = useState('');
     const [manualImageUri, setManualImageUri] = useState<string | null>(null);
 
     // Scan animation state
@@ -198,9 +219,12 @@ export default function FoodScannerModal({
         // Reset manual fields
         setManualCalories('');
         setManualSugar('');
+        setManualNaturalSugar('');
         setManualCarbs('');
         setManualProtein('');
         setManualFat('');
+        setManualFiber('');
+        setManualSodium('');
         setManualImageUri(null);
         // Reset editable result fields
         setEditCalories('');
@@ -211,6 +235,7 @@ export default function FoodScannerModal({
         setEditAddedSugar('');
         setEditNaturalSugar('');
         setEditFiber('');
+        setEditSodium('');
     };
 
     /** Show green success flash then transition to result step */
@@ -246,6 +271,7 @@ export default function FoodScannerModal({
         setEditAddedSugar(String(res.addedSugar ?? 0));
         setEditNaturalSugar(String(res.naturalSugar ?? 0));
         setEditFiber(String(res.fiber ?? 0));
+        setEditSodium(String(res.sodium ?? 0));
     };
 
     const pickImageForManual = async () => {
@@ -361,19 +387,21 @@ export default function FoodScannerModal({
 
         if (isManualEntry || manualCalories || manualSugar) {
             const addedSugarVal = parseFloat(manualSugar) || 0;
+            const naturalSugarVal = parseFloat(manualNaturalSugar) || 0;
+            const totalSugar = addedSugarVal + naturalSugarVal;
             const manualResult: AnalysisResult = {
                 foodName: textOnlyInput.trim(),
                 calories: parseInt(manualCalories) || 0,
                 protein: parseFloat(manualProtein) || 0,
                 carbs: parseFloat(manualCarbs) || 0,
-                carbsSugars: addedSugarVal,
+                carbsSugars: totalSugar,
                 fat: parseFloat(manualFat) || 0,
                 fatSaturated: 0,
-                fiber: 0,
-                sugar: addedSugarVal,
+                fiber: parseFloat(manualFiber) || 0,
+                sugar: totalSugar,
                 addedSugar: addedSugarVal,
-                naturalSugar: 0,
-                sodium: 0,
+                naturalSugar: naturalSugarVal,
+                sodium: parseFloat(manualSodium) || 0,
                 healthScore: 0, // Will be calculated
                 confidence: 1.0,
                 suggestion: 'Manually entered — only added sugar counts toward your streak.'
@@ -444,6 +472,7 @@ export default function FoodScannerModal({
         const addSug = parseFloat(editAddedSugar) || (result.addedSugar ?? 0);
         const natSug = parseFloat(editNaturalSugar) || (result.naturalSugar ?? 0);
         const fib = parseFloat(editFiber) || (result.fiber ?? 0);
+        const sod = parseFloat(editSodium) || (result.sodium ?? 0);
 
         const scannedItem: ScannedItem = {
             id: generateScanId(),
@@ -461,7 +490,7 @@ export default function FoodScannerModal({
             sugar: Math.round(sug * portionMultiplier * 10) / 10,
             addedSugar: Math.round(addSug * portionMultiplier * 10) / 10,
             naturalSugar: Math.round(natSug * portionMultiplier * 10) / 10,
-            sodium: Math.round(result.sodium * portionMultiplier),
+            sodium: Math.round(sod * portionMultiplier),
             healthScore: result.healthScore,
             confidence: result.confidence,
             suggestion: result.suggestion,
@@ -497,17 +526,7 @@ export default function FoodScannerModal({
                         {isPremium ? (
                             <TouchableOpacity
                                 style={styles.heroButton}
-                                onPress={() => {
-                                    Alert.alert(
-                                        'Scan Meal',
-                                        'Capture or upload your food',
-                                        [
-                                            { text: 'Camera', onPress: takePhoto },
-                                            { text: 'Gallery', onPress: pickFromGallery },
-                                            { text: 'Cancel', style: 'cancel' }
-                                        ]
-                                    );
-                                }}
+                                onPress={takePhoto}
                                 activeOpacity={0.9}
                             >
                                 <View style={styles.heroContent}>
@@ -649,7 +668,7 @@ export default function FoodScannerModal({
                                             <View style={styles.recentIconWrapper}><Text>📌</Text></View>
                                             <View style={styles.recentInfo}>
                                                 <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
-                                                <Text style={styles.recentDetails}>{item.calories}Cal • {item.sugar}g Sugar</Text>
+                                                <Text style={styles.recentDetails}>{item.calories}Cal • {item.addedSugar ?? 0}g Added Sugar</Text>
                                             </View>
                                             <Feather name="plus-circle" size={20} color={looviColors.coralOrange} />
                                         </TouchableOpacity>
@@ -679,7 +698,7 @@ export default function FoodScannerModal({
                                             <View style={styles.recentIconWrapper}><Feather name="clock" size={14} color={looviColors.text.tertiary} /></View>
                                             <View style={styles.recentInfo}>
                                                 <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
-                                                <Text style={styles.recentDetails}>{item.calories}Cal • {item.sugar}g Sugar</Text>
+                                                <Text style={styles.recentDetails}>{item.calories}Cal • {item.addedSugar ?? 0}g Added Sugar</Text>
                                             </View>
                                             <Feather name="plus-circle" size={20} color={looviColors.coralOrange} />
                                         </TouchableOpacity>
@@ -836,7 +855,7 @@ export default function FoodScannerModal({
                                             <Text style={styles.nutritionUnit}>g</Text>
                                         </View>
                                     </View>
-                                    <View style={[styles.nutritionRow, styles.nutritionRowLast]}>
+                                    <View style={styles.nutritionRow}>
                                         <Text style={styles.nutritionLabel}>Fat</Text>
                                         <View style={styles.nutritionInputContainer}>
                                             <TextInput
@@ -847,6 +866,48 @@ export default function FoodScannerModal({
                                                 onChangeText={setManualFat}
                                             />
                                             <Text style={styles.nutritionUnit}>g</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.nutritionRow}>
+                                        <View>
+                                            <Text style={styles.nutritionLabel}>Natural Sugar</Text>
+                                            <Text style={styles.nutritionHint}>From fruit, dairy</Text>
+                                        </View>
+                                        <View style={styles.nutritionInputContainer}>
+                                            <TextInput
+                                                style={styles.nutritionInput}
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={manualNaturalSugar}
+                                                onChangeText={setManualNaturalSugar}
+                                            />
+                                            <Text style={styles.nutritionUnit}>g</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.nutritionRow}>
+                                        <Text style={styles.nutritionLabel}>Fiber</Text>
+                                        <View style={styles.nutritionInputContainer}>
+                                            <TextInput
+                                                style={styles.nutritionInput}
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={manualFiber}
+                                                onChangeText={setManualFiber}
+                                            />
+                                            <Text style={styles.nutritionUnit}>g</Text>
+                                        </View>
+                                    </View>
+                                    <View style={[styles.nutritionRow, styles.nutritionRowLast]}>
+                                        <Text style={styles.nutritionLabel}>Sodium</Text>
+                                        <View style={styles.nutritionInputContainer}>
+                                            <TextInput
+                                                style={styles.nutritionInput}
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={manualSodium}
+                                                onChangeText={setManualSodium}
+                                            />
+                                            <Text style={styles.nutritionUnit}>mg</Text>
                                         </View>
                                     </View>
                                 </View>
@@ -865,7 +926,7 @@ export default function FoodScannerModal({
                                                 <View style={styles.recentIconWrapper}><Text>📌</Text></View>
                                                 <View style={styles.recentInfo}>
                                                     <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
-                                                    <Text style={styles.recentDetails}>{item.calories}Cal • {item.sugar}g Sugar</Text>
+                                                    <Text style={styles.recentDetails}>{item.calories}Cal • {item.addedSugar ?? 0}g Added Sugar</Text>
                                                 </View>
                                                 <Feather name="plus-circle" size={20} color={looviColors.coralOrange} />
                                             </TouchableOpacity>
@@ -886,7 +947,7 @@ export default function FoodScannerModal({
                                                 <View style={styles.recentIconWrapper}><Feather name="clock" size={14} color={looviColors.text.tertiary} /></View>
                                                 <View style={styles.recentInfo}>
                                                     <Text style={styles.recentName} numberOfLines={1}>{item.name}</Text>
-                                                    <Text style={styles.recentDetails}>{item.calories}Cal • {item.sugar}g Sugar</Text>
+                                                    <Text style={styles.recentDetails}>{item.calories}Cal • {item.addedSugar ?? 0}g Added Sugar</Text>
                                                 </View>
                                                 <Feather name="plus-circle" size={20} color={looviColors.coralOrange} />
                                             </TouchableOpacity>
@@ -1049,7 +1110,7 @@ export default function FoodScannerModal({
 
                                 {/* Portion — always visible */}
                                 <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Portion</Text><Text style={styles.sectionValue}>{portionPercent}%</Text></View>
-                                <Slider style={styles.sliderCompact} minimumValue={0} maximumValue={150} step={10} value={portionPercent} onValueChange={setPortionPercent} minimumTrackTintColor={looviColors.coralOrange} thumbTintColor={looviColors.coralOrange} />
+                                <Slider style={styles.sliderCompact} minimumValue={0} maximumValue={100} step={10} value={portionPercent} onValueChange={(value) => setPortionPercent(Math.min(100, value))} minimumTrackTintColor={looviColors.coralOrange} thumbTintColor={looviColors.coralOrange} />
 
                                 {/* Score + Macros combined card */}
                                 <View style={styles.scoreCard}>
@@ -1088,6 +1149,11 @@ export default function FoodScannerModal({
                                         <View style={styles.inlineMacroItem}>
                                             <TextInput style={styles.inlineMacroValue} value={editFiber} onChangeText={setEditFiber} keyboardType="numeric" />
                                             <Text style={styles.inlineMacroLabel}>Fiber</Text>
+                                        </View>
+                                        <View style={styles.inlineMacroDivider} />
+                                        <View style={styles.inlineMacroItem}>
+                                            <TextInput style={styles.inlineMacroValue} value={editSodium} onChangeText={setEditSodium} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroLabel}>Sodium</Text>
                                         </View>
                                     </View>
                                 </View>

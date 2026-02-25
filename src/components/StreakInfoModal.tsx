@@ -26,11 +26,9 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
   const [dailyLimit, setDailyLimit] = useState<number>(25); // Default to 25g
 
   const planType = (onboardingData?.plan || 'cold_turkey') as PlanType;
-  // Use streakData.startDate so the plan resets when the streak resets
-  const startDate = streakData?.startDate
-    ? (streakData.startDate instanceof Date ? streakData.startDate : new Date(String(streakData.startDate)))
-    : onboardingData?.startDate ? new Date(onboardingData.startDate) : new Date();
-  const currentWeek = getCurrentWeek(startDate);
+  // Plan start date - fixed from onboarding, never resets (independent of streak)
+  const planStartDate = onboardingData?.startDate ? new Date(onboardingData.startDate) : new Date();
+  const currentWeek = getCurrentWeek(planStartDate);
   const planDetails = getPlanDetails(planType);
   
   // Use todayStatus from streakResult instead of useStreak hook
@@ -50,9 +48,9 @@ export default function StreakInfoModal({ visible, onClose }: StreakInfoModalPro
     loadDailyLimit();
   }, []);
   
-  // Calculate plan progress (with safety checks)
+  // Calculate plan progress (with safety checks) - based on fixed plan start date
   const now = new Date();
-  const daysSinceStart = Math.max(0, Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+  const daysSinceStart = Math.max(0, Math.floor((now.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24)));
   const planDuration = 90; // All plans are now 90 days
   const planProgressPercent = Math.min(100, Math.max(0, Math.round((daysSinceStart / planDuration) * 100)));
   const daysRemaining = Math.max(0, planDuration - daysSinceStart);

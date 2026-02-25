@@ -487,6 +487,17 @@ export default function ProfileScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
+                            // Clear RevenueCat user ID first (important for proper cross-device sync)
+                            // This ensures that when user logs in on another device, their premium
+                            // status will be properly synced from RevenueCat
+                            try {
+                                await revenueCatService.logOut();
+                                console.log('✅ Cleared RevenueCat user ID on logout');
+                            } catch (rcError) {
+                                console.warn('⚠️ Failed to clear RevenueCat on logout:', rcError);
+                                // Non-critical, continue with logout
+                            }
+
                             // Clear ALL cached data to prevent data from showing for other accounts
                             // This includes wellness logs, food logs, pledges, and all other local storage
                             await AsyncStorage.clear();

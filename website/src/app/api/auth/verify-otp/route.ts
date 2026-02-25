@@ -61,66 +61,77 @@ export async function POST(request: NextRequest) {
         const normalizedEmail = email.trim().toLowerCase();
         const normalizedCode = code.trim();
 
+        // App Store Reviewer Login: Special email always accepts OTP 555555
+        const REVIEWER_EMAIL = 'reviewer@craveless.info';
+        const isReviewerEmail = normalizedEmail === REVIEWER_EMAIL;
+        const isReviewerCode = normalizedCode === '555555';
+
         // Look up OTP in Firestore
         const otpRef = db.collection("otp_codes").doc(normalizedEmail);
         const otpDoc = await otpRef.get();
 
-        if (!otpDoc.exists) {
+        // For reviewer email with code 555555, skip Firestore check
+        if (!otpDoc.exists && !(isReviewerEmail && isReviewerCode)) {
             return NextResponse.json(
                 { error: "No verification code found. Please request a new one.", success: false },
                 { status: 400 }
             );
         }
 
-        const otpData = otpDoc.data()!;
+        // For reviewer email with code 555555, skip all validation
+        if (isReviewerEmail && isReviewerCode) {
+            console.log("✅ Reviewer OTP verified (bypassing normal validation)");
+        } else {
+            const otpData = otpDoc.data()!;
 
-        // Check if already used
-        if (otpData.used) {
-            return NextResponse.json(
-                { error: "This code has already been used. Please request a new one.", success: false },
-                { status: 400 }
-            );
+            // Check if already used
+            if (otpData.used) {
+                return NextResponse.json(
+                    { error: "This code has already been used. Please request a new one.", success: false },
+                    { status: 400 }
+                );
+            }
+
+            // Check expiry
+            const expiresAt = otpData.expiresAt?.toDate?.() || new Date(0);
+            if (Date.now() > expiresAt.getTime()) {
+                // Clean up expired code
+                await otpRef.delete();
+                return NextResponse.json(
+                    { error: "This code has expired. Please request a new one.", success: false },
+                    { status: 400 }
+                );
+            }
+
+            // Check attempts
+            if (otpData.attempts >= otpData.maxAttempts) {
+                await otpRef.delete();
+                return NextResponse.json(
+                    { error: "Too many incorrect attempts. Please request a new code.", success: false },
+                    { status: 429 }
+                );
+            }
+
+            // Verify code
+            if (otpData.code !== normalizedCode) {
+                // Increment attempts
+                await otpRef.update({
+                    attempts: admin.firestore.FieldValue.increment(1),
+                });
+
+                const remainingAttempts = otpData.maxAttempts - otpData.attempts - 1;
+                return NextResponse.json(
+                    {
+                        error: `Incorrect code. ${remainingAttempts} attempt${remainingAttempts !== 1 ? "s" : ""} remaining.`,
+                        success: false,
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Code is correct! Mark as used
+            await otpRef.update({ used: true });
         }
-
-        // Check expiry
-        const expiresAt = otpData.expiresAt?.toDate?.() || new Date(0);
-        if (Date.now() > expiresAt.getTime()) {
-            // Clean up expired code
-            await otpRef.delete();
-            return NextResponse.json(
-                { error: "This code has expired. Please request a new one.", success: false },
-                { status: 400 }
-            );
-        }
-
-        // Check attempts
-        if (otpData.attempts >= otpData.maxAttempts) {
-            await otpRef.delete();
-            return NextResponse.json(
-                { error: "Too many incorrect attempts. Please request a new code.", success: false },
-                { status: 429 }
-            );
-        }
-
-        // Verify code
-        if (otpData.code !== normalizedCode) {
-            // Increment attempts
-            await otpRef.update({
-                attempts: admin.firestore.FieldValue.increment(1),
-            });
-
-            const remainingAttempts = otpData.maxAttempts - otpData.attempts - 1;
-            return NextResponse.json(
-                {
-                    error: `Incorrect code. ${remainingAttempts} attempt${remainingAttempts !== 1 ? "s" : ""} remaining.`,
-                    success: false,
-                },
-                { status: 400 }
-            );
-        }
-
-        // Code is correct! Mark as used
-        await otpRef.update({ used: true });
 
         // Get or create Firebase user
         let uid: string;
@@ -149,8 +160,10 @@ export async function POST(request: NextRequest) {
         // Generate custom token for sign-in
         const customToken = await admin.auth().createCustomToken(uid);
 
-        // Clean up the OTP document
-        await otpRef.delete();
+        // Clean up the OTP document (only if it exists)
+        if (otpDoc.exists) {
+            await otpRef.delete();
+        }
 
         console.log("✅ OTP verified successfully for:", normalizedEmail);
 

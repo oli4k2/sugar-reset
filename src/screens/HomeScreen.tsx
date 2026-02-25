@@ -149,7 +149,7 @@ export default function HomeScreen() {
     const celebrationScale = useRef(new Animated.Value(0)).current;
     const celebrationOpacity = useRef(new Animated.Value(0)).current;
     const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
-    
+
     // RevenueCat context for subscription and cancellation offers
     const {
         isPremium,
@@ -159,7 +159,7 @@ export default function HomeScreen() {
         showCancellationOffer,
         dismissCancellationOffer,
     } = useRevenueCat();
-    
+
     const {
         onboardingData,
         isLoading,
@@ -190,7 +190,17 @@ export default function HomeScreen() {
             ? streakData.startDate.toISOString()
             : String(streakData.startDate))
         : onboardingData.startDate || fallbackDateRef.current;
-    const startDate = useMemo(() => new Date(streakStartDateString), [streakStartDateString]);
+
+    // Stability fix: use the same fallback date for the entire component lifecycle
+    const startDate = useMemo(() => {
+        return new Date(streakStartDateString);
+    }, [streakStartDateString]);
+
+    // Plan start date - fixed from onboarding, never resets (independent of streak)
+    const planStartDate = useMemo(() => {
+        const planStartString = onboardingData?.startDate || fallbackDateRef.current;
+        return new Date(planStartString);
+    }, [onboardingData?.startDate]);
     const dailySpendingCents = onboardingData.dailySpendingCents || 300;
     const dailySugarGrams = onboardingData.dailySugarGrams || 77;
     const savingsGoal = onboardingData.savingsGoal || 'Something amazing';
@@ -681,9 +691,9 @@ export default function HomeScreen() {
 
                         {/* Plan Progress Bar */}
                         <PlanProgressBar
-                            daysSinceStart={daysSugarFree}
+                            daysSinceStart={Math.floor((Date.now() - planStartDate.getTime()) / (1000 * 60 * 60 * 24))}
                             planDuration={90}
-                            endDate={new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000)}
+                            endDate={new Date(planStartDate.getTime() + 90 * 24 * 60 * 60 * 1000)}
                             onInfoPress={() => setShowStreakInfoModal(true)}
                         />
 
@@ -1110,7 +1120,7 @@ export default function HomeScreen() {
                                             setShowReviewPrompt(true);
                                             markFirstScanPromptShown();
                                         }, 800);
-                                        
+
                                         // Schedule celebration notification for first scan
                                         try {
                                             const { notificationService } = await import('../services/notificationService');
@@ -1176,18 +1186,18 @@ export default function HomeScreen() {
                         onAcceptYearly={async (step: 'offer1' | 'offer2' | 'free') => {
                             try {
                                 let offerPackage: any = null;
-                                
+
                                 if (step === 'offer1') {
                                     offerPackage = await findPackageByIdentifier('annual_offer1');
                                 } else if (step === 'offer2') {
                                     offerPackage = await findPackageByIdentifier('annual_offer2');
                                 }
-                                
+
                                 // Fallback to regular annual if offer package not found
                                 if (!offerPackage && currentOffering?.annual) {
                                     offerPackage = currentOffering.annual;
                                 }
-                                
+
                                 if (offerPackage) {
                                     await purchasePackage(offerPackage);
                                     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1204,18 +1214,18 @@ export default function HomeScreen() {
                         onAcceptLifetime={async (step: 'offer1' | 'offer2' | 'free') => {
                             try {
                                 let offerPackage: any = null;
-                                
+
                                 if (step === 'offer1') {
                                     offerPackage = await findPackageByIdentifier('lifetime_offer1');
                                 } else if (step === 'offer2') {
                                     offerPackage = await findPackageByIdentifier('lifetime_offer2');
                                 }
-                                
+
                                 // Fallback to regular lifetime if offer packages not found
                                 if (!offerPackage && currentOffering?.lifetime) {
                                     offerPackage = currentOffering.lifetime;
                                 }
-                                
+
                                 if (offerPackage) {
                                     await purchasePackage(offerPackage);
                                     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

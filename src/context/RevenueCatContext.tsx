@@ -133,19 +133,41 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   }, [isInitialized, loadData]);
 
   // Sync user ID when authenticated and restore purchases
+  // This ensures premium status syncs across devices when user logs in
   useEffect(() => {
     if (isInitialized && isAuthenticated && user?.id) {
-      revenueCatService.setUserId(user.id).then(async () => {
-        // Restore purchases to link any anonymous purchases to this user
+      const syncUserAndRestore = async () => {
         try {
-          await revenueCatService.restorePurchases();
-          console.log('✅ Purchases restored after login');
+          // Step 1: Identify the user with RevenueCat (links purchases to this user ID)
+          // This is critical for cross-device sync - RevenueCat will link all purchases
+          // made with this user ID, regardless of which device they were purchased on
+          await revenueCatService.setUserId(user.id);
+          console.log('✅ RevenueCat user ID set:', user.id);
+          
+          // Step 2: Restore purchases from the app store
+          // This ensures any purchases made on this device (before login) are restored
+          // RevenueCat's logIn() already links purchases, but restorePurchases() is
+          // good practice to ensure everything is synced
+          try {
+            await revenueCatService.restorePurchases();
+            console.log('✅ Purchases restored after login');
+          } catch (error) {
+            // Not critical - restorePurchases might fail if no purchases exist
+            console.log('ℹ️ No purchases to restore or restore failed:', error);
+          }
+          
+          // Step 3: Refresh premium status to get the latest subscription state
+          // This will check RevenueCat for the user's active subscriptions
+          await loadData();
+          console.log('✅ Premium status refreshed after login');
         } catch (error) {
-          console.log('ℹ️ No purchases to restore or restore failed:', error);
+          console.error('❌ Failed to sync user and restore purchases:', error);
+          // Still try to load data even if sync failed
+          await loadData();
         }
-        // Refresh data after setting user ID
-        loadData();
-      });
+      };
+      
+      syncUserAndRestore();
     }
   }, [isInitialized, isAuthenticated, user?.id, loadData]);
 
@@ -166,6 +188,25 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         // Refresh offerings in case they changed
         const offering = await revenueCatService.getCurrentOffering();
         setCurrentOffering(offering);
+
+        // Track purchase event for SKAdNetwork attribution
+        // RevenueCat automatically handles SKAdNetwork conversion values on iOS
+        // This additional tracking is for Meta, TikTok, and Taboola SDKs if available
+        try {
+          const { purchaseEventTrackingService } = await import('../services/purchaseEventTrackingService');
+          await purchaseEventTrackingService.trackPurchase({
+            packageId: pkg.identifier,
+            packageType: pkg.packageType,
+            productId: pkg.product.identifier,
+            price: pkg.product.price,
+            currency: pkg.product.currencyCode || 'USD',
+            revenue: pkg.product.price,
+            customerInfo: info,
+          });
+        } catch (trackingError) {
+          // Don't fail purchase if tracking fails
+          console.log('ℹ️ Purchase event tracking failed (non-critical):', trackingError);
+        }
 
         return info;
       } catch (err: any) {
@@ -195,6 +236,15 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       // Refresh offerings
       const offering = await revenueCatService.getCurrentOffering();
       setCurrentOffering(offering);
+
+      // Track purchase restore event
+      try {
+        const { purchaseEventTrackingService } = await import('../services/purchaseEventTrackingService');
+        await purchaseEventTrackingService.trackRestore(info);
+      } catch (trackingError) {
+        // Don't fail restore if tracking fails
+        console.log('ℹ️ Restore event tracking failed (non-critical):', trackingError);
+      }
     } catch (err: any) {
       console.error('Restore failed:', err);
       setError(err.message || 'Failed to restore purchases');

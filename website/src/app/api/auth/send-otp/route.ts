@@ -68,11 +68,19 @@ export async function POST(request: NextRequest) {
 
         const normalizedEmail = email.trim().toLowerCase();
 
+        // App Store Reviewer Login: Special email always gets OTP 555555
+        const REVIEWER_EMAIL = 'reviewer@craveless.info';
+        const isReviewerEmail = normalizedEmail === REVIEWER_EMAIL;
+        
+        // For reviewer email, always use 555555 as OTP
+        const otp = isReviewerEmail ? '555555' : generateOTP();
+
         // Rate limiting: check if an OTP was sent recently (within 60 seconds)
+        // Skip rate limiting for reviewer email
         const otpRef = db.collection("otp_codes").doc(normalizedEmail);
         const existingDoc = await otpRef.get();
 
-        if (existingDoc.exists) {
+        if (existingDoc.exists && !isReviewerEmail) {
             const data = existingDoc.data();
             const createdAt = data?.createdAt?.toDate?.() || new Date(0);
             const secondsSinceLastSend = (Date.now() - createdAt.getTime()) / 1000;
@@ -88,9 +96,6 @@ export async function POST(request: NextRequest) {
                 );
             }
         }
-
-        // Generate OTP
-        const otp = generateOTP();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
         // Store OTP in Firestore
@@ -104,7 +109,7 @@ export async function POST(request: NextRequest) {
             used: false,
         });
 
-        console.log("📧 OTP generated for:", normalizedEmail);
+        console.log("📧 OTP generated for:", normalizedEmail, isReviewerEmail ? "(Reviewer - always 555555)" : "");
 
         // Send email via Resend
         const { data, error: resendError } = await resend.emails.send({
