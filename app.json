@@ -15,7 +15,7 @@
     },
     "ios": {
       "icon": "./src/public/craveless_app_icon.png",
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.sugarreset.app",
       "appleTeamId": "LX5566JXPP",
       "infoPlist": {
