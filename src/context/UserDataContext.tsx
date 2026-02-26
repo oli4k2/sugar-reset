@@ -349,8 +349,16 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 await AsyncStorage.setItem('streak_broken_at', effectiveStartDate.toISOString());
             } else if (todayOnTrack) {
                 // currentStreak is 0 but user is on track today (no reset yet)
-                // Use current time as Day 0
-                effectiveStartDate = new Date();
+                // For new users with no food logs, use onboarding start date instead of "now"
+                // This prevents the timer from resetting every time they navigate between screens
+                const hasAnyFoodLogs = result.totalDaysUnderTarget > 0 || result.todayStatus?.hasLogs;
+                if (!hasAnyFoodLogs && onboardingData.startDate) {
+                    // Brand new user - use onboarding start date
+                    effectiveStartDate = onboardingStart;
+                } else {
+                    // User has logged food before but streak is 0 - use current time as Day 0
+                    effectiveStartDate = new Date();
+                }
             } else {
                 // Streak is broken (grace period exceeded) - create reset timestamp (Day 0)
                 effectiveStartDate = new Date();
