@@ -212,19 +212,6 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
             crave_intensity: onboardingData?.craveIntensity || '0',
             nickname: onboardingData?.nickname || ''
         });
-
-        // Trigger notification prompt on page load
-        const requestNotifications = async () => {
-            try {
-                const { notificationService } = await import('../../services/notificationService');
-                await notificationService.requestNotificationPermissionOnly();
-            } catch (error) {
-                console.error('Error requesting notification permissions:', error);
-            }
-        };
-
-        // Small delay to ensure UI is ready
-        setTimeout(requestNotifications, 800);
     }, []);
 
     const GoalPill = ({ label }: { label: string }) => (

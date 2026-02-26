@@ -998,7 +998,7 @@ export default function FoodScannerModal({
                                 ) : (
                                     <>
                                         <Text style={styles.analyzingTitle}>Analyzing with AI...</Text>
-                                        <Text style={styles.analyzingSubtitle}>Gemini is identifying sugars & macros</Text>
+                                        <Text style={styles.analyzingSubtitle}>Craveless is identifying sugars & macros</Text>
                                     </>
                                 )}
                             </View>
@@ -1073,7 +1073,7 @@ export default function FoodScannerModal({
                                 <>
                                     <ActivityIndicator size="small" color={looviColors.coralOrange} style={{ marginBottom: 8 }} />
                                     <Text style={styles.analyzingTitle}>Scanning with AI...</Text>
-                                    <Text style={styles.analyzingSubtitle}>Gemini is identifying sugars & macros</Text>
+                                    <Text style={styles.analyzingSubtitle}>We are analyzing sugars & macros</Text>
                                 </>
                             )}
                         </View>

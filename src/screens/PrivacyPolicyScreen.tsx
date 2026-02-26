@@ -36,7 +36,13 @@ export default function PrivacyPolicyScreen() {
                         <View style={styles.bulletPoint}>
                             <Text style={styles.bullet}>•</Text>
                             <Text style={styles.bulletText}>
-                                <Text style={styles.bold}>Password Encryption:</Text> Your passwords are fully encrypted. No one, including our development team, has access to your actual password.
+                                <Text style={styles.bold}>AI-Powered Food Analysis:</Text> We use Google Gemini AI to analyze food images and descriptions. Images and food data are sent to Google's Gemini API for analysis, but we do not store your food images permanently.
+                            </Text>
+                        </View>
+                        <View style={styles.bulletPoint}>
+                            <Text style={styles.bullet}>•</Text>
+                            <Text style={styles.bulletText}>
+                                <Text style={styles.bold}>Authentication:</Text> We use secure authentication methods including email-based one-time passwords (OTP). We do not store passwords.
                             </Text>
                         </View>
                         <View style={styles.bulletPoint}>
