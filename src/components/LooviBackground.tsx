@@ -14,6 +14,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Treat larger screens (like iPads) as tablet layouts so we can keep content
+// at a comfortable "phone-like" width and avoid stretched or overlapping text.
+const IS_TABLET = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) >= 768;
+
 // Loovi-inspired color palette
 export const looviColors = {
     // Main background - light warm gray/beige
@@ -611,5 +615,13 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         zIndex: 10,
+        // On tablets, keep content at a narrower max width and center it.
+        // This preserves the iPhone design while making the app feel intentional on iPads.
+        ...(IS_TABLET
+            ? {
+                alignSelf: 'center',
+                width: Math.min(SCREEN_WIDTH, 540),
+            }
+            : null),
     },
 });

@@ -133,21 +133,21 @@ const createMockCustomerInfo = (isPremium: boolean = false): CustomerInfo => {
     entitlements: {
       active: isPremium
         ? {
-            premium: {
-              identifier: 'premium',
-              isActive: true,
-              willRenew: true,
-              periodType: 'NORMAL',
-              latestPurchaseDate: new Date().toISOString(),
-              originalPurchaseDate: new Date().toISOString(),
-              expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              store: Platform.OS === 'ios' ? 'APP_STORE' : 'PLAY_STORE',
-              productIdentifier: 'monthly_subscription',
-              isSandbox: true,
-              unsubscribeDetectedAt: null,
-              billingIssueDetectedAt: null,
-            },
-          }
+          premium: {
+            identifier: 'premium',
+            isActive: true,
+            willRenew: true,
+            periodType: 'NORMAL',
+            latestPurchaseDate: new Date().toISOString(),
+            originalPurchaseDate: new Date().toISOString(),
+            expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            store: Platform.OS === 'ios' ? 'APP_STORE' : 'PLAY_STORE',
+            productIdentifier: 'monthly_subscription',
+            isSandbox: true,
+            unsubscribeDetectedAt: null,
+            billingIssueDetectedAt: null,
+          },
+        }
         : {},
       all: {},
     },
@@ -246,7 +246,7 @@ class RevenueCatServiceImpl implements RevenueCatService {
           android: androidKey ? 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY' : 'EXPO_PUBLIC_REVENUECAT_API_KEY (fallback)',
         });
         console.log(`🔑 RevenueCat: Using ${keySource}`);
-        
+
         // Warn if using fallback key when platform-specific key should be used
         if (Platform.OS === 'ios' && !iosKey && fallbackKey) {
           console.warn('⚠️ RevenueCat: Using fallback key for iOS. Consider setting EXPO_PUBLIC_REVENUECAT_IOS_API_KEY for production.');
@@ -329,7 +329,7 @@ class RevenueCatServiceImpl implements RevenueCatService {
 
     try {
       const customerInfo = await Purchases.restorePurchases();
-      
+
       // Log restore result in development
       if (__DEV__) {
         console.log('🔄 Restore purchases result:', {
@@ -337,7 +337,7 @@ class RevenueCatServiceImpl implements RevenueCatService {
           activeSubscriptions: customerInfo.activeSubscriptions,
         });
       }
-      
+
       return customerInfo;
     } catch (error) {
       console.error('❌ Restore purchases failed:', error);
@@ -359,7 +359,7 @@ class RevenueCatServiceImpl implements RevenueCatService {
 
     try {
       const customerInfo = await Purchases.getCustomerInfo();
-      
+
       // Log customer info in development for debugging
       if (__DEV__) {
         console.log('📊 RevenueCat Customer Info:', {
@@ -369,7 +369,7 @@ class RevenueCatServiceImpl implements RevenueCatService {
           activeSubscriptions: customerInfo.activeSubscriptions,
         });
       }
-      
+
       return customerInfo;
     } catch (error) {
       console.error('❌ Failed to get customer info:', error);
@@ -384,14 +384,14 @@ class RevenueCatServiceImpl implements RevenueCatService {
 
     try {
       const customerInfo = await this.getCustomerInfo();
-      
+
       // Check if premium entitlement exists and is active
       const premiumEntitlement = customerInfo.entitlements.active['premium'];
       const hasPremium = premiumEntitlement !== undefined;
-      
+
       // Check if user is anonymous
       const isAnonymous = customerInfo.originalAppUserId?.startsWith('$RCAnonymousID:') ?? false;
-      
+
       // Debug logging
       if (__DEV__) {
         console.log('🔍 Premium check:', {
@@ -409,17 +409,17 @@ class RevenueCatServiceImpl implements RevenueCatService {
           allEntitlements: Object.keys(customerInfo.entitlements.all || {}),
         });
       }
-      
+
       // IMPORTANT: Trust premium status from RevenueCat regardless of anonymous status
       // RevenueCat properly handles anonymous purchases and will link them when user logs in
       // The previous check that blocked anonymous premium was too restrictive and caused
       // legitimate premium users to be downgraded on app reload
-      
+
       // Double-check: entitlement must exist AND be active
       if (hasPremium && premiumEntitlement) {
         return premiumEntitlement.isActive === true;
       }
-      
+
       return false;
     } catch (error) {
       console.error('❌ Failed to check premium status:', error);
@@ -462,10 +462,19 @@ class RevenueCatServiceImpl implements RevenueCatService {
     }
 
     try {
-      // Just fetch customer info to sync
-      await this.getCustomerInfo();
+      // Force a receipt refresh with Apple/Google servers
+      // This is important for sandbox testing and for ensuring premium status
+      // is accurately synced (e.g., after subscription renewal or expiration)
+      await Purchases.syncPurchases();
+      console.log('✅ Purchases synced with store');
     } catch (error) {
       console.error('❌ Failed to sync purchases:', error);
+      // Fall back to just fetching customer info
+      try {
+        await this.getCustomerInfo();
+      } catch (fallbackError) {
+        console.error('❌ Fallback getCustomerInfo also failed:', fallbackError);
+      }
     }
   }
 }

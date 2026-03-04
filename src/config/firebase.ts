@@ -13,7 +13,9 @@
  */
 
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence, getAuth as getAuthFallback, Auth } from 'firebase/auth';
+// @ts-ignore - Some firebase types don't export getReactNativePersistence in newer versions
+import { initializeAuth, getReactNativePersistence, getAuth as getAuthFallback } from 'firebase/auth';
+import type { Auth } from 'firebase/auth';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeFirestore, Firestore, doc, getDoc, setDoc, enableNetwork, disableNetwork } from 'firebase/firestore';
 

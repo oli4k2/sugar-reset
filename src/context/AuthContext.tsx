@@ -10,6 +10,7 @@ import { auth, isFirebaseReady } from '../config/firebase';
 import { User } from '../types';
 import { userService } from '../services/userService';
 import { notificationService } from '../services/notificationService';
+import { onboardingService } from '../services/onboardingService';
 import { usePostHog } from 'posthog-react-native';
 
 interface AuthContextType {
@@ -104,14 +105,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 providers: fbUser?.providerData?.map(p => p?.providerId),
             });
 
-            setFirebaseUser(fbUser);
+            // Don't set firebaseUser yet — wait until onboarding flag is restored
+            // so that isAuthenticated doesn't trigger UserDataContext prematurely
 
             if (fbUser) {
                 // Set local user immediately so app can proceed
                 const localUser = createLocalUser(fbUser);
 
                 // Try to fetch profile with a short timeout - don't block the app
-                const fetchWithTimeout = async (): Promise<User> => {
+                const fetchWithTimeout = async (): Promise<{ user: User; fromFirestore: boolean }> => {
                     try {
                         const profile = await Promise.race([
                             userService.getUserProfile(fbUser.uid, 0), // No retries - fast fail
@@ -124,16 +126,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
                                 profile.photoURL = fbUser.photoURL;
                             }
                             console.log('✅ User profile loaded from Firestore');
-                            return profile;
+                            return { user: profile, fromFirestore: true };
                         }
                     } catch (e) {
                         console.log('📴 Could not fetch profile, using local data');
                     }
-                    return localUser;
+                    return { user: localUser, fromFirestore: false };
                 };
 
-                const finalUser = await fetchWithTimeout();
+                const { user: finalUser, fromFirestore: isReturningUser } = await fetchWithTimeout();
+
+                // IMPORTANT: Restore onboarding flag BEFORE setting firebaseUser/isAuthenticated.
+                // UserDataContext re-loads when isAuthenticated changes, and it reads
+                // hasCompletedOnboarding from AsyncStorage. If isAuthenticated becomes true
+                // before the flag is restored, UserDataContext reads the stale 'false' value
+                // and the user gets stuck on the onboarding/login screen.
+                if (isReturningUser) {
+                    try {
+                        const alreadyCompleted = await onboardingService.hasCompletedOnboarding();
+                        if (!alreadyCompleted) {
+                            console.log('🔄 Returning user detected — restoring onboarding completion flag');
+                            await onboardingService.completeOnboarding();
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ Failed to restore onboarding flag:', e);
+                    }
+                }
+
+                // Now set all state in one synchronous block — React batches these
+                // into a single re-render so isAuthenticated + user + loading all update together
                 if (isMounted) {
+                    setFirebaseUser(fbUser);
                     setUser(finalUser);
                     setIsLoading(false);
                     console.log('✅ Auth loading complete');
@@ -144,6 +167,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     .then(token => token && console.log('Push notifications registered'))
                     .catch(() => { });
             } else {
+                setFirebaseUser(null);
                 setUser(null);
                 setIsLoading(false);
                 console.log('✅ Auth loading complete (no user)');

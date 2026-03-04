@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { StatusBar } from 'react-native';
+import { StatusBar, Text, TextInput, Dimensions, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 let GoogleSignin: any = null;
@@ -42,6 +42,12 @@ import {
   Outfit_800ExtraBold,
 } from '@expo-google-fonts/outfit';
 
+// Detect tablet-sized devices (used to improve layout on iPads)
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isTablet =
+  // iPad and larger tablets typically have min dimension >= 768
+  Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) >= 768;
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     DMSans_400Regular,
@@ -68,6 +74,18 @@ export default function App() {
       });
     }
   }, []);
+
+  // Ensure system text size changes don't cause overlapping text on large screens (e.g. iPad)
+  // while keeping visual design consistent with iPhone layouts.
+  // This is applied globally and early in the component tree.
+  if (Text.defaultProps == null) Text.defaultProps = {};
+  if (TextInput.defaultProps == null) TextInput.defaultProps = {};
+
+  // Disable automatic font scaling by default to avoid layout issues with very large
+  // accessibility font sizes on iPad, while still allowing per-component overrides.
+  // This keeps iPhone designs unchanged and prevents overlapping text on tablets.
+  Text.defaultProps.allowFontScaling = false;
+  TextInput.defaultProps.allowFontScaling = false;
 
   if (!fontsLoaded) {
     return null; // Keep splash screen visible or show loading

@@ -185,7 +185,9 @@ export function WellnessModal({
                         size={14}
                         color={looviColors.skyBlueDark}
                     />
-                    <Text style={[styles.syncText, { color: looviColors.skyBlueDark }]}>Sync</Text>
+                    <Text style={[styles.syncText, { color: looviColors.skyBlueDark }]}>
+                        Sync with Apple Health
+                    </Text>
                 </TouchableOpacity>
             </View>
             <Slider

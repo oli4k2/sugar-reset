@@ -394,13 +394,17 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
             await purchasePackage(selectedPackage);
 
             // Verify purchase actually succeeded by checking premium status
-            // Wait a moment for RevenueCat to update
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Check if purchase was successful
+            // Retry with increasing delays since RevenueCat may take time to propagate
             const { revenueCatService } = await import('../../services/revenueCatService');
-            const updatedInfo = await revenueCatService.getCustomerInfo();
-            const hasPremium = updatedInfo?.entitlements?.active?.['premium'];
+            let hasPremium = false;
+            const retryDelays = [500, 1500, 3000];
+
+            for (const delay of retryDelays) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+                const updatedInfo = await revenueCatService.getCustomerInfo();
+                hasPremium = !!updatedInfo?.entitlements?.active?.['premium'];
+                if (hasPremium) break;
+            }
 
             if (!hasPremium) {
                 // Purchase didn't actually complete - don't proceed
@@ -419,7 +423,8 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
             if (selectedPlan === 'yearly' && selectedPackage?.packageType === 'ANNUAL') {
                 try {
                     // Check if user has active premium entitlement with trial period
-                    const premiumEntitlement = updatedInfo?.entitlements?.active?.['premium'];
+                    const latestInfo = await revenueCatService.getCustomerInfo();
+                    const premiumEntitlement = latestInfo?.entitlements?.active?.['premium'];
                     if (premiumEntitlement && premiumEntitlement.expirationDate) {
                         const expirationDate = new Date(premiumEntitlement.expirationDate);
                         const now = new Date();
@@ -504,11 +509,11 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     const getYearlyMonthlyEquivalent = () => {
         const annualPkg = currentOffering?.annual;
         if (!annualPkg) return '$2.50';
-        
+
         const price = annualPkg.product.price || 29.99;
         const currencyCode = annualPkg.product.currencyCode || 'USD';
         const monthlyPrice = price / 12;
-        
+
         // Format based on currency
         if (currencyCode === 'USD') {
             return `$${monthlyPrice.toFixed(2)}`;
@@ -563,16 +568,19 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                     activeOpacity={0.8}
                 >
                     <Text style={styles.primaryButtonText}>
-                        Try for {currentOffering?.annual?.product?.currencyCode === 'USD' 
-                            ? '$0.00' 
-                            : currentOffering?.annual?.product?.currencyCode 
-                                ? `0.00 ${currentOffering.annual.product.currencyCode}` 
+                        Try for {currentOffering?.annual?.product?.currencyCode === 'USD'
+                            ? '$0.00'
+                            : currentOffering?.annual?.product?.currencyCode
+                                ? `0.00 ${currentOffering.annual.product.currencyCode}`
                                 : '$0.00'}
                     </Text>
                 </TouchableOpacity>
 
+                <Text style={styles.billedAmountText}>
+                    Just {getYearlyPrice()} per year
+                </Text>
                 <Text style={styles.priceSubtext}>
-                    Just {getYearlyPrice()} per year ({getYearlyMonthlyEquivalent()}/mo)
+                    (≈ {getYearlyMonthlyEquivalent()}/mo)
                 </Text>
             </View>
         </Animated.View>
@@ -609,8 +617,11 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                     <Text style={styles.primaryButtonText}>Continue for FREE</Text>
                 </TouchableOpacity>
 
+                <Text style={styles.billedAmountText}>
+                    Just {getYearlyPrice()} per year
+                </Text>
                 <Text style={styles.priceSubtext}>
-                    Just {getYearlyPrice()} per year ({getYearlyMonthlyEquivalent()}/mo)
+                    (≈ {getYearlyMonthlyEquivalent()}/mo)
                 </Text>
                 <TouchableOpacity
                     style={styles.notificationCtaButton}
@@ -761,7 +772,16 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                                 </View>
                             )}
                             <Text style={styles.planLabel}>Yearly</Text>
-                            <Text style={styles.planPrice}>{getYearlyMonthlyEquivalent()}<Text style={styles.planPeriod}>/mo</Text></Text>
+                            {/* Annual total is the primary price for App Store compliance */}
+                            <Text style={styles.planPrice}>
+                                {getYearlyPrice()}
+                                <Text style={styles.planPeriod}>/year</Text>
+                            </Text>
+                            {/* Monthly equivalent as secondary helper text */}
+                            <Text style={styles.planMonthlyEquivalent}>
+                                ≈ {getYearlyMonthlyEquivalent()}
+                                <Text style={styles.planMonthlyEquivalentPeriod}>/mo</Text>
+                            </Text>
                             <View style={[
                                 styles.radioCircle,
                                 selectedPlan === 'yearly' && styles.radioCircleSelected,
@@ -797,10 +817,16 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                         )}
                     </TouchableOpacity>
 
-                    <Text style={styles.priceSubtext}>
+                    <Text style={styles.billedAmountText}>
                         {hasTrial
-                            ? `3 days free, then ${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} (${selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)`
-                            : `${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'} (${selectedPlan === 'yearly' ? getYearlyMonthlyEquivalent() : getMonthlyPrice()}/mo)`
+                            ? `3 days free, then ${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'}`
+                            : `${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'}`
+                        }
+                    </Text>
+                    <Text style={styles.priceSubtext}>
+                        {selectedPlan === 'yearly'
+                            ? `Equivalent to ${getYearlyMonthlyEquivalent()}/mo`
+                            : `Billed at ${getMonthlyPrice()}/mo`
                         }
                     </Text>
                 </View>
@@ -1116,6 +1142,13 @@ const styles = StyleSheet.create({
         color: looviColors.text.tertiary,
         textAlign: 'center',
     },
+    billedAmountText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: looviColors.text.primary,
+        textAlign: 'center',
+        marginBottom: 2,
+    },
     notificationCtaButton: {
         marginTop: spacing.xs,
         alignSelf: 'center',
@@ -1154,5 +1187,16 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: looviColors.text.primary,
+    },
+    planMonthlyEquivalent: {
+        marginTop: 2,
+        fontSize: 13,
+        fontWeight: '500',
+        color: looviColors.text.secondary,
+    },
+    planMonthlyEquivalentPeriod: {
+        fontSize: 12,
+        fontWeight: '400',
+        color: looviColors.text.tertiary,
     },
 });

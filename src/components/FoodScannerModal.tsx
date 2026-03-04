@@ -67,17 +67,17 @@ export default function FoodScannerModal({
     onShowPaywall,
 }: FoodScannerModalProps) {
     const { isPremium, isLoading: isPremiumLoading } = useRevenueCat();
-    
+
     // Debug premium status - log when modal opens to help diagnose premium access issues
     useEffect(() => {
         if (visible && !isPremiumLoading) {
-            console.log('🔍 FoodScannerModal - Premium status:', { 
-                isPremium, 
-                isPremiumLoading, 
+            console.log('🔍 FoodScannerModal - Premium status:', {
+                isPremium,
+                isPremiumLoading,
                 selectedDate,
                 timestamp: new Date().toISOString()
             });
-            
+
             // Warn if premium check seems incorrect
             if (!isPremium && visible) {
                 console.warn('⚠️ Camera feature may be blocked - isPremium is false');
@@ -719,33 +719,47 @@ export default function FoodScannerModal({
                 );
 
             case 'describe':
+                // Wrap in ScrollView so the description input can scroll above the keyboard
                 return (
-                    <View style={styles.stepContainer}>
-                        <Image source={{ uri: imageUri! }} style={styles.reviewImage} />
-                        <View style={styles.reviewContent}>
-                            <View style={styles.describeTitleRow}>
-                                <Feather name="message-circle" size={22} color={looviColors.coralOrange} />
-                                <Text style={styles.stepTitle}>Help us get it right! ✨</Text>
-                            </View>
-                            <Text style={styles.describeHint}>Tell us a little about your meal — anything that helps us identify it better, like brand, portion size, or dietary notes.</Text>
-                            <TextInput
-                                style={styles.descriptionInput}
-                                placeholder="e.g. 'It's a small portion', 'Sugar-free version', 'Homemade with oat milk'..."
-                                placeholderTextColor={looviColors.text.muted}
-                                value={description}
-                                onChangeText={setDescription}
-                                multiline
-                                blurOnSubmit
-                            />
-                            <View style={styles.actionRow}>
-                                <TouchableOpacity style={styles.ghostButton} onPress={processImage}><Text style={styles.ghostButtonText}>Skip</Text></TouchableOpacity>
-                                <TouchableOpacity style={styles.primaryButton} onPress={processImage}>
-                                    <Text style={styles.primaryButtonText}>Analyze</Text>
-                                    <Feather name="arrow-right" size={18} color="#FFF" />
-                                </TouchableOpacity>
+                    <ScrollView
+                        style={styles.scrollContainer}
+                        contentContainerStyle={styles.scrollContent}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View style={styles.stepContainer}>
+                            <Image source={{ uri: imageUri! }} style={styles.reviewImage} />
+                            <View style={styles.reviewContent}>
+                                <View style={styles.describeTitleRow}>
+                                    <Feather name="message-circle" size={22} color={looviColors.coralOrange} />
+                                    <Text style={styles.stepTitle}>Help us get it right! ✨</Text>
+                                </View>
+                                <Text style={styles.describeHint}>
+                                    Tell us a little about your meal — anything that helps us identify it better,
+                                    like brand, portion size, or dietary notes.
+                                </Text>
+                                <TextInput
+                                    style={styles.descriptionInput}
+                                    placeholder="e.g. 'It's a small portion', 'Sugar-free version', 'Homemade with oat milk'..."
+                                    placeholderTextColor={looviColors.text.muted}
+                                    value={description}
+                                    onChangeText={setDescription}
+                                    multiline
+                                    blurOnSubmit
+                                    textAlignVertical="top"
+                                />
+                                <View style={styles.actionRow}>
+                                    <TouchableOpacity style={styles.ghostButton} onPress={processImage}>
+                                        <Text style={styles.ghostButtonText}>Skip</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.primaryButton} onPress={processImage}>
+                                        <Text style={styles.primaryButtonText}>Analyze</Text>
+                                        <Feather name="arrow-right" size={18} color="#FFF" />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
-                    </View>
+                    </ScrollView>
                 );
 
             case 'text-input':
@@ -981,7 +995,7 @@ export default function FoodScannerModal({
 
             case 'analyzing':
                 const scanImageHeight = 260;
-                
+
                 // If no image (text-only input), show simple circular loading animation
                 if (!imageUri) {
                     return (
@@ -1005,7 +1019,7 @@ export default function FoodScannerModal({
                         </View>
                     );
                 }
-                
+
                 // If image exists, show scan animation
                 return (
                     <View style={styles.analyzingContainer}>
@@ -1095,8 +1109,8 @@ export default function FoodScannerModal({
 
                             {/* Editable hint */}
                             <View style={styles.editHintRow}>
-                                <Feather name="edit-3" size={12} color={looviColors.text.muted} />
-                                <Text style={styles.editHintText}>All values can be edited — tap any number to adjust</Text>
+                                <Feather name="sliders" size={12} color={looviColors.text.muted} />
+                                <Text style={styles.editHintText}>Drag the portion slider to adjust all values</Text>
                             </View>
 
                             <View style={styles.resultBody}>
@@ -1127,32 +1141,32 @@ export default function FoodScannerModal({
                                     {/* Inline macros row */}
                                     <View style={styles.inlineMacrosRow}>
                                         <View style={styles.inlineMacroItem}>
-                                            <TextInput style={styles.inlineMacroValue} value={editCalories} onChangeText={setEditCalories} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroValue}>{Math.round((parseFloat(editCalories) || 0) * pMul)}</Text>
                                             <Text style={styles.inlineMacroLabel}>kcal</Text>
                                         </View>
                                         <View style={styles.inlineMacroDivider} />
                                         <View style={styles.inlineMacroItem}>
-                                            <TextInput style={styles.inlineMacroValue} value={editProtein} onChangeText={setEditProtein} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroValue}>{((parseFloat(editProtein) || 0) * pMul).toFixed(1)}</Text>
                                             <Text style={styles.inlineMacroLabel}>Protein</Text>
                                         </View>
                                         <View style={styles.inlineMacroDivider} />
                                         <View style={styles.inlineMacroItem}>
-                                            <TextInput style={styles.inlineMacroValue} value={editCarbs} onChangeText={setEditCarbs} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroValue}>{((parseFloat(editCarbs) || 0) * pMul).toFixed(1)}</Text>
                                             <Text style={styles.inlineMacroLabel}>Carbs</Text>
                                         </View>
                                         <View style={styles.inlineMacroDivider} />
                                         <View style={styles.inlineMacroItem}>
-                                            <TextInput style={styles.inlineMacroValue} value={editFat} onChangeText={setEditFat} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroValue}>{((parseFloat(editFat) || 0) * pMul).toFixed(1)}</Text>
                                             <Text style={styles.inlineMacroLabel}>Fat</Text>
                                         </View>
                                         <View style={styles.inlineMacroDivider} />
                                         <View style={styles.inlineMacroItem}>
-                                            <TextInput style={styles.inlineMacroValue} value={editFiber} onChangeText={setEditFiber} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroValue}>{((parseFloat(editFiber) || 0) * pMul).toFixed(1)}</Text>
                                             <Text style={styles.inlineMacroLabel}>Fiber</Text>
                                         </View>
                                         <View style={styles.inlineMacroDivider} />
                                         <View style={styles.inlineMacroItem}>
-                                            <TextInput style={styles.inlineMacroValue} value={editSodium} onChangeText={setEditSodium} keyboardType="numeric" />
+                                            <Text style={styles.inlineMacroValue}>{Math.round((parseFloat(editSodium) || 0) * pMul)}</Text>
                                             <Text style={styles.inlineMacroLabel}>Sodium</Text>
                                         </View>
                                     </View>
@@ -1168,12 +1182,7 @@ export default function FoodScannerModal({
                                                 <Ionicons name="warning" size={12} color="#EF4444" />
                                             </View>
                                             <View style={styles.sugarEditRow}>
-                                                <TextInput
-                                                    style={[styles.sugarBreakdownValue, { color: '#EF4444' }]}
-                                                    value={editAddedSugar}
-                                                    onChangeText={setEditAddedSugar}
-                                                    keyboardType="numeric"
-                                                />
+                                                <Text style={[styles.sugarBreakdownValue, { color: '#EF4444' }]}>{((parseFloat(editAddedSugar) || 0) * pMul).toFixed(1)}</Text>
                                                 <Text style={[styles.sugarBreakdownUnit, { color: '#EF4444' }]}>g</Text>
                                             </View>
                                             <Text style={styles.sugarBreakdownLabel}>Added Sugar</Text>
@@ -1186,12 +1195,7 @@ export default function FoodScannerModal({
                                                 <Ionicons name="leaf" size={12} color="#22C55E" />
                                             </View>
                                             <View style={styles.sugarEditRow}>
-                                                <TextInput
-                                                    style={[styles.sugarBreakdownValue, { color: '#22C55E' }]}
-                                                    value={editNaturalSugar}
-                                                    onChangeText={setEditNaturalSugar}
-                                                    keyboardType="numeric"
-                                                />
+                                                <Text style={[styles.sugarBreakdownValue, { color: '#22C55E' }]}>{((parseFloat(editNaturalSugar) || 0) * pMul).toFixed(1)}</Text>
                                                 <Text style={[styles.sugarBreakdownUnit, { color: '#22C55E' }]}>g</Text>
                                             </View>
                                             <Text style={styles.sugarBreakdownLabel}>Natural Sugar</Text>
@@ -1275,10 +1279,10 @@ const styles = StyleSheet.create({
 
     // Analyzing / scan effect
     analyzingContainer: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.xl },
-    simpleLoadingContainer: { 
-        width: 120, 
-        height: 120, 
-        alignItems: 'center', 
+    simpleLoadingContainer: {
+        width: 120,
+        height: 120,
+        alignItems: 'center',
         justifyContent: 'center',
         marginBottom: spacing.lg,
     },

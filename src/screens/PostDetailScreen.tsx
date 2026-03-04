@@ -45,6 +45,7 @@ type PostDTO = Omit<Post, 'createdAt' | 'updatedAt'> & {
 
 type RootStackParamList = {
     PostDetail: { post: Post | PostDTO };
+    Paywall: undefined;
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostDetail'>;
@@ -256,7 +257,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
                                 const { db } = await import('../config/firebase');
                                 const commentRef = doc(db, 'posts', post.id, 'comments', comment.id);
                                 const commentSnap = await getDoc(commentRef);
-                                
+
                                 if (commentSnap.exists() && (user?.id === comment.authorId || isAdmin)) {
                                     await deleteDoc(commentRef);
                                     // Update local comment count

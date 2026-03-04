@@ -189,7 +189,7 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                     .then(checkIn => setTodayCheckIn(checkIn))
                     .catch(() => { }); // Silently ignore errors
             }
-            
+
             // Initialize with minimal default - refreshStreakFromFoodLogs will calculate the real values
             // This ensures we always show fresh data, not cached values
             if (localOnboarding.startDate) {
@@ -208,6 +208,16 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         }
     }, [isAuthenticated, userId]);
 
+    // Reload data when auth state changes (e.g., user logs in after logout)
+    // This ensures the restored onboarding flag is picked up
+    const prevAuthRef = useRef(isAuthenticated);
+    useEffect(() => {
+        if (prevAuthRef.current !== isAuthenticated) {
+            prevAuthRef.current = isAuthenticated;
+            setHasLoadedOnce(false); // Force reload on auth change
+        }
+    }, [isAuthenticated]);
+
     // Load data once on mount and when auth changes
     useEffect(() => {
         if (!hasLoadedOnce) {
@@ -215,29 +225,6 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             setHasLoadedOnce(true);
         }
     }, [loadData, hasLoadedOnce]);
-
-    // Calculate streak from food logs after initial load
-    useEffect(() => {
-        if (hasLoadedOnce && onboardingData?.startDate) {
-            // Use refreshStreakFromFoodLogs for consistent effective start date logic
-            refreshStreakFromFoodLogs();
-        }
-    }, [hasLoadedOnce, onboardingData?.startDate, onboardingData?.plan, refreshStreakFromFoodLogs]);
-
-    // Refresh streak when app comes to foreground to ensure fresh data
-    useEffect(() => {
-        const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-            if (nextAppState === 'active' && hasLoadedOnce && onboardingData?.startDate) {
-                // App came to foreground - refresh streak to get latest data
-                // This prevents showing cached/incorrect values when reopening the app
-                refreshStreakFromFoodLogs();
-            }
-        });
-
-        return () => {
-            subscription.remove();
-        };
-    }, [hasLoadedOnce, onboardingData?.startDate, refreshStreakFromFoodLogs]);
 
     // Update onboarding data
     const updateOnboardingData = useCallback(async (data: Partial<OnboardingData>) => {
@@ -320,8 +307,8 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
             const daysSinceStart = Math.floor(msSinceStart / (1000 * 60 * 60 * 24));
 
             // Check if streak was just broken today (exceeded sugar limit)
-            const streakJustBroken = result.currentStreak === 0 && 
-                result.todayStatus?.hasLogs && 
+            const streakJustBroken = result.currentStreak === 0 &&
+                result.todayStatus?.hasLogs &&
                 !result.todayStatus.isUnderTarget;
 
             if (result.currentStreak > 0) {
@@ -349,14 +336,12 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
                 await AsyncStorage.setItem('streak_broken_at', effectiveStartDate.toISOString());
             } else if (todayOnTrack) {
                 // currentStreak is 0 but user is on track today (no reset yet)
-                // For new users with no food logs, use onboarding start date instead of "now"
-                // This prevents the timer from resetting every time they navigate between screens
-                const hasAnyFoodLogs = result.totalDaysUnderTarget > 0 || result.todayStatus?.hasLogs;
-                if (!hasAnyFoodLogs && onboardingData.startDate) {
-                    // Brand new user - use onboarding start date
+                // This is Day 0 — always use onboarding start date for a stable timer.
+                // The streak-broken scenario is already handled above (storedBrokenAt / streakJustBroken).
+                if (onboardingData.startDate) {
                     effectiveStartDate = onboardingStart;
                 } else {
-                    // User has logged food before but streak is 0 - use current time as Day 0
+                    // No onboarding start date at all — extremely rare edge case
                     effectiveStartDate = new Date();
                 }
             } else {
@@ -407,6 +392,29 @@ export function UserDataProvider({ children }: UserDataProviderProps) {
         // Note: We intentionally don't include streakData in dependencies to avoid infinite loops.
         // We only read streakData for stability calculations, and the actual streak is calculated from food logs.
     }, [onboardingData?.plan, onboardingData?.startDate, isAuthenticated, userId]);
+
+    // Calculate streak from food logs after initial load
+    useEffect(() => {
+        if (hasLoadedOnce && onboardingData?.startDate) {
+            // Use refreshStreakFromFoodLogs for consistent effective start date logic
+            refreshStreakFromFoodLogs();
+        }
+    }, [hasLoadedOnce, onboardingData?.startDate, onboardingData?.plan, refreshStreakFromFoodLogs]);
+
+    // Refresh streak when app comes to foreground to ensure fresh data
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+            if (nextAppState === 'active' && hasLoadedOnce && onboardingData?.startDate) {
+                // App came to foreground - refresh streak to get latest data
+                // This prevents showing cached/incorrect values when reopening the app
+                refreshStreakFromFoodLogs();
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [hasLoadedOnce, onboardingData?.startDate, refreshStreakFromFoodLogs]);
 
     // Record a check-in
     const recordCheckIn = useCallback(async (sugarFree: boolean, notes?: string) => {

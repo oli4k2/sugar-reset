@@ -22,6 +22,7 @@ import {
     Platform,
     TouchableWithoutFeedback,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Line, Circle, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { colors, typography, spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';

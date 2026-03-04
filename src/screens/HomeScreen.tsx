@@ -372,7 +372,7 @@ export default function HomeScreen() {
             }
         };
         loadWellnessAverages();
-    }, [showWellnessModal]); // Reload when wellness modal closes
+    }, [showWellnessModal, isFocused]); // Reload when wellness modal closes or tab is focused
 
     // Check if food has been logged today
     useEffect(() => {
@@ -443,6 +443,20 @@ export default function HomeScreen() {
 
         maybePromptNotifications();
     }, [user?.id, isAuthenticated]);
+
+    // Handle notification taps — open the relevant modal directly
+    useEffect(() => {
+        const subscription = notificationService.addNotificationResponseListener((response) => {
+            const notificationType = response.notification.request.content.data?.type;
+            if (notificationType === 'food_logging_reminder') {
+                setShowFoodScannerModal(true);
+            } else if (notificationType === 'wellness_checkin_reminder') {
+                setShowWellnessModal(true);
+            }
+        });
+
+        return () => subscription.remove();
+    }, []);
 
     const handleNotificationPrePromptContinue = async () => {
         if (!user?.id || isRequestingNotificationPermission) return;

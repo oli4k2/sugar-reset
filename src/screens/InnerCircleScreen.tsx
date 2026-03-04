@@ -68,7 +68,7 @@ export default function InnerCircleScreen() {
 
     // Pulse animation for the connection lines
     const pulseAnim = useRef(new Animated.Value(0)).current;
-    
+
     // Swipe to dismiss
     const panResponder = useRef(
         PanResponder.create({
@@ -164,8 +164,8 @@ export default function InnerCircleScreen() {
                 <LinearGradient colors={THEME.bg as any} style={StyleSheet.absoluteFillObject} />
                 <SafeAreaView style={styles.safeArea}>
                     <View style={styles.header}>
-                        <TouchableOpacity 
-                            onPress={() => navigation.goBack()} 
+                        <TouchableOpacity
+                            onPress={() => navigation.goBack()}
                             style={styles.closeButton}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
@@ -181,7 +181,9 @@ export default function InnerCircleScreen() {
                                 navigation.navigate('Paywall');
                             }}
                             showUpgradeButton={true}
-                        />
+                        >
+                            <View />
+                        </PremiumGate>
                     </View>
                 </SafeAreaView>
             </View>
@@ -195,8 +197,8 @@ export default function InnerCircleScreen() {
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity 
-                        onPress={() => navigation.goBack()} 
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
                         style={styles.closeButton}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
@@ -392,6 +394,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 40, // Moved down for better accessibility
         minHeight: 60,
+    },
+    closeButton: {
+        padding: 8,
     },
     headerTitle: {
         fontSize: 14,

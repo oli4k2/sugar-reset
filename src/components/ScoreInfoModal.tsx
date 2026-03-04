@@ -82,7 +82,8 @@ export const SCORE_INFO: Record<string, ScoreInfo> = {
             { min: 80, max: 100, label: 'Thriving', color: '#22C55E', tip: 'You feel amazing! Note what you did today to replicate this feeling.' },
             { min: 60, max: 79, label: 'Balanced', color: '#3B82F6', tip: 'Steady energy and good mood. A 10-min walk could push you into Thriving!' },
             {
-                min: 40, max: 59, label: 'Stable', color: '#F59E0B', tip: 'You're holding steady.Earlier bedtime tonight might boost your score tomorrow.' },
+                min: 40, max: 59, label: 'Stable', color: '#F59E0B', tip: "You're holding steady. Earlier bedtime tonight might boost your score tomorrow."
+            },
             { min: 0, max: 39, label: 'Struggling', color: '#EF4444', tip: "It's okay to have low energy days. Be extra kind to yourself today." },
         ],
         howToImprove: [

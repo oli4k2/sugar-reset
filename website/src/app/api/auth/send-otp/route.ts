@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import * as admin from "firebase-admin";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Validate Resend API key before initializing
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+if (!RESEND_API_KEY) {
+    console.error("❌ RESEND_API_KEY is missing from environment variables");
+}
+
+const resend = new Resend(RESEND_API_KEY);
 
 // Initialize Firebase Admin (prevent re-initialization)
 if (!admin.apps.length) {
@@ -68,10 +74,28 @@ export async function POST(request: NextRequest) {
 
         const normalizedEmail = email.trim().toLowerCase();
 
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(normalizedEmail)) {
+            return NextResponse.json(
+                { error: "Invalid email format", success: false },
+                { status: 400 }
+            );
+        }
+
+        // Validate Resend API key is present
+        if (!RESEND_API_KEY) {
+            console.error("❌ RESEND_API_KEY is missing - cannot send OTP email");
+            return NextResponse.json(
+                { error: "Email service is not configured. Please contact support.", success: false },
+                { status: 500 }
+            );
+        }
+
         // App Store Reviewer Login: Special email always gets OTP 555555
         const REVIEWER_EMAIL = 'reviewer@craveless.info';
         const isReviewerEmail = normalizedEmail === REVIEWER_EMAIL;
-        
+
         // For reviewer email, always use 555555 as OTP
         const otp = isReviewerEmail ? '555555' : generateOTP();
 
@@ -111,9 +135,23 @@ export async function POST(request: NextRequest) {
 
         console.log("📧 OTP generated for:", normalizedEmail, isReviewerEmail ? "(Reviewer - always 555555)" : "");
 
+        // For reviewer email, skip sending actual email - code is always 555555
+        // This prevents failures if the reviewer email can't receive emails
+        if (isReviewerEmail) {
+            console.log("✅ Reviewer OTP stored (email send skipped - code is always 555555)");
+            return NextResponse.json({ success: true, data: { id: 'reviewer-bypass' } });
+        }
+
+        const fromEmail = process.env.RESEND_FROM_EMAIL || "Craveless <auth@craveless.info>";
+        console.log("📤 Attempting to send email via Resend:", {
+            from: fromEmail,
+            to: normalizedEmail,
+            hasApiKey: !!RESEND_API_KEY,
+        });
+
         // Send email via Resend
         const { data, error: resendError } = await resend.emails.send({
-            from: process.env.RESEND_FROM_EMAIL || "Craveless <auth@craveless.info>",
+            from: fromEmail,
             to: normalizedEmail,
             subject: "Your Craveless verification code",
             html: `
@@ -140,18 +178,56 @@ export async function POST(request: NextRequest) {
         });
 
         if (resendError) {
-            console.error("Resend error:", resendError);
+            console.error("❌ Resend error details:", {
+                error: resendError,
+                errorType: typeof resendError,
+                errorString: JSON.stringify(resendError, null, 2),
+                email: normalizedEmail,
+                fromEmail: fromEmail,
+            });
+
+            // Provide more detailed error message
+            let errorMessage = "Failed to send verification email";
+            if (typeof resendError === "string") {
+                errorMessage = resendError;
+            } else if (resendError && typeof resendError === "object") {
+                // Try to extract meaningful error message from Resend error object
+                const errorObj = resendError as any;
+                const errorMsg = errorObj.message || errorObj.error?.message || "";
+
+                // Check for suppression list error
+                if (errorMsg.toLowerCase().includes("suppression") ||
+                    errorMsg.toLowerCase().includes("suppressed")) {
+                    errorMessage = "This email address cannot receive emails. Please use a different email address or contact support.";
+                } else {
+                    errorMessage = errorMsg || JSON.stringify(resendError);
+                }
+            }
+
             return NextResponse.json(
                 {
-                    error:
-                        typeof resendError === "string"
-                            ? resendError
-                            : "Failed to send verification email",
+                    error: errorMessage,
                     success: false,
                 },
                 { status: 500 }
             );
         }
+
+        if (!data) {
+            console.error("❌ Resend returned no data and no error - this is unexpected");
+            return NextResponse.json(
+                {
+                    error: "Email service returned an unexpected response. Please try again.",
+                    success: false,
+                },
+                { status: 500 }
+            );
+        }
+
+        console.log("✅ OTP email sent successfully:", {
+            email: normalizedEmail,
+            resendId: data.id,
+        });
 
         return NextResponse.json({ success: true, data });
     } catch (error: any) {

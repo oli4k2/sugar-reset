@@ -279,6 +279,9 @@ const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
     },
+    scrollView: {
+        flex: 1,
+    },
     contentContainer: {
         paddingHorizontal: spacing.lg,
         paddingBottom: Platform.OS === 'ios' ? 90 : 70,
