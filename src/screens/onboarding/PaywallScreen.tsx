@@ -642,6 +642,8 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
         // Check if selected package has a trial period
         const yearlyPkg = currentOffering?.annual;
         const hasTrial = canGetTrial && (yearlyPkg?.product?.introPrice !== null);
+        const isYearlySelected = selectedPlan === 'yearly';
+        const showTrialForSelectedPlan = hasTrial && isYearlySelected;
         const title = isFromApp
             ? (hasTrial ? 'Upgrade to Premium' : 'Subscribe to Premium')
             : 'Start your 3-day FREE\ntrial to continue.';
@@ -795,7 +797,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                 </View>
 
                 <View style={styles.bottomArea}>
-                    {hasTrial && (
+                    {showTrialForSelectedPlan && (
                         <View style={styles.noPaymentRow}>
                             <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
                             <Text style={styles.noPaymentText}>No Payment Due Now</Text>
@@ -812,14 +814,14 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                             <ActivityIndicator size="small" color="#FFFFFF" />
                         ) : (
                             <Text style={styles.primaryButtonText}>
-                                {hasTrial ? 'Start My 3-Day Free Trial' : 'Subscribe Now'}
+                                {showTrialForSelectedPlan ? 'Start My 3-Day Free Trial' : (isFromApp || !hasTrial ? 'Subscribe Now' : 'Start Your Journey')}
                             </Text>
                         )}
                     </TouchableOpacity>
 
                     <Text style={styles.billedAmountText}>
-                        {hasTrial
-                            ? `3 days free, then ${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'}`
+                        {showTrialForSelectedPlan
+                            ? `3 days free, then ${getYearlyPrice()} per year`
                             : `${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'}`
                         }
                     </Text>
