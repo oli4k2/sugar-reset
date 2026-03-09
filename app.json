@@ -19,8 +19,6 @@
       "bundleIdentifier": "com.sugarreset.app",
       "appleTeamId": "LX5566JXPP",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "Craveless needs access to read your health data to provide personalized insights and track your wellness journey.",
-        "NSHealthUpdateUsageDescription": "Craveless needs access to update your health data with your logged nutrition.",
         "ITSAppUsesNonExemptEncryption": false,
         "SKAdNetworkItems": [
           {
@@ -190,11 +188,7 @@
       "package": "com.craveless.app",
       "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.health.READ_NUTRITION",
-        "android.permission.health.WRITE_NUTRITION"
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./src/public/craveless_app_icon.png"

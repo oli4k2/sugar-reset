@@ -25,7 +25,6 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { spacing, borderRadius } from '../theme';
 import { looviColors } from './LooviBackground';
-import { healthService } from '../services/healthService';
 
 export interface WellnessLog {
     date: string;
@@ -58,7 +57,6 @@ export function WellnessModal({
     const [focus, setFocus] = useState(0);
     const [sleepHours, setSleepHours] = useState(0);
     const [thoughts, setThoughts] = useState('');
-    const [syncing, setSyncing] = useState(false);
 
     // Reset or prefill values when modal opens
     useEffect(() => {
@@ -75,22 +73,6 @@ export function WellnessModal({
                 setFocus(0);
                 setSleepHours(0);
                 setThoughts('');
-
-                // Auto-sync sleep data from Apple Health when opening fresh
-                const autoSyncSleep = async () => {
-                    try {
-                        const sleepHrs = await healthService.getTodaySleep();
-                        if (sleepHrs > 0) {
-                            const rounded = Math.round(sleepHrs);
-                            setSleepHours(rounded);
-                            console.log('✅ Auto-synced sleep data:', rounded, 'hours');
-                        }
-                    } catch (e) {
-                        // Silently fail - user can still manually sync
-                        console.log('Auto-sync sleep failed:', e);
-                    }
-                };
-                autoSyncSleep();
             }
         }
     }, [visible, existingData]);
@@ -106,23 +88,6 @@ export function WellnessModal({
             thoughts: thoughts.trim() || undefined,
         });
         onClose();
-    };
-
-    const handleSyncSleep = async () => {
-        setSyncing(true);
-        try {
-            const sleepHrs = await healthService.getTodaySleep();
-            if (sleepHrs > 0) {
-                const rounded = Math.round(sleepHrs);
-                setSleepHours(rounded);
-                Alert.alert('Synced!', `Sleep data: ${rounded} hours`);
-            } else {
-                Alert.alert('No Data', 'No sleep data found in Health app.');
-            }
-        } catch (e) {
-            Alert.alert('Error', 'Failed to sync sleep data.');
-        }
-        setSyncing(false);
     };
 
     const isToday = selectedDate === new Date().toISOString().split('T')[0];
@@ -175,20 +140,6 @@ export function WellnessModal({
                         {sleepHours === 0 ? 'Slide to set' : `${sleepHours}h`}
                     </Text>
                 </View>
-                <TouchableOpacity
-                    style={styles.syncButton}
-                    onPress={handleSyncSleep}
-                    disabled={syncing}
-                >
-                    <Ionicons
-                        name={syncing ? "hourglass" : "sync"}
-                        size={14}
-                        color={looviColors.skyBlueDark}
-                    />
-                    <Text style={[styles.syncText, { color: looviColors.skyBlueDark }]}>
-                        Sync with Apple Health
-                    </Text>
-                </TouchableOpacity>
             </View>
             <Slider
                 style={styles.slider}
@@ -443,20 +394,6 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: looviColors.text.tertiary,
         fontWeight: '500',
-    },
-    // Sync button
-    syncButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 4,
-        borderRadius: borderRadius.md,
-        backgroundColor: 'rgba(0, 0, 0, 0.04)',
-    },
-    syncText: {
-        fontSize: 11,
-        fontWeight: '600',
     },
     // Thoughts Section
     thoughtsSection: {

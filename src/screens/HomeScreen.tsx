@@ -56,7 +56,6 @@ import {
 } from '../components';
 import { useUserData } from '../context/UserDataContext';
 import { getTodayGuidance, PlanType, getPlanDetails, getCurrentWeek } from '../utils/planUtils';
-import { healthService } from '../services/healthService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppIcon } from '../components/OnboardingIcon';
 import { WellnessLog } from '../components/WellnessModal';
