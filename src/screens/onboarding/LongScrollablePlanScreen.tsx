@@ -17,6 +17,7 @@ import {
     Animated,
     Easing,
     Dimensions,
+    useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -176,7 +177,11 @@ function FlickeringStars({ count = 10 }: { count?: number }) {
 export default function LongScrollablePlanScreen({ navigation }: LongScrollablePlanScreenProps) {
     const { onboardingData, setOnboardingCheckpoint } = useUserData();
     const insets = useSafeAreaInsets();
+    const { height: windowHeight } = useWindowDimensions();
     const posthog = usePostHog();
+
+    // Push footer content down slightly; scale with screen height for different device sizes
+    const footerContentOffset = Math.round(Math.min(14, Math.max(6, windowHeight * 0.012)));
 
     const quitDate = new Date();
     const dayOfMonth = quitDate.getDate();
@@ -425,7 +430,15 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
                 </ScrollView>
 
                 {/* Sticky CTA Footer */}
-                <View style={[styles.ctaSection, { paddingBottom: Math.max(spacing.lg, insets.bottom + 12) }]}>
+                <View
+                    style={[
+                        styles.ctaSection,
+                        {
+                            paddingTop: spacing.md + footerContentOffset,
+                            paddingBottom: Math.max(spacing.sm, Math.max(spacing.md, insets.bottom + 8) - footerContentOffset),
+                        },
+                    ]}
+                >
                     <View style={footerButtonWrapperStyle}>
                         <TouchableOpacity
                             style={styles.button}
@@ -745,7 +758,6 @@ const styles = StyleSheet.create({
     ctaSection: {
         backgroundColor: '#1E293B',
         paddingHorizontal: spacing.screen.horizontal,
-        paddingTop: spacing.xl,
         alignItems: 'center',
     },
     button: {
@@ -755,7 +767,7 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.lg,
+        marginBottom: spacing.sm,
         shadowColor: looviColors.accent.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
@@ -770,6 +782,9 @@ const styles = StyleSheet.create({
     guaranteeRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'stretch',
+        marginTop: 2,
     },
     guaranteeText: {
         color: 'rgba(255,255,255,0.6)',

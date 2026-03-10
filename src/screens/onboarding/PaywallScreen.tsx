@@ -23,6 +23,7 @@ import {
     Dimensions,
     Animated,
     Image,
+    ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,7 +40,7 @@ import { usePostHog } from 'posthog-react-native';
 import CancellationOfferScreen from '../../components/CancellationOfferScreen';
 import { notificationService, NOTIFICATION_PROMPTED_ONBOARDING_KEY } from '../../services/notificationService';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Responsive scaling: reference iPhone 14 (390pt), clamped for small phones and iPad
 const BASE_WIDTH = 390;
@@ -560,145 +561,135 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     // Render Step 1: Intro
     const renderIntroStep = () => (
         <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.contentArea}>
-                <Text style={styles.mainTitle}>We want you to{'\n'}try Craveless for free.</Text>
+            <ScrollView
+                style={styles.stepScroll}
+                contentContainerStyle={styles.stepScrollContent}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+            >
+                <View style={styles.contentArea}>
+                    <Text style={styles.mainTitle}>We want you to{'\n'}try Craveless for free.</Text>
 
-                {/* App Preview Mockup */}
-                <View style={styles.phonePreview}>
-                    <View style={styles.phoneMockup}>
-                        <Image
-                            source={{ uri: 'https://images.pexels.com/photos/2097090/pexels-photo-2097090.jpeg?auto=compress&cs=tinysrgb&w=800' }}
-                            style={styles.previewImage}
-                            resizeMode="cover"
-                        />
-                        <View style={styles.previewOverlay}>
-                            <View style={styles.scannerCorners}>
-                                <View style={[styles.corner, styles.cornerTL]} />
-                                <View style={[styles.corner, styles.cornerTR]} />
-                                <View style={[styles.corner, styles.cornerBL]} />
-                                <View style={[styles.corner, styles.cornerBR]} />
+                    {/* App Preview Mockup */}
+                    <View style={styles.phonePreview}>
+                        <View style={styles.phoneMockup}>
+                            <Image
+                                source={{ uri: 'https://images.pexels.com/photos/2097090/pexels-photo-2097090.jpeg?auto=compress&cs=tinysrgb&w=800' }}
+                                style={styles.previewImage}
+                                resizeMode="cover"
+                            />
+                            <View style={styles.previewOverlay}>
+                                <View style={styles.scannerCorners}>
+                                    <View style={[styles.corner, styles.cornerTL]} />
+                                    <View style={[styles.corner, styles.cornerTR]} />
+                                    <View style={[styles.corner, styles.cornerBL]} />
+                                    <View style={[styles.corner, styles.cornerBR]} />
+                                </View>
                             </View>
                         </View>
                     </View>
                 </View>
-            </View>
 
-            <View style={styles.bottomArea}>
-                <View style={styles.noPaymentRow}>
-                    <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
-                    <Text style={styles.noPaymentText}>No Payment Due Now</Text>
-                </View>
-
-                <TouchableOpacity
-                    style={styles.primaryButton}
-                    onPress={handleNextStep}
-                    activeOpacity={0.8}
-                >
-                    <Text style={styles.primaryButtonText}>
-                        Try for {currentOffering?.annual?.product?.currencyCode === 'USD'
-                            ? '$0.00'
-                            : currentOffering?.annual?.product?.currencyCode
-                                ? `0.00 ${currentOffering.annual.product.currencyCode}`
-                                : '$0.00'}
-                    </Text>
-                </TouchableOpacity>
-
-                <Text style={styles.billedAmountText}>
-                    Just {getYearlyPrice()} per year
-                </Text>
-                <Text style={styles.priceSubtext}>
-                    (≈ {getYearlyMonthlyEquivalent()}/mo)
-                </Text>
-                <View style={styles.legalFooter}>
+                <View style={styles.bottomArea}>
                     <TouchableOpacity
-                        onPress={handleRestorePurchases}
-                        disabled={isRestoring}
-                        style={styles.legalLinkTouchable}
+                        style={styles.primaryButton}
+                        onPress={handleNextStep}
+                        activeOpacity={0.8}
                     >
-                        <Text style={styles.legalLinkText}>
-                            {isRestoring ? 'Restoring...' : 'Restore Purchases'}
+                        <Text style={styles.primaryButtonText}>
+                            Try for {currentOffering?.annual?.product?.currencyCode === 'USD'
+                                ? '$0.00'
+                                : currentOffering?.annual?.product?.currencyCode
+                                    ? `0.00 ${currentOffering.annual.product.currencyCode}`
+                                    : '$0.00'}
                         </Text>
                     </TouchableOpacity>
-                    <Text style={styles.legalSeparator}>•</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
-                        <Text style={styles.legalLinkText}>Privacy Policy</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.legalSeparator}>•</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
-                        <Text style={styles.legalLinkText}>Terms of Use</Text>
-                    </TouchableOpacity>
+
+                    <Text style={styles.billedAmountText}>
+                        Just {getYearlyPrice()} per year
+                    </Text>
+                    <Text style={styles.priceSubtext}>
+                        (≈ {getYearlyMonthlyEquivalent()}/mo)
+                    </Text>
+                    <View style={styles.legalFooter}>
+                        <View style={styles.legalFooterSmallLinksRow}>
+                            <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
+                                <Text style={styles.legalLinkTextSmall}>Privacy Policy</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.legalSeparatorSmall}>•</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
+                                <Text style={styles.legalLinkTextSmall}>Terms of Use</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
-            </View>
+            </ScrollView>
         </Animated.View>
     );
 
     // Render Step 2: Reminder
     const renderReminderStep = () => (
         <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.contentArea}>
-                <Text style={styles.mainTitle}>We'll send you{'\n'}a reminder before your{'\n'}free trial ends</Text>
+            <ScrollView
+                style={styles.stepScroll}
+                contentContainerStyle={styles.stepScrollContent}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+            >
+                <View style={[styles.contentArea, styles.reminderContentArea]}>
+                    <Text style={styles.mainTitle}>We'll send you{'\n'}a reminder before your{'\n'}free trial ends</Text>
 
-                {/* Bell Icon + Turn on notifications - grouped so link sits directly under bell */}
-                <View style={styles.bellAndNotificationGroup}>
-                    <View style={styles.bellIconWrapper}>
-                        <Ionicons name="notifications-outline" size={s(80)} color={looviColors.text.muted} />
-                        <View style={styles.notificationBadge}>
-                            <Text style={styles.notificationBadgeText}>1</Text>
+                    {/* Bell Icon + Turn on notifications - vertically centered in remaining space */}
+                    <View style={styles.reminderBellCentered}>
+                        <View style={styles.bellAndNotificationGroup}>
+                            <View style={styles.bellIconWrapper}>
+                                <Ionicons name="notifications-outline" size={s(80)} color={looviColors.text.muted} />
+                                <View style={styles.notificationBadge}>
+                                    <Text style={styles.notificationBadgeText}>1</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.notificationCtaButton}
+                                onPress={handleEnableNotificationsFromOnboarding}
+                                activeOpacity={0.75}
+                                disabled={isRequestingNotifications}
+                            >
+                                <Text style={styles.notificationCtaText}>
+                                    {isRequestingNotifications ? 'Opening...' : 'Turn on notifications'}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
+                </View>
+
+                <View style={styles.bottomArea}>
                     <TouchableOpacity
-                        style={styles.notificationCtaButton}
-                        onPress={handleEnableNotificationsFromOnboarding}
-                        activeOpacity={0.75}
-                        disabled={isRequestingNotifications}
+                        style={styles.primaryButton}
+                        onPress={handleNextStep}
+                        activeOpacity={0.8}
                     >
-                        <Text style={styles.notificationCtaText}>
-                            {isRequestingNotifications ? 'Opening...' : 'Turn on notifications'}
-                        </Text>
+                        <Text style={styles.primaryButtonText}>Continue for FREE</Text>
                     </TouchableOpacity>
-                </View>
-            </View>
 
-            <View style={styles.bottomArea}>
-                <View style={styles.noPaymentRow}>
-                    <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
-                    <Text style={styles.noPaymentText}>No Payment Due Now</Text>
+                    <Text style={styles.billedAmountText}>
+                        Just {getYearlyPrice()} per year
+                    </Text>
+                    <Text style={styles.priceSubtext}>
+                        (≈ {getYearlyMonthlyEquivalent()}/mo)
+                    </Text>
+                    <View style={styles.legalFooter}>
+                        <View style={styles.legalFooterSmallLinksRow}>
+                            <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
+                                <Text style={styles.legalLinkTextSmall}>Privacy Policy</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.legalSeparatorSmall}>•</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
+                                <Text style={styles.legalLinkTextSmall}>Terms of Use</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
-
-                <TouchableOpacity
-                    style={styles.primaryButton}
-                    onPress={handleNextStep}
-                    activeOpacity={0.8}
-                >
-                    <Text style={styles.primaryButtonText}>Continue for FREE</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.billedAmountText}>
-                    Just {getYearlyPrice()} per year
-                </Text>
-                <Text style={styles.priceSubtext}>
-                    (≈ {getYearlyMonthlyEquivalent()}/mo)
-                </Text>
-                <View style={styles.legalFooter}>
-                    <TouchableOpacity
-                        onPress={handleRestorePurchases}
-                        disabled={isRestoring}
-                        style={styles.legalLinkTouchable}
-                    >
-                        <Text style={styles.legalLinkText}>
-                            {isRestoring ? 'Restoring...' : 'Restore Purchases'}
-                        </Text>
-                    </TouchableOpacity>
-                    <Text style={styles.legalSeparator}>•</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
-                        <Text style={styles.legalLinkText}>Privacy Policy</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.legalSeparator}>•</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
-                        <Text style={styles.legalLinkText}>Terms of Use</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
+            </ScrollView>
         </Animated.View>
     );
 
@@ -715,6 +706,12 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
 
         return (
             <Animated.View style={[styles.stepContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+                <ScrollView
+                    style={styles.stepScroll}
+                    contentContainerStyle={styles.stepScrollContent}
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                >
                 <View style={styles.contentArea}>
                     <Text style={styles.mainTitle}>{title}</Text>
 
@@ -862,13 +859,6 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                 </View>
 
                 <View style={styles.bottomArea}>
-                    {showTrialForSelectedPlan && (
-                        <View style={styles.noPaymentRow}>
-                            <Ionicons name="checkmark-circle" size={20} color={looviColors.accent.success} />
-                            <Text style={styles.noPaymentText}>No Payment Due Now</Text>
-                        </View>
-                    )}
-
                     <TouchableOpacity
                         style={[styles.primaryButton, isPurchasing && styles.buttonDisabled]}
                         onPress={handleStartTrial}
@@ -885,37 +875,30 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                     </TouchableOpacity>
 
                     <Text style={styles.billedAmountText}>
-                        {showTrialForSelectedPlan
-                            ? `3 days free, then ${getYearlyPrice()} per year`
-                            : `${selectedPlan === 'yearly' ? getYearlyPrice() + ' per year' : getMonthlyPrice() + ' per month'}`
+                        {selectedPlan === 'yearly'
+                            ? `Just ${getYearlyPrice()} per year`
+                            : `${getMonthlyPrice()} per month`
                         }
                     </Text>
                     <Text style={styles.priceSubtext}>
                         {selectedPlan === 'yearly'
-                            ? `Equivalent to ${getYearlyMonthlyEquivalent()}/mo`
+                            ? `(≈ ${getYearlyMonthlyEquivalent()}/mo)`
                             : `Billed at ${getMonthlyPrice()}/mo`
                         }
                     </Text>
                     <View style={styles.legalFooter}>
-                        <TouchableOpacity
-                            onPress={handleRestorePurchases}
-                            disabled={isRestoring}
-                            style={styles.legalLinkTouchable}
-                        >
-                            <Text style={styles.legalLinkText}>
-                                {isRestoring ? 'Restoring...' : 'Restore Purchases'}
-                            </Text>
-                        </TouchableOpacity>
-                        <Text style={styles.legalSeparator}>•</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
-                            <Text style={styles.legalLinkText}>Privacy Policy</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.legalSeparator}>•</Text>
-                        <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
-                            <Text style={styles.legalLinkText}>Terms of Use</Text>
-                        </TouchableOpacity>
+                        <View style={styles.legalFooterSmallLinksRow}>
+                            <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
+                                <Text style={styles.legalLinkTextSmall}>Privacy Policy</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.legalSeparatorSmall}>•</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
+                                <Text style={styles.legalLinkTextSmall}>Terms of Use</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
+                </ScrollView>
             </Animated.View>
         );
     };
@@ -933,6 +916,15 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                         ) : (
                             <View style={styles.backButton} />
                         )}
+                        <TouchableOpacity
+                            onPress={handleRestorePurchases}
+                            disabled={isRestoring}
+                            style={styles.restoreHeaderLink}
+                        >
+                            <Text style={styles.restoreHeaderText}>
+                                {isRestoring ? 'Restoring...' : 'Restore Purchases'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Step Content */}
@@ -976,14 +968,36 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         justifyContent: 'center',
     },
+    restoreHeaderLink: {
+        paddingVertical: s(8),
+        paddingHorizontal: s(4),
+        justifyContent: 'center',
+    },
+    restoreHeaderText: {
+        fontSize: s(11),
+        fontWeight: '500',
+        color: looviColors.text.muted,
+    },
     stepContainer: {
         flex: 1,
+    },
+    stepScroll: {
+        flex: 1,
+    },
+    stepScrollContent: {
+        flexGrow: 1,
         justifyContent: 'space-between',
     },
     contentArea: {
-        flex: 1,
         paddingHorizontal: s(24),
         paddingTop: s(20),
+    },
+    reminderContentArea: {
+        flex: 1,
+    },
+    reminderBellCentered: {
+        flex: 1,
+        justifyContent: 'center',
     },
     mainTitle: {
         fontSize: s(28),
@@ -994,14 +1008,13 @@ const styles = StyleSheet.create({
         letterSpacing: -0.5,
     },
     phonePreview: {
-        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: s(24),
     },
     phoneMockup: {
-        width: Math.min(SCREEN_WIDTH * 0.55, s(280)),
-        height: Math.min(SCREEN_WIDTH * 0.9, s(460)),
+        width: Math.min(SCREEN_WIDTH * 0.5, s(240)),
+        height: Math.min(SCREEN_HEIGHT * 0.38, s(400)),
         backgroundColor: looviColors.text.primary,
         borderRadius: s(36),
         padding: s(8),
@@ -1038,9 +1051,9 @@ const styles = StyleSheet.create({
     cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
     cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
     bellAndNotificationGroup: {
-        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        marginVertical: s(24),
     },
     bellIconWrapper: {
         position: 'relative',
@@ -1194,26 +1207,14 @@ const styles = StyleSheet.create({
     },
     bottomArea: {
         paddingHorizontal: s(24),
-        paddingBottom: s(24),
-    },
-    noPaymentRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: s(12),
-        gap: s(4),
-    },
-    noPaymentText: {
-        fontSize: s(15),
-        color: looviColors.text.primary,
-        fontWeight: '500',
+        paddingBottom: s(16),
     },
     primaryButton: {
         backgroundColor: looviColors.text.primary,
         paddingVertical: s(18),
         borderRadius: s(30),
         alignItems: 'center',
-        marginBottom: s(12),
+        marginBottom: s(8),
     },
     buttonDisabled: {
         opacity: 0.6,
@@ -1248,16 +1249,14 @@ const styles = StyleSheet.create({
         textDecorationLine: 'underline',
     },
     legalFooter: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: s(20),
-        gap: s(8),
+        marginTop: s(10),
     },
     legalLinkTouchable: {
         paddingVertical: 4,
-        paddingHorizontal: 8,
+        paddingHorizontal: 4,
     },
     legalLinkText: {
         fontSize: s(13),
@@ -1265,8 +1264,21 @@ const styles = StyleSheet.create({
         color: looviColors.text.secondary,
         textDecorationLine: 'underline',
     },
-    legalSeparator: {
-        fontSize: s(12),
+    legalFooterSmallLinksRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: s(4),
+        marginTop: 4,
+    },
+    legalLinkTextSmall: {
+        fontSize: s(10),
+        fontWeight: '500',
+        color: looviColors.text.secondary,
+        textDecorationLine: 'underline',
+    },
+    legalSeparatorSmall: {
+        fontSize: s(10),
         color: looviColors.text.tertiary,
     },
     featuresContainer: {
