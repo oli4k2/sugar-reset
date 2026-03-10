@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import LooviBackground, { looviColors } from '../../components/LooviBackground';
+import LooviBackground, { looviColors, footerFullWidthStyle, footerButtonWrapperStyle } from '../../components/LooviBackground';
 import { spacing, borderRadius } from '../../theme';
 import { useUserData } from '../../context/UserDataContext';
 import { usePostHog } from 'posthog-react-native';
@@ -149,16 +149,18 @@ export default function SymptomsScreen({ navigation }: SymptomsScreenProps) {
                     ))}
                 </ScrollView>
 
-                <View style={styles.footer}>
-                    <TouchableOpacity
-                        style={styles.continueButton}
-                        onPress={handleContinue}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.continueButtonText}>
-                            Begin your recovery
-                        </Text>
-                    </TouchableOpacity>
+                <View style={[styles.footer, footerFullWidthStyle]}>
+                    <View style={footerButtonWrapperStyle}>
+                        <TouchableOpacity
+                            style={styles.continueButton}
+                            onPress={handleContinue}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.continueButtonText}>
+                                Begin your recovery
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </SafeAreaView>
         </LooviBackground>

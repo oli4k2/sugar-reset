@@ -25,7 +25,7 @@ import { Feather } from '@expo/vector-icons';
 import { usePostHog } from 'posthog-react-native';
 
 import { OnboardingStackParamList } from '../../types';
-import LooviBackground, { looviColors } from '../../components/LooviBackground';
+import LooviBackground, { looviColors, footerButtonWrapperStyle, sectionFullWidthStyle } from '../../components/LooviBackground';
 import { spacing } from '../../theme';
 import { useUserData } from '../../context/UserDataContext';
 import PersonalizedInsight from '../../components/PersonalizedInsight';
@@ -266,7 +266,7 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
 
     return (
         <LooviBackground variant="blueDominant">
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <SafeAreaView style={[styles.container, sectionFullWidthStyle]} edges={['top', 'left', 'right']}>
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
@@ -426,19 +426,21 @@ export default function LongScrollablePlanScreen({ navigation }: LongScrollableP
 
                 {/* Sticky CTA Footer */}
                 <View style={[styles.ctaSection, { paddingBottom: Math.max(spacing.lg, insets.bottom + 12) }]}>
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={handleContinue}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.buttonText}>Become Craveless</Text>
-                    </TouchableOpacity>
-                    <View style={styles.guaranteeRow}>
-                        <Feather name="shield" size={14} color="rgba(255,255,255,0.7)" />
-                        <Text style={styles.guaranteeText}>Secure & Private</Text>
-                        <View style={styles.dot} />
-                        <Feather name="check" size={14} color="rgba(255,255,255,0.7)" />
-                        <Text style={styles.guaranteeText}>Cancel Anytime</Text>
+                    <View style={footerButtonWrapperStyle}>
+                        <TouchableOpacity
+                            style={styles.button}
+                            onPress={handleContinue}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.buttonText}>Become Craveless</Text>
+                        </TouchableOpacity>
+                        <View style={styles.guaranteeRow}>
+                            <Feather name="shield" size={14} color="rgba(255,255,255,0.7)" />
+                            <Text style={styles.guaranteeText}>Secure & Private</Text>
+                            <View style={styles.dot} />
+                            <Feather name="check" size={14} color="rgba(255,255,255,0.7)" />
+                            <Text style={styles.guaranteeText}>Cancel Anytime</Text>
+                        </View>
                     </View>
                 </View>
             </SafeAreaView>

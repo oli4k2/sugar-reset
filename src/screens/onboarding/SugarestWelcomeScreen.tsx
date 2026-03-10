@@ -13,22 +13,27 @@ import {
     TouchableOpacity,
     Animated,
     Image,
-    Dimensions,
+    useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TABLET_BREAKPOINT = 600;
 
 type SugarestWelcomeScreenProps = {
     navigation: NativeStackNavigationProp<any, 'SugarestWelcome'>;
 };
 
 export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScreenProps) {
+    const { width: screenWidth } = useWindowDimensions();
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
+
+    const contentMaxWidth = Math.min(screenWidth * 0.9, 520);
+    const headerImageWidth = Math.min(screenWidth * 0.85, contentMaxWidth);
+    const isTablet = screenWidth >= TABLET_BREAKPOINT;
 
     useEffect(() => {
         Animated.parallel([
@@ -58,6 +63,7 @@ export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScr
                         {
                             opacity: fadeAnim,
                             transform: [{ translateY: slideAnim }],
+                            paddingHorizontal: isTablet ? spacing['2xl'] : spacing.screen.horizontal,
                         },
                     ]}
                 >
@@ -65,17 +71,18 @@ export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScr
                     <View style={styles.centeredContent}>
                         {/* Welcome Message */}
                         <View style={styles.welcomeSection}>
-                            <Image
-                                source={require('../../../assets/images/craveless-sugar-reset-header.png')}
-                                style={styles.welcomeHeaderImage}
-                                resizeMode="contain"
-                            />
-                            <Text style={styles.welcomeSubtitle}>
-                                Join thousands of others breaking the cycle of sugar addiction through science and community support.
-                            </Text>
+                            <View style={styles.welcomeContentWrapper}>
+                                <Image
+                                    source={require('../../../assets/images/craveless-sugar-reset-header.png')}
+                                    style={[styles.welcomeHeaderImage, { width: headerImageWidth, maxWidth: contentMaxWidth }]}
+                                    resizeMode="contain"
+                                />
+                                <Text style={styles.welcomeSubtitle}>
+                                    Join thousands of others breaking the cycle of sugar addiction through science and community support.
+                                </Text>
 
-                            {/* Features Row - Horizontal */}
-                            <View style={styles.featuresRow}>
+                                {/* Features Row - Horizontal */}
+                                <View style={[styles.featuresRow, { maxWidth: contentMaxWidth }]}>
                                 <View style={styles.featureItem}>
                                     <View style={styles.iconContainer}>
                                         <Image 
@@ -107,6 +114,7 @@ export default function SugarestWelcomeScreen({ navigation }: SugarestWelcomeScr
                                     <Text style={styles.featureLabel}>Social Support</Text>
                                 </View>
                             </View>
+                            </View>
                         </View>
                     </View>
 
@@ -130,7 +138,6 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: spacing.screen.horizontal,
         paddingBottom: spacing['2xl'],
     },
     centeredContent: {
@@ -140,9 +147,12 @@ const styles = StyleSheet.create({
     welcomeSection: {
         alignItems: 'center',
     },
+    welcomeContentWrapper: {
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: 520,
+    },
     welcomeHeaderImage: {
-        width: SCREEN_WIDTH * 0.85,
-        maxWidth: 320,
         height: undefined,
         aspectRatio: 2.8,
         marginBottom: spacing.lg,
@@ -155,6 +165,7 @@ const styles = StyleSheet.create({
         lineHeight: 22,
         marginBottom: 40,
         paddingHorizontal: spacing.md,
+        alignSelf: 'stretch',
     },
     featuresRow: {
         flexDirection: 'row',

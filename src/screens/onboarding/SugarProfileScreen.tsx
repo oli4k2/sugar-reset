@@ -20,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing, borderRadius } from '../../theme';
-import LooviBackground, { looviColors } from '../../components/LooviBackground';
+import LooviBackground, { looviColors, footerFullWidthStyle, footerButtonWrapperStyle } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 import { useUserData } from '../../context/UserDataContext';
 
@@ -266,20 +266,22 @@ export default function SugarProfileScreen({ navigation }: SugarProfileScreenPro
                 </ScrollView>
 
                 {/* Continue Button */}
-                <View style={styles.footer}>
-                    <TouchableOpacity
-                        style={[
-                            styles.continueButton,
-                            !canProceed() && styles.continueButtonDisabled,
-                        ]}
-                        onPress={handleNext}
-                        disabled={!canProceed()}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.continueButtonText}>
-                            {step < 3 ? 'Continue' : 'Choose Your Plan →'}
-                        </Text>
-                    </TouchableOpacity>
+                <View style={[styles.footer, footerFullWidthStyle]}>
+                    <View style={footerButtonWrapperStyle}>
+                        <TouchableOpacity
+                            style={[
+                                styles.continueButton,
+                                !canProceed() && styles.continueButtonDisabled,
+                            ]}
+                            onPress={handleNext}
+                            disabled={!canProceed()}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.continueButtonText}>
+                                {step < 3 ? 'Continue' : 'Choose Your Plan →'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </SafeAreaView>
         </LooviBackground>

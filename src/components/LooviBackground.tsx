@@ -9,14 +9,41 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
+import { View, StyleSheet, Dimensions, Animated, Easing, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Treat larger screens (like iPads) as tablet layouts so we can keep content
-// at a comfortable "phone-like" width and avoid stretched or overlapping text.
-const IS_TABLET = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) >= 768;
+/** Content max width on tablet - must match the content style below */
+export const CONTENT_MAX_WIDTH = 540;
+
+/** Style to make content span full device width when inside tablet-constrained content */
+export const sectionFullWidthStyle = (() => {
+    const contentWidth = Math.min(SCREEN_WIDTH, CONTENT_MAX_WIDTH);
+    if (SCREEN_WIDTH <= contentWidth) return {};
+    return {
+        width: SCREEN_WIDTH,
+        marginLeft: (contentWidth - SCREEN_WIDTH) / 2,
+        marginHorizontal: 0, // Override any horizontal margin so section extends edge-to-edge
+    };
+})();
+
+/** Style to make a footer span full device width when inside tablet-constrained content */
+export const footerFullWidthStyle = (() => {
+    const contentWidth = Math.min(SCREEN_WIDTH, CONTENT_MAX_WIDTH);
+    if (SCREEN_WIDTH <= contentWidth) return {};
+    return {
+        ...sectionFullWidthStyle,
+        alignItems: 'center' as const, // Prevent button from stretching to full width
+    };
+})();
+
+/** Wraps the footer button to constrain its width on tablet (max content width) */
+export const footerButtonWrapperStyle = {
+    width: '100%' as const,
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center' as const,
+};
 
 // Loovi-inspired color palette
 export const looviColors = {
@@ -182,6 +209,8 @@ export default function LooviBackground({
     variant = 'coralTop',
     showParticles = true,
 }: LooviBackgroundProps) {
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+    const isTablet = Math.min(windowWidth, windowHeight) >= 768;
 
     const renderVariant = () => {
         switch (variant) {
@@ -576,7 +605,17 @@ export default function LooviBackground({
             ))}
 
             {/* Content */}
-            <View style={styles.content}>
+            <View
+                style={[
+                    styles.content,
+                    isTablet
+                        ? {
+                            alignSelf: 'center',
+                            width: Math.min(windowWidth, CONTENT_MAX_WIDTH),
+                        }
+                        : null,
+                ]}
+            >
                 {children}
             </View>
         </View>
@@ -615,13 +654,5 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         zIndex: 10,
-        // On tablets, keep content at a narrower max width and center it.
-        // This preserves the iPhone design while making the app feel intentional on iPads.
-        ...(IS_TABLET
-            ? {
-                alignSelf: 'center',
-                width: Math.min(SCREEN_WIDTH, 540),
-            }
-            : null),
     },
 });

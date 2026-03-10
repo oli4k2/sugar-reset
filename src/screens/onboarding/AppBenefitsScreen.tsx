@@ -12,7 +12,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     FlatList,
-    Dimensions,
+    useWindowDimensions,
     Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,8 +20,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing, borderRadius } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type AppBenefitsScreenProps = {
     navigation: NativeStackNavigationProp<any, 'AppBenefits'>;
@@ -139,9 +137,12 @@ const benefitSlides: BenefitSlide[] = [
 ];
 
 export default function AppBenefitsScreen({ navigation }: AppBenefitsScreenProps) {
+    const { width: screenWidth } = useWindowDimensions();
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [viewportWidth, setViewportWidth] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const scrollX = useRef(new Animated.Value(0)).current;
+    const pageWidth = viewportWidth || screenWidth;
 
     const handleNext = () => {
         if (currentIndex < benefitSlides.length - 1) {
@@ -158,7 +159,7 @@ export default function AppBenefitsScreen({ navigation }: AppBenefitsScreenProps
     }).current;
 
     const renderSlide = ({ item }: { item: BenefitSlide }) => (
-        <View style={styles.slide}>
+        <View style={[styles.slide, { width: pageWidth }]}>
             <View style={styles.slideContent}>
                 {item.emoji && <Text style={styles.emoji}>{item.emoji}</Text>}
                 <Text style={styles.title}>{item.title}</Text>
@@ -215,29 +216,47 @@ export default function AppBenefitsScreen({ navigation }: AppBenefitsScreenProps
         <LooviBackground variant="coralTop">
             <SafeAreaView style={styles.container}>
                 {/* Slides */}
-                <FlatList
-                    ref={flatListRef}
-                    data={benefitSlides}
-                    renderItem={renderSlide}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    keyExtractor={(item) => item.id}
-                    onViewableItemsChanged={onViewableItemsChanged}
-                    viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
-                    onScroll={Animated.event(
-                        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                        { useNativeDriver: false }
+                <View
+                    style={styles.flatListWrapper}
+                    onLayout={(event) => {
+                        const nextWidth = Math.round(event.nativeEvent.layout.width);
+                        if (nextWidth > 0 && nextWidth !== viewportWidth) {
+                            setViewportWidth(nextWidth);
+                        }
+                    }}
+                >
+                    {viewportWidth > 0 && (
+                        <FlatList
+                            key={pageWidth}
+                            ref={flatListRef}
+                            data={benefitSlides}
+                            renderItem={renderSlide}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            keyExtractor={(item) => item.id}
+                            onViewableItemsChanged={onViewableItemsChanged}
+                            viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
+                            getItemLayout={(_, index) => ({
+                                length: pageWidth,
+                                offset: pageWidth * index,
+                                index,
+                            })}
+                            onScroll={Animated.event(
+                                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                                { useNativeDriver: false }
+                            )}
+                        />
                     )}
-                />
+                </View>
 
                 {/* Pagination */}
                 <View style={styles.pagination}>
                     {benefitSlides.map((_, index) => {
                         const inputRange = [
-                            (index - 1) * SCREEN_WIDTH,
-                            index * SCREEN_WIDTH,
-                            (index + 1) * SCREEN_WIDTH,
+                            (index - 1) * pageWidth,
+                            index * pageWidth,
+                            (index + 1) * pageWidth,
                         ];
                         const dotWidth = scrollX.interpolate({
                             inputRange,
@@ -279,8 +298,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    flatListWrapper: {
+        flex: 1,
+    },
     slide: {
-        width: SCREEN_WIDTH,
         paddingHorizontal: spacing.screen.horizontal,
     },
     slideContent: {

@@ -5,7 +5,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     FlatList,
-    Dimensions,
+    useWindowDimensions,
     Animated,
     Image,
     ImageSourcePropType,
@@ -15,8 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
 import { useUserData } from '../../context/UserDataContext';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type SugarScienceScreenProps = {
     navigation: NativeStackNavigationProp<any, 'SugarScience'>;
@@ -69,11 +67,14 @@ const scienceSlides: ScienceSlide[] = [
 ];
 
 export default function SugarScienceScreen({ navigation }: SugarScienceScreenProps) {
+    const { width: screenWidth } = useWindowDimensions();
     const { setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [viewportWidth, setViewportWidth] = useState(0);
     const flatListRef = useRef<FlatList>(null);
     const scrollX = useRef(new Animated.Value(0)).current;
+    const pageWidth = viewportWidth || screenWidth;
 
     useEffect(() => {
         setOnboardingCheckpoint('SugarDangers').catch(() => { });
@@ -130,7 +131,7 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
     };
 
     const renderSlide = ({ item }: { item: ScienceSlide }) => (
-        <View style={styles.slide}>
+        <View style={[styles.slide, { width: pageWidth }]}>
             <View style={styles.slideContent}>
                 <Image
                     source={item.image}
@@ -150,12 +151,12 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
     // Transition starts at 50% through slide 4, so background is already navy
     // by the time user reaches the last slide - this prevents the visible color change
     const lastSlideIndex = scienceSlides.length - 1;
-    const transitionStart = (lastSlideIndex - 1) * SCREEN_WIDTH + SCREEN_WIDTH * 0.5;
-    const transitionEnd = lastSlideIndex * SCREEN_WIDTH;
+    const transitionStart = (lastSlideIndex - 1) * pageWidth + pageWidth * 0.5;
+    const transitionEnd = lastSlideIndex * pageWidth;
 
     const backgroundColor = scrollX.interpolate({
         inputRange: [
-            (lastSlideIndex - 1) * SCREEN_WIDTH,
+            (lastSlideIndex - 1) * pageWidth,
             transitionStart,
             transitionEnd,
         ],
@@ -180,29 +181,47 @@ export default function SugarScienceScreen({ navigation }: SugarScienceScreenPro
                     </View>
 
                     {/* Slides */}
-                    <FlatList
-                        ref={flatListRef}
-                        data={scienceSlides}
-                        renderItem={renderSlide}
-                        horizontal
-                        pagingEnabled
-                        showsHorizontalScrollIndicator={false}
-                        keyExtractor={(item) => item.id}
-                        onViewableItemsChanged={onViewableItemsChanged}
-                        viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
-                        onScroll={Animated.event(
-                            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                            { useNativeDriver: false }
+                    <View
+                        style={styles.flatListWrapper}
+                        onLayout={(event) => {
+                            const nextWidth = Math.round(event.nativeEvent.layout.width);
+                            if (nextWidth > 0 && nextWidth !== viewportWidth) {
+                                setViewportWidth(nextWidth);
+                            }
+                        }}
+                    >
+                        {viewportWidth > 0 && (
+                            <FlatList
+                                key={pageWidth}
+                                ref={flatListRef}
+                                data={scienceSlides}
+                                renderItem={renderSlide}
+                                horizontal
+                                pagingEnabled
+                                showsHorizontalScrollIndicator={false}
+                                keyExtractor={(item) => item.id}
+                                onViewableItemsChanged={onViewableItemsChanged}
+                                viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
+                                getItemLayout={(_, index) => ({
+                                    length: pageWidth,
+                                    offset: pageWidth * index,
+                                    index,
+                                })}
+                                onScroll={Animated.event(
+                                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                                    { useNativeDriver: false }
+                                )}
+                            />
                         )}
-                    />
+                    </View>
 
                     {/* Pagination */}
                     <View style={styles.pagination}>
                         {scienceSlides.map((_, index) => {
                             const inputRange = [
-                                (index - 1) * SCREEN_WIDTH,
-                                index * SCREEN_WIDTH,
-                                (index + 1) * SCREEN_WIDTH,
+                                (index - 1) * pageWidth,
+                                index * pageWidth,
+                                (index + 1) * pageWidth,
                             ];
                             const dotWidth = scrollX.interpolate({
                                 inputRange,
@@ -245,6 +264,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    flatListWrapper: {
+        flex: 1,
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -262,7 +284,6 @@ const styles = StyleSheet.create({
     },
 
     slide: {
-        width: SCREEN_WIDTH,
     },
     slideContent: {
         flex: 1,

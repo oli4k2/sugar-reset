@@ -12,7 +12,7 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    Dimensions,
+    useWindowDimensions,
     FlatList,
     Image,
     ImageSourcePropType,
@@ -24,7 +24,8 @@ import { spacing } from '../../theme';
 import { useUserData } from '../../context/UserDataContext';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Breakpoint for tablet/large screens (iPad portrait ~768px)
+const TABLET_BREAKPOINT = 600;
 
 type FeatureShowcaseScreenProps = {
     navigation: NativeStackNavigationProp<any, 'FeatureShowcase'>;
@@ -84,10 +85,18 @@ const FEATURES: Feature[] = [
 ];
 
 export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScreenProps) {
+    const { width: screenWidth } = useWindowDimensions();
     const { setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [viewportWidth, setViewportWidth] = useState(0);
     const flatListRef = useRef<FlatList>(null);
+    const pageWidth = viewportWidth || screenWidth;
+
+    // Responsive layout: content scales for tablet, capped for very wide screens
+    const contentMaxWidth = Math.min(pageWidth * 0.9, 520);
+    const headerImageWidth = Math.min(pageWidth * 0.85, contentMaxWidth);
+    const isTablet = pageWidth >= TABLET_BREAKPOINT;
 
     useEffect(() => {
         setOnboardingCheckpoint('FeatureShowcase').catch(() => { });
@@ -155,48 +164,50 @@ export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScr
     const renderFeature = ({ item }: { item: Feature }) => {
         if (item.id === 'welcome') {
             return (
-                <View style={styles.slideContent}>
-                    <View style={styles.welcomeSection}>
-                        <Image
-                            source={item.image}
-                            style={styles.welcomeHeaderImage}
-                            resizeMode="contain"
-                        />
-                        <Text style={styles.welcomeSubtitle}>
-                            Join thousands of others breaking the cycle of sugar addiction through science and community support.
-                        </Text>
+                <View style={[styles.slideContent, { width: pageWidth }]}>
+                    <View style={[styles.welcomeSection, { width: pageWidth, paddingHorizontal: isTablet ? spacing['2xl'] : spacing.screen.horizontal }]}>
+                        <View style={styles.welcomeContentWrapper}>
+                            <Image
+                                source={item.image}
+                                style={[styles.welcomeHeaderImage, { width: headerImageWidth, maxWidth: contentMaxWidth }]}
+                                resizeMode="contain"
+                            />
+                            <Text style={styles.welcomeSubtitle}>
+                                Join thousands of others breaking the cycle of sugar addiction through science and community support.
+                            </Text>
 
-                        {/* Features Row - Horizontal */}
-                        <View style={styles.featuresRow}>
-                            <View style={styles.featureItemCompact}>
-                                <View style={styles.iconContainer}>
-                                    <Image
-                                        source={require('../../public/feature_personalized.png')}
-                                        style={styles.featureIconSmall}
-                                        resizeMode="contain"
-                                    />
+                            {/* Features Row - Horizontal */}
+                            <View style={[styles.featuresRow, { maxWidth: contentMaxWidth }]}>
+                                <View style={styles.featureItemCompact}>
+                                    <View style={styles.iconContainer}>
+                                        <Image
+                                            source={require('../../public/feature_personalized.png')}
+                                            style={styles.featureIconSmall}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                    <Text style={styles.featureLabelSmall}>Personalized</Text>
                                 </View>
-                                <Text style={styles.featureLabelSmall}>Personalized</Text>
-                            </View>
-                            <View style={styles.featureItemCompact}>
-                                <View style={styles.iconContainer}>
-                                    <Image
-                                        source={require('../../public/feature_science.png')}
-                                        style={styles.featureIconSmall}
-                                        resizeMode="contain"
-                                    />
+                                <View style={styles.featureItemCompact}>
+                                    <View style={styles.iconContainer}>
+                                        <Image
+                                            source={require('../../public/feature_science.png')}
+                                            style={styles.featureIconSmall}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                    <Text style={styles.featureLabelSmall}>Science-Backed</Text>
                                 </View>
-                                <Text style={styles.featureLabelSmall}>Science-Backed</Text>
-                            </View>
-                            <View style={styles.featureItemCompact}>
-                                <View style={styles.iconContainer}>
-                                    <Image
-                                        source={require('../../public/feature_social.png')}
-                                        style={styles.featureIconSocialSmall}
-                                        resizeMode="contain"
-                                    />
+                                <View style={styles.featureItemCompact}>
+                                    <View style={styles.iconContainer}>
+                                        <Image
+                                            source={require('../../public/feature_social.png')}
+                                            style={styles.featureIconSocialSmall}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                    <Text style={styles.featureLabelSmall}>Social Support</Text>
                                 </View>
-                                <Text style={styles.featureLabelSmall}>Social Support</Text>
                             </View>
                         </View>
                     </View>
@@ -205,9 +216,9 @@ export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScr
         }
 
         return (
-            <View style={styles.slideContent}>
+            <View style={[styles.slideContent, { width: pageWidth }]}>
                 {/* Illustration */}
-                <View style={styles.illustrationContainer}>
+                <View style={[styles.illustrationContainer, { width: Math.min(pageWidth * 0.6, 400), height: Math.min(pageWidth * 0.6, 400) }]}>
                     <Image
                         source={item.image}
                         style={styles.illustration}
@@ -216,8 +227,8 @@ export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScr
                 </View>
 
                 {/* Feature Info */}
-                <View style={styles.featureInfo}>
-                    <Text style={styles.featureTitle}>{item.title}</Text>
+                <View style={[styles.featureInfo, { paddingHorizontal: isTablet ? spacing['3xl'] : spacing['2xl'], maxWidth: contentMaxWidth }]}>
+                    <Text style={[styles.featureTitle, isTablet && { fontSize: 32 }]}>{item.title}</Text>
                     {renderBoldedDescription(item.description, item.descriptionBold)}
                 </View>
             </View>
@@ -228,19 +239,37 @@ export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScr
         <LooviBackground variant="mixed">
             <View style={styles.container}>
                 {/* Swipeable Content */}
-                <FlatList
-                    ref={flatListRef}
-                    data={FEATURES}
-                    renderItem={renderFeature}
-                    keyExtractor={(item) => item.id}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onViewableItemsChanged={onViewableItemsChanged}
-                    viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-                    style={styles.flatList}
-                    contentContainerStyle={styles.flatListContent}
-                />
+                <View
+                    style={styles.flatListWrapper}
+                    onLayout={(event) => {
+                        const nextWidth = Math.round(event.nativeEvent.layout.width);
+                        if (nextWidth > 0 && nextWidth !== viewportWidth) {
+                            setViewportWidth(nextWidth);
+                        }
+                    }}
+                >
+                    {viewportWidth > 0 && (
+                        <FlatList
+                            key={pageWidth}
+                            ref={flatListRef}
+                            data={FEATURES}
+                            renderItem={renderFeature}
+                            keyExtractor={(item) => item.id}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            onViewableItemsChanged={onViewableItemsChanged}
+                            viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+                            getItemLayout={(_, index) => ({
+                                length: pageWidth,
+                                offset: pageWidth * index,
+                                index,
+                            })}
+                            style={styles.flatList}
+                            contentContainerStyle={styles.flatListContent}
+                        />
+                    )}
+                </View>
 
                 {/* Fixed Bottom Section */}
                 <SafeAreaView edges={['bottom']} style={styles.fixedBottom}>
@@ -258,7 +287,7 @@ export default function FeatureShowcaseScreen({ navigation }: FeatureShowcaseScr
                     </View>
 
                     {/* Continue Button */}
-                    <View style={styles.footer}>
+                    <View style={[styles.footer, { paddingHorizontal: isTablet ? spacing['2xl'] : spacing.screen.horizontal }]}>
                         <TouchableOpacity
                             style={styles.continueButton}
                             onPress={handleContinue}
@@ -280,11 +309,13 @@ const styles = StyleSheet.create({
     flatList: {
         flex: 1,
     },
+    flatListWrapper: {
+        flex: 1,
+    },
     flatListContent: {
         paddingBottom: 0,
     },
     slideContent: {
-        width: SCREEN_WIDTH,
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
@@ -293,12 +324,15 @@ const styles = StyleSheet.create({
     },
     welcomeSection: {
         alignItems: 'center',
-        width: SCREEN_WIDTH,
-        paddingHorizontal: spacing.screen.horizontal,
+        flex: 1,
+        justifyContent: 'center',
+    },
+    welcomeContentWrapper: {
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: 520,
     },
     welcomeHeaderImage: {
-        width: SCREEN_WIDTH * 0.85,
-        maxWidth: 320,
         height: undefined,
         aspectRatio: 2.8,
         marginBottom: spacing.lg,
@@ -311,6 +345,7 @@ const styles = StyleSheet.create({
         lineHeight: 24,
         marginBottom: 40,
         paddingHorizontal: spacing.md,
+        alignSelf: 'stretch',
     },
     featuresRow: {
         flexDirection: 'row',
@@ -353,8 +388,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: spacing['2xl'],
-        width: SCREEN_WIDTH * 0.6,
-        height: SCREEN_WIDTH * 0.6,
     },
     illustration: {
         width: '100%',

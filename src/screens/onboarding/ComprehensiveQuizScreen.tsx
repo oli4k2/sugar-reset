@@ -18,6 +18,7 @@ import {
     Keyboard,
     Image,
     Easing,
+    Modal,
 } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -35,6 +36,7 @@ import { PlanBuildingAnimation } from '../../components/PlanBuildingAnimation';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isSmallScreen = SCREEN_HEIGHT < 700; // iPhone SE, smaller Android devices
+const isTablet = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) >= 768; // iPad and large tablets
 
 type ComprehensiveQuizScreenProps = {
     navigation: NativeStackNavigationProp<any, 'ComprehensiveQuiz'>;
@@ -1173,17 +1175,17 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
     if (showResult) {
         const categoryScores = getCategoryScores();
 
-        // Adaptive spacing for smaller screens
+        // Adaptive spacing: small phones | default | tablet
         const adaptiveSpacing = {
-            titleBottom: isSmallScreen ? spacing.sm : spacing.md,
-            sublineBottom: isSmallScreen ? 6 : 10,
-            barStackTop: isSmallScreen ? 6 : 10,
-            barStackBottom: isSmallScreen ? spacing.md : spacing.lg,
-            barGap: isSmallScreen ? spacing.md : spacing.lg,
-            disclaimerTop: isSmallScreen ? spacing.md : spacing.lg,
-            disclaimerBottom: isSmallScreen ? spacing.xl : spacing['2xl'],
-            buttonTop: isSmallScreen ? spacing.lg : spacing.xl,
-            scrollPadding: isSmallScreen ? spacing.xl : spacing['2xl'],
+            titleBottom: isSmallScreen ? spacing.sm : isTablet ? spacing.lg : spacing.md,
+            sublineBottom: isSmallScreen ? 6 : isTablet ? 14 : 10,
+            barStackTop: isSmallScreen ? 6 : isTablet ? 16 : 10,
+            barStackBottom: isSmallScreen ? spacing.md : isTablet ? spacing.xl : spacing.lg,
+            barGap: isSmallScreen ? spacing.md : isTablet ? spacing.xl : spacing.lg,
+            disclaimerTop: isSmallScreen ? spacing.md : isTablet ? spacing.xl : spacing.lg,
+            disclaimerBottom: isSmallScreen ? spacing.xl : isTablet ? spacing['2xl'] : spacing['2xl'],
+            buttonTop: isSmallScreen ? spacing.lg : isTablet ? spacing['2xl'] : spacing.xl,
+            scrollPadding: isSmallScreen ? spacing.xl : isTablet ? spacing['2xl'] : spacing['2xl'],
         };
 
         // Get color based on score (1 = best, 5 = worst) - Monochromatic Scale
@@ -1245,14 +1247,16 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                 ]).start();
             }, []);
 
+            const labelSize = isSmallScreen ? 13 : isTablet ? 17 : 14;
+            const segmentHeight = isSmallScreen ? 28 : isTablet ? 32 : 24;
+
             return (
                 <View style={styles.categoryBarContainer}>
                     <View style={styles.categoryHeader}>
-                        <Text style={[styles.categoryBarLabel, isSmallScreen && { fontSize: 13 }]}>{label}</Text>
+                        <Text style={[styles.categoryBarLabel, { fontSize: labelSize }]}>{label}</Text>
                         <Text style={[
                             styles.categoryScoreLabel,
-                            { color: '#C97B5D' }, // Always use dark readable coral for text
-                            isSmallScreen && { fontSize: 13 }
+                            { color: '#C97B5D', fontSize: labelSize }
                         ]}>
                             {scoreLabel}
                         </Text>
@@ -1262,7 +1266,8 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                         styles.categoryBarSegments,
                         {
                             opacity: barOpacity,
-                            transform: [{ translateX: barTranslateX }]
+                            transform: [{ translateX: barTranslateX }],
+                            gap: isTablet ? 8 : 6,
                         }
                     ]}>
                         {segments.map((filled, index) => (
@@ -1270,7 +1275,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 key={index}
                                 style={[
                                     styles.categoryBarSegment,
-                                    isSmallScreen && { height: 28 },
+                                    { height: segmentHeight },
                                     filled && {
                                         backgroundColor: segmentColor,
                                     },
@@ -1305,7 +1310,10 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             {/* Title */}
                             <Text style={[
                                 styles.resultTitle,
-                                isSmallScreen && { fontSize: 28, marginBottom: adaptiveSpacing.titleBottom }
+                                {
+                                    fontSize: isSmallScreen ? 28 : isTablet ? 38 : 32,
+                                    marginBottom: adaptiveSpacing.titleBottom
+                                }
                             ]}>
                                 Pattern detected
                             </Text>
@@ -1313,8 +1321,8 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             {/* Subline */}
                             <Text style={[
                                 styles.resultSubline,
-                                isSmallScreen && {
-                                    fontSize: 15,
+                                {
+                                    fontSize: isSmallScreen ? 15 : isTablet ? 19 : 16,
                                     marginBottom: adaptiveSpacing.sublineBottom
                                 }
                             ]}>
@@ -1341,6 +1349,7 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                             <Text style={[
                                 styles.resultDisclaimer,
                                 {
+                                    fontSize: isSmallScreen ? 10 : isTablet ? 13 : 10,
                                     marginTop: adaptiveSpacing.disclaimerTop,
                                     marginBottom: adaptiveSpacing.disclaimerBottom,
                                 }
@@ -1354,15 +1363,15 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                     styles.checkSymptomsButton,
                                     {
                                         marginTop: adaptiveSpacing.buttonTop,
-                                    },
-                                    isSmallScreen && { paddingVertical: 16 }
+                                        paddingVertical: isSmallScreen ? 16 : isTablet ? 22 : 18,
+                                    }
                                 ]}
                                 onPress={handleContinue}
                                 activeOpacity={0.8}
                             >
                                 <Text style={[
                                     styles.checkSymptomsButtonText,
-                                    isSmallScreen && { fontSize: 16 }
+                                    { fontSize: isSmallScreen ? 16 : isTablet ? 20 : 18 }
                                 ]}>
                                     Check symptoms
                                 </Text>
@@ -1456,6 +1465,8 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 onPress={goNext}
                                 disabled={!canProceed()}
                                 activeOpacity={0.8}
+                                enableFocusRing={false}
+                                focusable={false}
                             >
                                 <Text style={styles.continueButtonText}>
                                     {currentQuestion < QUESTIONS.length - 1 ? 'Continue' : 'Analyse'}
@@ -1471,6 +1482,8 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                                 style={styles.continueButton}
                                 onPress={handleContinueToAnalysis}
                                 activeOpacity={0.8}
+                                enableFocusRing={false}
+                                focusable={false}
                             >
                                 <Text style={styles.continueButtonText}>
                                     Analyse
@@ -1481,13 +1494,13 @@ export default function ComprehensiveQuizScreen({ navigation, route }: Comprehen
                 </SafeAreaView>
             )}
 
-            {/* Transition Animation */}
-            {isCalculating && (
+            {/* Transition Animation - Modal ensures full-screen overlay on iPad (escapes tablet width constraint) */}
+            <Modal visible={isCalculating} transparent animationType="fade">
                 <PlanBuildingAnimation
                     answers={answers}
                     onComplete={handleAnimationComplete}
                 />
-            )}
+            </Modal>
         </LooviBackground>
     );
 }
@@ -1766,18 +1779,19 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.screen.horizontal,
         paddingBottom: spacing.xl,
         paddingTop: spacing.md,
-        backgroundColor: 'rgba(255,250,245,0.95)',
+        backgroundColor: 'transparent',
     },
     continueButton: {
         backgroundColor: looviColors.accent.primary,
         paddingVertical: 18,
         borderRadius: 30,
         alignItems: 'center',
-        shadowColor: looviColors.coralOrange,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 5,
+        borderWidth: 0,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 3,
     },
     continueButtonDisabled: {
         opacity: 0.5,

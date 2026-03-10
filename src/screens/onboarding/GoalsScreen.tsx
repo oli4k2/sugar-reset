@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing, borderRadius } from '../../theme';
-import LooviBackground, { looviColors } from '../../components/LooviBackground';
+import LooviBackground, { looviColors, footerFullWidthStyle, footerButtonWrapperStyle } from '../../components/LooviBackground';
 import { useUserData } from '../../context/UserDataContext';
 import { usePostHog } from 'posthog-react-native';
 
@@ -154,18 +154,20 @@ export default function GoalsScreen({ navigation }: GoalsScreenProps) {
                 </ScrollView>
 
                 {/* Continue Button */}
-                <View style={styles.footer}>
-                    <TouchableOpacity
-                        style={[
-                            styles.continueButton,
-                            !canProceed && styles.continueButtonDisabled,
-                        ]}
-                        onPress={handleContinue}
-                        disabled={!canProceed}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.continueButtonText}>Track these goals</Text>
-                    </TouchableOpacity>
+                <View style={[styles.footer, footerFullWidthStyle]}>
+                    <View style={footerButtonWrapperStyle}>
+                        <TouchableOpacity
+                            style={[
+                                styles.continueButton,
+                                !canProceed && styles.continueButtonDisabled,
+                            ]}
+                            onPress={handleContinue}
+                            disabled={!canProceed}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.continueButtonText}>Track these goals</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </SafeAreaView>
         </LooviBackground >

@@ -11,7 +11,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     Image,
-    Dimensions,
+    useWindowDimensions,
 } from 'react-native';
 import { usePostHog } from 'posthog-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,9 +29,17 @@ type SugarResetGraphScreenProps = {
     navigation: NativeStackNavigationProp<OnboardingStackParamList, 'SugarResetGraph'>;
 };
 
+// Max content height so layout stays consistent on tablet (iPad) instead of stretching
+const MAX_GRAPH_HEIGHT = 380;
+const CONTENT_TOP_RATIO = 0.06; // Title ~6% from top for consistent placement across devices
+
 export default function SugarResetGraphScreen({ navigation }: SugarResetGraphScreenProps) {
+    const { height: windowHeight } = useWindowDimensions();
     const { setOnboardingCheckpoint } = useUserData();
     const posthog = usePostHog();
+
+    const contentTopPadding = Math.max(spacing.xl, windowHeight * CONTENT_TOP_RATIO);
+    const graphMaxHeight = Math.min(windowHeight * 0.42, MAX_GRAPH_HEIGHT);
 
     useEffect(() => {
         setOnboardingCheckpoint('SugarResetGraph').catch(() => { });
@@ -44,14 +52,14 @@ export default function SugarResetGraphScreen({ navigation }: SugarResetGraphScr
     return (
         <LooviBackground variant="subtle">
             <SafeAreaView style={styles.container}>
-                <View style={styles.main}>
+                <View style={[styles.main, { paddingTop: contentTopPadding }]}>
                     <View style={styles.content}>
                         <View style={styles.header}>
                             <Text style={styles.title}>From cravings to control</Text>
                         </View>
                         <Image
                             source={graphSource}
-                            style={styles.graph}
+                            style={[styles.graph, { maxHeight: graphMaxHeight }]}
                             resizeMode="contain"
                         />
                         <Text style={styles.subtitle}>
@@ -80,10 +88,8 @@ const styles = StyleSheet.create({
     },
     main: {
         flex: 1,
-        justifyContent: 'center',
     },
     content: {
-        flex: 1,
         paddingHorizontal: spacing.screen.horizontal,
         alignItems: 'center',
         width: '100%',
@@ -109,7 +115,6 @@ const styles = StyleSheet.create({
         marginBottom: spacing.sm,
     },
     graph: {
-        flex: 1,
         width: '100%',
         marginVertical: spacing.sm,
     },

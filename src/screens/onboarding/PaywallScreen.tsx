@@ -29,7 +29,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PurchasesPackage } from 'react-native-purchases';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { spacing } from '../../theme';
 import LooviBackground, { looviColors } from '../../components/LooviBackground';
 import { useRevenueCat } from '../../hooks/useRevenueCat';
 import { useUserData } from '../../context/UserDataContext';
@@ -42,6 +41,21 @@ import { notificationService, NOTIFICATION_PROMPTED_ONBOARDING_KEY } from '../..
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Responsive scaling: reference iPhone 14 (390pt), clamped for small phones and iPad
+const BASE_WIDTH = 390;
+const CONTENT_MAX_WIDTH = 500;
+const IPAD_BREAKPOINT = 768;
+const s = (size: number) => {
+    const factor = Math.min(SCREEN_WIDTH, CONTENT_MAX_WIDTH) / BASE_WIDTH;
+    return Math.round(size * Math.min(Math.max(factor, 0.8), 1.05));
+};
+// Timeline/roadmap scale: same as s() on phone, scales up on iPad so roadmap isn't too small
+const t = (size: number) => {
+    const base = s(size);
+    if (SCREEN_WIDTH >= IPAD_BREAKPOINT) return Math.round(base * 1.2);
+    return base;
+};
+
 type PaywallScreenProps = {
     navigation: NativeStackNavigationProp<any, 'Paywall'>;
     route?: any;
@@ -51,7 +65,7 @@ type PaywallScreenProps = {
 type PaywallStep = 'intro' | 'reminder' | 'plans';
 
 export default function PaywallScreen({ navigation, route }: PaywallScreenProps) {
-    const { currentOffering, isLoading, purchasePackage, isPremium, customerInfo, findPackageByIdentifier } = useRevenueCat();
+    const { currentOffering, isLoading, purchasePackage, isPremium, customerInfo, findPackageByIdentifier, restorePurchases } = useRevenueCat();
     const { hasCompletedOnboarding, completeOnboarding, setPostPaywallAuthRequired, setOnboardingCheckpoint, onboardingData } = useUserData();
     const { isAuthenticated } = useAuthContext();
     const posthog = usePostHog();
@@ -65,6 +79,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
     const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
     const [isPurchasing, setIsPurchasing] = useState(false);
+    const [isRestoring, setIsRestoring] = useState(false);
     const [showCancellationOffer, setShowCancellationOffer] = useState(false);
     const [isRequestingNotifications, setIsRequestingNotifications] = useState(false);
 
@@ -213,6 +228,20 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
             Alert.alert('Error', 'Could not request notifications right now. Please try again later.');
         } finally {
             setIsRequestingNotifications(false);
+        }
+    };
+
+    const handleRestorePurchases = async () => {
+        if (isRestoring || !restorePurchases) return;
+        setIsRestoring(true);
+        try {
+            await restorePurchases();
+            Alert.alert('Restore Complete', 'If you had an active subscription, you should now have access. Otherwise, no previous purchases were found.');
+
+        } catch (err: any) {
+            Alert.alert('Restore Failed', err?.message || 'Could not restore purchases. Please try again.');
+        } finally {
+            setIsRestoring(false);
         }
     };
 
@@ -494,8 +523,6 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
         }
     };
 
-    // Restore functionality removed - not needed on paywall
-
     // Calculate billing date (3 days from now)
     const getBillingDate = () => {
         const date = new Date();
@@ -582,6 +609,25 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                 <Text style={styles.priceSubtext}>
                     (≈ {getYearlyMonthlyEquivalent()}/mo)
                 </Text>
+                <View style={styles.legalFooter}>
+                    <TouchableOpacity
+                        onPress={handleRestorePurchases}
+                        disabled={isRestoring}
+                        style={styles.legalLinkTouchable}
+                    >
+                        <Text style={styles.legalLinkText}>
+                            {isRestoring ? 'Restoring...' : 'Restore Purchases'}
+                        </Text>
+                    </TouchableOpacity>
+                    <Text style={styles.legalSeparator}>•</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
+                        <Text style={styles.legalLinkText}>Privacy Policy</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.legalSeparator}>•</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
+                        <Text style={styles.legalLinkText}>Terms of Use</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </Animated.View>
     );
@@ -592,14 +638,24 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
             <View style={styles.contentArea}>
                 <Text style={styles.mainTitle}>We'll send you{'\n'}a reminder before your{'\n'}free trial ends</Text>
 
-                {/* Bell Icon */}
-                <View style={styles.bellContainer}>
+                {/* Bell Icon + Turn on notifications - grouped so link sits directly under bell */}
+                <View style={styles.bellAndNotificationGroup}>
                     <View style={styles.bellIconWrapper}>
-                        <Ionicons name="notifications-outline" size={80} color={looviColors.text.muted} />
+                        <Ionicons name="notifications-outline" size={s(80)} color={looviColors.text.muted} />
                         <View style={styles.notificationBadge}>
                             <Text style={styles.notificationBadgeText}>1</Text>
                         </View>
                     </View>
+                    <TouchableOpacity
+                        style={styles.notificationCtaButton}
+                        onPress={handleEnableNotificationsFromOnboarding}
+                        activeOpacity={0.75}
+                        disabled={isRequestingNotifications}
+                    >
+                        <Text style={styles.notificationCtaText}>
+                            {isRequestingNotifications ? 'Opening...' : 'Turn on notifications'}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -623,16 +679,25 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                 <Text style={styles.priceSubtext}>
                     (≈ {getYearlyMonthlyEquivalent()}/mo)
                 </Text>
-                <TouchableOpacity
-                    style={styles.notificationCtaButton}
-                    onPress={handleEnableNotificationsFromOnboarding}
-                    activeOpacity={0.75}
-                    disabled={isRequestingNotifications}
-                >
-                    <Text style={styles.notificationCtaText}>
-                        {isRequestingNotifications ? 'Opening...' : 'Turn on notifications'}
-                    </Text>
-                </TouchableOpacity>
+                <View style={styles.legalFooter}>
+                    <TouchableOpacity
+                        onPress={handleRestorePurchases}
+                        disabled={isRestoring}
+                        style={styles.legalLinkTouchable}
+                    >
+                        <Text style={styles.legalLinkText}>
+                            {isRestoring ? 'Restoring...' : 'Restore Purchases'}
+                        </Text>
+                    </TouchableOpacity>
+                    <Text style={styles.legalSeparator}>•</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
+                        <Text style={styles.legalLinkText}>Privacy Policy</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.legalSeparator}>•</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
+                        <Text style={styles.legalLinkText}>Terms of Use</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </Animated.View>
     );
@@ -660,7 +725,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                             <View style={styles.timelineItem}>
                                 <View style={styles.timelineIconContainer}>
                                     <View style={[styles.timelineIcon, styles.timelineIconActive]}>
-                                        <Ionicons name="lock-open" size={16} color="#FFFFFF" />
+                                        <Ionicons name="lock-open" size={t(16)} color="#FFFFFF" />
                                     </View>
                                     <View style={styles.timelineLine} />
                                 </View>
@@ -676,7 +741,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                             <View style={styles.timelineItem}>
                                 <View style={styles.timelineIconContainer}>
                                     <View style={[styles.timelineIcon, styles.timelineIconPending]}>
-                                        <Ionicons name="notifications" size={16} color="#FFFFFF" />
+                                        <Ionicons name="notifications" size={t(16)} color="#FFFFFF" />
                                     </View>
                                     <View style={styles.timelineLine} />
                                 </View>
@@ -692,7 +757,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                             <View style={styles.timelineItem}>
                                 <View style={styles.timelineIconContainer}>
                                     <View style={[styles.timelineIcon, styles.timelineIconFuture]}>
-                                        <Ionicons name="card" size={16} color="#FFFFFF" />
+                                        <Ionicons name="card" size={t(16)} color="#FFFFFF" />
                                     </View>
                                     <View style={styles.timelineLineBottom} />
                                 </View>
@@ -789,7 +854,7 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                                 selectedPlan === 'yearly' && styles.radioCircleSelected,
                             ]}>
                                 {selectedPlan === 'yearly' && (
-                                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                                    <Ionicons name="checkmark" size={t(14)} color="#FFFFFF" />
                                 )}
                             </View>
                         </TouchableOpacity>
@@ -831,6 +896,25 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
                             : `Billed at ${getMonthlyPrice()}/mo`
                         }
                     </Text>
+                    <View style={styles.legalFooter}>
+                        <TouchableOpacity
+                            onPress={handleRestorePurchases}
+                            disabled={isRestoring}
+                            style={styles.legalLinkTouchable}
+                        >
+                            <Text style={styles.legalLinkText}>
+                                {isRestoring ? 'Restoring...' : 'Restore Purchases'}
+                            </Text>
+                        </TouchableOpacity>
+                        <Text style={styles.legalSeparator}>•</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')} style={styles.legalLinkTouchable}>
+                            <Text style={styles.legalLinkText}>Privacy Policy</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.legalSeparator}>•</Text>
+                        <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')} style={styles.legalLinkTouchable}>
+                            <Text style={styles.legalLinkText}>Terms of Use</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </Animated.View>
         );
@@ -839,23 +923,23 @@ export default function PaywallScreen({ navigation, route }: PaywallScreenProps)
     return (
         <LooviBackground variant="white">
             <SafeAreaView style={styles.container}>
-                {/* Header */}
-                <View style={styles.header}>
-                    {(currentStep !== 'intro' || isFromApp) ? (
-                        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                            <Ionicons name={isFromApp ? "close" : "chevron-back"} size={24} color={looviColors.text.primary} />
-                        </TouchableOpacity>
-                    ) : (
-                        <View style={styles.backButton} />
-                    )}
+                <View style={styles.innerContainer}>
+                    {/* Header */}
+                    <View style={styles.header}>
+                        {(currentStep !== 'intro' || isFromApp) ? (
+                            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                                <Ionicons name={isFromApp ? "close" : "chevron-back"} size={s(24)} color={looviColors.text.primary} />
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={styles.backButton} />
+                        )}
+                    </View>
+
+                    {/* Step Content */}
+                    {currentStep === 'intro' && renderIntroStep()}
+                    {currentStep === 'reminder' && renderReminderStep()}
+                    {currentStep === 'plans' && renderPlansStep()}
                 </View>
-
-                {/* Step Content */}
-                {currentStep === 'intro' && renderIntroStep()}
-                {currentStep === 'reminder' && renderReminderStep()}
-                {currentStep === 'plans' && renderPlansStep()}
-
-                {/* Restore button removed - not needed on paywall */}
             </SafeAreaView>
 
             <CancellationOfferScreen
@@ -873,50 +957,54 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    innerContainer: {
+        flex: 1,
+        maxWidth: CONTENT_MAX_WIDTH,
+        width: '100%',
+        alignSelf: 'center',
+    },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
+        paddingHorizontal: s(20),
+        paddingVertical: s(12),
     },
     backButton: {
-        width: 40,
-        height: 40,
+        width: s(40),
+        height: s(40),
         alignItems: 'flex-start',
         justifyContent: 'center',
     },
-    // Restore button styles removed - not used anymore
     stepContainer: {
         flex: 1,
         justifyContent: 'space-between',
     },
     contentArea: {
         flex: 1,
-        paddingHorizontal: spacing.xl,
-        paddingTop: spacing.lg,
+        paddingHorizontal: s(24),
+        paddingTop: s(20),
     },
     mainTitle: {
-        fontSize: 28,
+        fontSize: s(28),
         fontWeight: '800',
         color: looviColors.text.primary,
         textAlign: 'center',
-        lineHeight: 36,
+        lineHeight: s(36),
         letterSpacing: -0.5,
     },
-    // Phone Preview
     phonePreview: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: spacing.xl,
+        marginTop: s(24),
     },
     phoneMockup: {
-        width: SCREEN_WIDTH * 0.55,
-        height: SCREEN_WIDTH * 0.9,
+        width: Math.min(SCREEN_WIDTH * 0.55, s(280)),
+        height: Math.min(SCREEN_WIDTH * 0.9, s(460)),
         backgroundColor: looviColors.text.primary,
-        borderRadius: 36,
-        padding: 8,
+        borderRadius: s(36),
+        padding: s(8),
         overflow: 'hidden',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 10 },
@@ -927,7 +1015,7 @@ const styles = StyleSheet.create({
     previewImage: {
         width: '100%',
         height: '100%',
-        borderRadius: 28,
+        borderRadius: s(28),
     },
     previewOverlay: {
         ...StyleSheet.absoluteFillObject,
@@ -936,12 +1024,12 @@ const styles = StyleSheet.create({
     },
     scannerCorners: {
         ...StyleSheet.absoluteFillObject,
-        margin: 20,
+        margin: s(20),
     },
     corner: {
         position: 'absolute',
-        width: 20,
-        height: 20,
+        width: s(20),
+        height: s(20),
         borderColor: '#FFFFFF',
         borderWidth: 3,
     },
@@ -949,8 +1037,7 @@ const styles = StyleSheet.create({
     cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
     cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
     cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
-    // Bell
-    bellContainer: {
+    bellAndNotificationGroup: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
@@ -962,34 +1049,33 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: -4,
         right: -4,
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: s(28),
+        height: s(28),
+        borderRadius: s(14),
         backgroundColor: looviColors.coralOrange,
         alignItems: 'center',
         justifyContent: 'center',
     },
     notificationBadgeText: {
         color: '#FFFFFF',
-        fontSize: 14,
+        fontSize: s(14),
         fontWeight: '700',
     },
-    // Timeline
     timeline: {
-        marginTop: spacing.xl,
+        marginTop: t(24),
     },
     timelineItem: {
         flexDirection: 'row',
-        marginBottom: spacing.sm,
+        marginBottom: t(8),
     },
     timelineIconContainer: {
         alignItems: 'center',
-        width: 40,
+        width: t(40),
     },
     timelineIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: t(32),
+        height: t(32),
+        borderRadius: t(16),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -1010,37 +1096,36 @@ const styles = StyleSheet.create({
     },
     timelineLineBottom: {
         width: 3,
-        height: 20,
+        height: t(20),
         backgroundColor: '#E5E5E5',
         marginTop: 4,
     },
     timelineContent: {
         flex: 1,
-        paddingLeft: spacing.md,
-        paddingBottom: spacing.lg,
+        paddingLeft: t(12),
+        paddingBottom: t(20),
     },
     timelineTitle: {
-        fontSize: 16,
+        fontSize: t(16),
         fontWeight: '700',
         color: looviColors.text.primary,
         marginBottom: 4,
     },
     timelineDescription: {
-        fontSize: 13,
+        fontSize: t(13),
         color: looviColors.text.secondary,
-        lineHeight: 18,
+        lineHeight: t(18),
     },
-    // Plan Selection
     planSelection: {
         flexDirection: 'row',
-        gap: spacing.md,
-        marginTop: spacing.lg,
+        gap: t(12),
+        marginTop: t(20),
     },
     planOption: {
         flex: 1,
         backgroundColor: '#F8F9FA',
-        borderRadius: 16,
-        padding: spacing.md,
+        borderRadius: t(16),
+        padding: t(12),
         borderWidth: 2,
         borderColor: 'transparent',
         position: 'relative',
@@ -1061,37 +1146,37 @@ const styles = StyleSheet.create({
     freeTrialBadgeText: {
         backgroundColor: looviColors.text.primary,
         color: '#FFFFFF',
-        fontSize: 12,
+        fontSize: t(12),
         fontWeight: '800',
         letterSpacing: 1,
-        paddingHorizontal: spacing.md,
+        paddingHorizontal: t(12),
         paddingVertical: 4,
         borderRadius: 10,
         overflow: 'hidden',
     },
     planLabel: {
-        fontSize: 14,
+        fontSize: t(14),
         color: looviColors.text.secondary,
         marginBottom: 4,
     },
     planPrice: {
-        fontSize: 18,
+        fontSize: t(18),
         fontWeight: '700',
         color: looviColors.text.primary,
     },
     planPeriod: {
-        fontSize: 14,
+        fontSize: t(14),
         fontWeight: '400',
         color: looviColors.text.secondary,
     },
     radioCircle: {
         position: 'absolute',
-        right: spacing.md,
+        right: t(12),
         top: '50%',
-        marginTop: -10,
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        marginTop: -(t(24) / 2),
+        width: t(24),
+        height: t(24),
+        borderRadius: t(12),
         borderWidth: 2,
         borderColor: looviColors.text.muted,
         alignItems: 'center',
@@ -1102,102 +1187,122 @@ const styles = StyleSheet.create({
         borderColor: looviColors.text.primary,
     },
     radioInner: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
+        width: t(10),
+        height: t(10),
+        borderRadius: t(5),
         backgroundColor: '#FFFFFF',
     },
-    // Bottom
     bottomArea: {
-        paddingHorizontal: spacing.xl,
-        paddingBottom: spacing.xl,
+        paddingHorizontal: s(24),
+        paddingBottom: s(24),
     },
     noPaymentRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.md,
-        gap: spacing.xs,
+        marginBottom: s(12),
+        gap: s(4),
     },
     noPaymentText: {
-        fontSize: 15,
+        fontSize: s(15),
         color: looviColors.text.primary,
         fontWeight: '500',
     },
     primaryButton: {
         backgroundColor: looviColors.text.primary,
-        paddingVertical: 18,
-        borderRadius: 30,
+        paddingVertical: s(18),
+        borderRadius: s(30),
         alignItems: 'center',
-        marginBottom: spacing.md,
+        marginBottom: s(12),
     },
     buttonDisabled: {
         opacity: 0.6,
     },
     primaryButtonText: {
-        fontSize: 17,
+        fontSize: s(17),
         fontWeight: '700',
         color: '#FFFFFF',
     },
     priceSubtext: {
-        fontSize: 13,
+        fontSize: s(13),
         color: looviColors.text.tertiary,
         textAlign: 'center',
     },
     billedAmountText: {
-        fontSize: 15,
+        fontSize: s(15),
         fontWeight: '700',
         color: looviColors.text.primary,
         textAlign: 'center',
         marginBottom: 2,
     },
     notificationCtaButton: {
-        marginTop: spacing.xs,
+        marginTop: s(16),
         alignSelf: 'center',
         paddingVertical: 6,
         paddingHorizontal: 10,
     },
     notificationCtaText: {
-        fontSize: 13,
+        fontSize: s(13),
         fontWeight: '600',
         color: looviColors.text.secondary,
         textDecorationLine: 'underline',
     },
-    // Feature List Styles
+    legalFooter: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: s(20),
+        gap: s(8),
+    },
+    legalLinkTouchable: {
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+    },
+    legalLinkText: {
+        fontSize: s(13),
+        fontWeight: '500',
+        color: looviColors.text.secondary,
+        textDecorationLine: 'underline',
+    },
+    legalSeparator: {
+        fontSize: s(12),
+        color: looviColors.text.tertiary,
+    },
     featuresContainer: {
-        marginTop: spacing.md,
-        marginBottom: spacing.xl,
-        gap: spacing.md,
+        marginTop: s(12),
+        marginBottom: s(24),
+        gap: s(12),
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(255,255,255,0.6)',
-        padding: spacing.md,
-        borderRadius: 16,
+        padding: s(12),
+        borderRadius: s(16),
     },
     featureIconBg: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: s(36),
+        height: s(36),
+        borderRadius: s(18),
         backgroundColor: 'rgba(255,255,255,0.9)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: spacing.md,
+        marginRight: s(12),
     },
     featureText: {
-        fontSize: 16,
+        fontSize: s(16),
         fontWeight: '600',
         color: looviColors.text.primary,
     },
     planMonthlyEquivalent: {
         marginTop: 2,
-        fontSize: 13,
+        fontSize: t(13),
         fontWeight: '500',
         color: looviColors.text.secondary,
     },
     planMonthlyEquivalentPeriod: {
-        fontSize: 12,
+        fontSize: t(12),
         fontWeight: '400',
         color: looviColors.text.tertiary,
     },

@@ -23,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { spacing } from '../../theme';
 import { useUserData } from '../../context/UserDataContext';
-import LooviBackground, { looviColors } from '../../components/LooviBackground';
+import LooviBackground, { looviColors, footerFullWidthStyle, footerButtonWrapperStyle } from '../../components/LooviBackground';
 import { GlassCard } from '../../components/GlassCard';
 
 type SuccessStoriesScreenProps = {
@@ -156,16 +156,18 @@ export default function SuccessStoriesScreen({ navigation }: SuccessStoriesScree
                 </ScrollView>
 
                 {/* Continue Button */}
-                <View style={styles.footer}>
-                    <TouchableOpacity
-                        style={styles.continueButton}
-                        onPress={handleContinue}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.continueButtonText}>
-                            See How It Works →
-                        </Text>
-                    </TouchableOpacity>
+                <View style={[styles.footer, footerFullWidthStyle]}>
+                    <View style={footerButtonWrapperStyle}>
+                        <TouchableOpacity
+                            style={styles.continueButton}
+                            onPress={handleContinue}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.continueButtonText}>
+                                See How It Works →
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </SafeAreaView>
         </LooviBackground>
@@ -276,10 +278,12 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,250,245,0.95)',
     },
     continueButton: {
+        width: '100%',
         backgroundColor: looviColors.accent.primary,
         paddingVertical: 18,
         borderRadius: 30,
         alignItems: 'center',
+        justifyContent: 'center',
         shadowColor: looviColors.coralOrange,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.25,

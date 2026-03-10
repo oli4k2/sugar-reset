@@ -98,13 +98,25 @@ const ActivityRing = () => {
 
 const styles = StyleSheet.create({
     fullScreenOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width,
+        height,
         zIndex: 999,
         justifyContent: 'center',
         alignItems: 'center',
     },
     background: {
-        ...StyleSheet.absoluteFillObject,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width,
+        height,
         backgroundColor: 'rgba(255, 250, 245, 0.98)',
     },
     contentContainer: {

@@ -21,11 +21,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { spacing } from '../theme';
 import { looviColors } from './LooviBackground';
 import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const BASE_WIDTH = 390;
+const MODAL_MAX_WIDTH = 468;
+const s = (size: number) => {
+    const factor = Math.min(SCREEN_WIDTH, MODAL_MAX_WIDTH) / BASE_WIDTH;
+    return Math.round(size * Math.min(Math.max(factor, 0.8), 1.05));
+};
 
 interface CancellationOfferProps {
     visible: boolean;
@@ -157,9 +163,6 @@ export default function CancellationOfferScreen({
                         $24.99
                     </Text>
                     <Text style={styles.dealPeriod}>one-time</Text>
-                    <View style={[styles.savingsBadge, styles.savingsBadgeGold]}>
-                        <Text style={styles.savingsText}>90% OFF</Text>
-                    </View>
                 </TouchableOpacity>
             </View>
 
@@ -312,22 +315,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     container: {
-        width: SCREEN_WIDTH - 32,
+        width: Math.min(SCREEN_WIDTH - 32, MODAL_MAX_WIDTH),
         maxHeight: '90%',
         backgroundColor: '#FFFFFF',
-        borderRadius: 28,
+        borderRadius: s(28),
         overflow: 'hidden',
     },
     safeArea: {
-        padding: spacing.xl,
+        padding: s(24),
     },
     closeButton: {
         position: 'absolute',
-        top: spacing.md,
-        right: spacing.md,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        top: s(12),
+        right: s(12),
+        width: s(36),
+        height: s(36),
+        borderRadius: s(18),
         backgroundColor: 'rgba(0,0,0,0.05)',
         alignItems: 'center',
         justifyContent: 'center',
@@ -335,32 +338,31 @@ const styles = StyleSheet.create({
     },
     offerContent: {
         alignItems: 'center',
-        paddingTop: spacing.xl,
+        paddingTop: s(24),
     },
     waitTitle: {
-        fontSize: 28,
+        fontSize: s(28),
         fontWeight: '800',
         color: looviColors.text.primary,
         textAlign: 'center',
-        marginBottom: spacing.sm,
+        marginBottom: s(8),
     },
     offerSubtitle: {
-        fontSize: 15,
+        fontSize: s(15),
         color: looviColors.text.secondary,
         textAlign: 'center',
-        marginBottom: spacing.xl,
+        marginBottom: s(24),
     },
-    // Offer 1 Grid
     offerGrid: {
         flexDirection: 'row',
-        gap: spacing.md,
-        marginBottom: spacing.lg,
+        gap: s(12),
+        marginBottom: s(20),
     },
     offerCard: {
         flex: 1,
         backgroundColor: '#F8F9FA',
-        borderRadius: 20,
-        padding: spacing.lg,
+        borderRadius: s(20),
+        padding: s(20),
         alignItems: 'center',
         borderWidth: 2,
         borderColor: 'transparent',
@@ -373,42 +375,42 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: -10,
         backgroundColor: looviColors.coralOrange,
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: s(8),
         paddingVertical: 3,
         borderRadius: 8,
     },
     bestValueText: {
         color: '#FFFFFF',
-        fontSize: 9,
+        fontSize: s(9),
         fontWeight: '800',
         letterSpacing: 0.5,
     },
     dealLabel: {
-        fontSize: 11,
+        fontSize: s(11),
         fontWeight: '700',
         color: looviColors.text.tertiary,
         letterSpacing: 0.5,
-        marginBottom: spacing.xs,
-        marginTop: spacing.sm,
+        marginBottom: s(4),
+        marginTop: s(8),
     },
     dealOriginalPrice: {
-        fontSize: 16,
+        fontSize: s(16),
         color: looviColors.text.muted,
         textDecorationLine: 'line-through',
     },
     dealNewPrice: {
-        fontSize: 36,
+        fontSize: s(36),
         fontWeight: '800',
         color: looviColors.text.primary,
     },
     dealPeriod: {
-        fontSize: 13,
+        fontSize: s(13),
         color: looviColors.text.secondary,
-        marginBottom: spacing.sm,
+        marginBottom: s(8),
     },
     savingsBadge: {
         backgroundColor: 'rgba(127, 176, 105, 0.15)',
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: s(8),
         paddingVertical: 4,
         borderRadius: 8,
     },
@@ -416,69 +418,68 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 107, 107, 0.15)',
     },
     savingsText: {
-        fontSize: 11,
+        fontSize: s(11),
         fontWeight: '700',
         color: looviColors.accent.success,
     },
     offerFeatures: {
         alignSelf: 'stretch',
-        marginBottom: spacing.lg,
+        marginBottom: s(20),
     },
     featureItem: {
-        fontSize: 14,
+        fontSize: s(14),
         color: looviColors.text.secondary,
-        marginBottom: spacing.xs,
+        marginBottom: s(4),
     },
-    // Offer 2 - Lifetime
     finalChanceEmoji: {
-        fontSize: 56,
-        marginBottom: spacing.sm,
+        fontSize: s(56),
+        marginBottom: s(8),
     },
     finalChanceLabel: {
-        fontSize: 11,
+        fontSize: s(11),
         fontWeight: '800',
         color: looviColors.coralOrange,
         letterSpacing: 1,
-        marginBottom: spacing.sm,
+        marginBottom: s(8),
     },
     lifetimeCard: {
         backgroundColor: '#F8F9FA',
-        borderRadius: 20,
-        padding: spacing.xl,
+        borderRadius: s(20),
+        padding: s(24),
         alignItems: 'center',
         alignSelf: 'stretch',
-        marginBottom: spacing.lg,
+        marginBottom: s(20),
     },
     lifetimeOriginal: {
-        fontSize: 18,
+        fontSize: s(18),
         color: looviColors.text.muted,
         textDecorationLine: 'line-through',
     },
     lifetimePrice: {
-        fontSize: 56,
+        fontSize: s(56),
         fontWeight: '800',
         color: looviColors.accent.success,
     },
     lifetimePeriod: {
-        fontSize: 16,
+        fontSize: s(16),
         color: looviColors.text.secondary,
         fontWeight: '500',
-        marginBottom: spacing.lg,
+        marginBottom: s(20),
     },
     lifetimeFeaturesList: {
         alignSelf: 'stretch',
     },
     lifetimeFeature: {
-        fontSize: 14,
+        fontSize: s(14),
         color: looviColors.text.primary,
         fontWeight: '500',
-        marginBottom: spacing.xs,
+        marginBottom: s(4),
     },
     lifetimeCta: {
         backgroundColor: looviColors.accent.success,
-        paddingVertical: 16,
-        paddingHorizontal: spacing['2xl'],
-        borderRadius: 25,
+        paddingVertical: s(16),
+        paddingHorizontal: s(32),
+        borderRadius: s(25),
         alignSelf: 'stretch',
         alignItems: 'center',
         shadowColor: looviColors.accent.success,
@@ -488,36 +489,35 @@ const styles = StyleSheet.create({
         elevation: 5,
     },
     lifetimeCtaText: {
-        fontSize: 17,
+        fontSize: s(17),
         fontWeight: '700',
         color: '#FFFFFF',
     },
-    // Free Tier
     freeEmoji: {
-        fontSize: 48,
-        marginBottom: spacing.sm,
+        fontSize: s(48),
+        marginBottom: s(8),
     },
     freeComparisonCard: {
         backgroundColor: '#F8F9FA',
-        borderRadius: 20,
-        padding: spacing.lg,
+        borderRadius: s(20),
+        padding: s(20),
         alignSelf: 'stretch',
-        marginBottom: spacing.lg,
+        marginBottom: s(20),
     },
     comparisonTitle: {
-        fontSize: 14,
+        fontSize: s(14),
         fontWeight: '700',
         color: looviColors.text.primary,
-        marginBottom: spacing.sm,
+        marginBottom: s(8),
     },
     comparisonItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: spacing.xs,
-        gap: spacing.sm,
+        marginBottom: s(4),
+        gap: s(8),
     },
     comparisonText: {
-        fontSize: 14,
+        fontSize: s(14),
         color: looviColors.text.primary,
     },
     textMuted: {
@@ -526,32 +526,32 @@ const styles = StyleSheet.create({
     divider: {
         height: 1,
         backgroundColor: '#E5E5E5',
-        marginVertical: spacing.md,
+        marginVertical: s(12),
     },
     upgradeHint: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.xs,
-        marginBottom: spacing.lg,
-        padding: spacing.md,
+        gap: s(4),
+        marginBottom: s(20),
+        padding: s(12),
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        borderRadius: 12,
+        borderRadius: s(12),
     },
     upgradeHintText: {
-        fontSize: 13,
+        fontSize: s(13),
         color: looviColors.accent.primary,
         fontWeight: '500',
     },
     freeCta: {
         backgroundColor: looviColors.text.primary,
-        paddingVertical: 16,
-        paddingHorizontal: spacing['2xl'],
-        borderRadius: 25,
+        paddingVertical: s(16),
+        paddingHorizontal: s(32),
+        borderRadius: s(25),
         alignSelf: 'stretch',
         alignItems: 'center',
     },
     freeCtaText: {
-        fontSize: 17,
+        fontSize: s(17),
         fontWeight: '700',
         color: '#FFFFFF',
     },
